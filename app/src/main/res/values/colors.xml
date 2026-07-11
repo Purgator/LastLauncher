@@ -1,7 +1,6 @@
 <resources>
     <color name="deep_space">#0A0E1A</color>
     <color name="glass">#14FFFFFF</color>
-    <color name="glass_bright">#22FFFFFF</color>
     <color name="glass_stroke">#2EFFFFFF</color>
     <color name="text_primary">#F2F5FF</color>
     <color name="text_secondary">#9BA3B7</color>

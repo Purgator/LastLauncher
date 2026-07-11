@@ -99,6 +99,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     @Deprecated("Deprecated in Java")
+    @Suppress("MissingSuperCall")
+    @android.annotation.SuppressLint("MissingSuperCall")
     override fun onBackPressed() {
         // A launcher never finishes; back just collapses search.
         if (allAppsOpen || binding.searchInput.text.isNotEmpty()) resetToHome()

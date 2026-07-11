@@ -13,7 +13,6 @@
     <string name="menu_app_info">App info</string>
     <string name="menu_uninstall">Uninstall</string>
     <string name="menu_hide">Hide from list</string>
-    <string name="menu_unhide">Unhide</string>
 
     <!-- Lock / gestures -->
     <string name="lock_service_label">LastLauncher actions</string>

@@ -13,7 +13,6 @@
     <string name="menu_app_info">Infos de l’application</string>
     <string name="menu_uninstall">Désinstaller</string>
     <string name="menu_hide">Masquer de la liste</string>
-    <string name="menu_unhide">Afficher à nouveau</string>
 
     <!-- Lock / gestures -->
     <string name="lock_service_label">Actions LastLauncher</string>
