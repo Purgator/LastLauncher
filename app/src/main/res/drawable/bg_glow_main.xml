@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Radial glow behind the main suggested app; tinted with the accent at runtime. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <gradient
+        android:type="radial"
+        android:gradientRadius="52dp"
+        android:startColor="#5A00E5FF"
+        android:endColor="#0000E5FF" />
+</shape>

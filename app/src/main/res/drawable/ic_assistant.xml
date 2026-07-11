@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Four-point sparkle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2 C12.6,6.6 14.4,8.9 19,9.5 C14.4,10.1 12.6,12.4 12,17 C11.4,12.4 9.6,10.1 5,9.5 C9.6,8.9 11.4,6.6 12,2 Z M18.5,14 C18.8,16.1 19.7,17.2 21.8,17.5 C19.7,17.8 18.8,18.9 18.5,21 C18.2,18.9 17.3,17.8 15.2,17.5 C17.3,17.2 18.2,16.1 18.5,14 Z" />
+</vector>

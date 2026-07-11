@@ -1,0 +1,82 @@
+<resources>
+    <string name="app_name">LastLauncher</string>
+
+    <!-- Home -->
+    <string name="search_hint">Type to launch…</string>
+    <string name="assistant_button">Assistant</string>
+    <string name="all_apps_button">All apps</string>
+    <string name="no_match_web_search">Search the web for “%1$s”</string>
+    <string name="update_pill">Update %1$s ready — tap to install</string>
+    <string name="suggestion_slot">Suggested app</string>
+
+    <!-- App long-press menu -->
+    <string name="menu_app_info">App info</string>
+    <string name="menu_uninstall">Uninstall</string>
+    <string name="menu_hide">Hide from list</string>
+    <string name="menu_unhide">Unhide</string>
+
+    <!-- Lock / gestures -->
+    <string name="lock_service_label">LastLauncher actions</string>
+    <string name="lock_service_description">Lets LastLauncher lock the screen when you double-tap the home screen and open the notification shade on swipe down. LastLauncher never reads screen content.</string>
+    <string name="lock_needs_service_title">Enable screen lock</string>
+    <string name="lock_needs_service_message">To lock the screen with a double tap, enable “LastLauncher actions” in the accessibility settings. The service only performs the lock action and never reads your screen.</string>
+    <string name="open_settings">Open settings</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="cat_general">General</string>
+    <string name="pref_default_launcher">Set as default launcher</string>
+    <string name="pref_default_launcher_summary">Make LastLauncher your home app</string>
+    <string name="pref_keyboard_always">Keyboard always ready</string>
+    <string name="pref_keyboard_always_summary">Open the keyboard on the home screen so you can type instantly. When off, swipe up to search.</string>
+    <string name="pref_haptics">Haptic feedback</string>
+    <string name="pref_haptics_summary">Vibrate lightly on launches and gestures</string>
+
+    <string name="cat_suggestions">Smart suggestions</string>
+    <string name="pref_predictions">Predict my next app</string>
+    <string name="pref_predictions_summary">Learn from your habits (time, app sequences, Bluetooth, headphones, charging) and suggest the apps you are most likely to open. Everything stays on this device.</string>
+    <string name="pref_bt_signal">Use Bluetooth as a signal</string>
+    <string name="pref_bt_signal_summary">Suggest apps you usually open after connecting to a Bluetooth device (car, headphones…)</string>
+    <string name="pref_reset_learning">Forget everything learned</string>
+    <string name="pref_reset_learning_summary">Delete all launch history used for predictions</string>
+    <string name="reset_learning_confirm">Delete all learned launch history? Suggestions will start from scratch.</string>
+    <string name="reset_learning_done">Launch history deleted</string>
+
+    <string name="cat_gestures">Gestures</string>
+    <string name="pref_double_tap_lock">Double tap to lock</string>
+    <string name="pref_double_tap_lock_summary">Double-tap an empty area of the home screen to lock the phone</string>
+    <string name="pref_swipe_down">Swipe down for notifications</string>
+    <string name="pref_swipe_down_summary">Swipe down on the home screen to open the notification shade</string>
+
+    <string name="cat_appearance">Appearance</string>
+    <string name="pref_accent">Accent color</string>
+    <string name="pref_dim">Wallpaper dimming</string>
+    <string name="pref_animations">Animations</string>
+    <string name="pref_animations_summary">Subtle entrance and press effects. Turn off for maximum battery savings.</string>
+    <string name="pref_show_clock">Show clock</string>
+
+    <string name="cat_apps">Apps</string>
+    <string name="pref_hidden_apps">Hidden apps</string>
+    <string name="pref_hidden_apps_summary">Choose apps to hide from search and suggestions</string>
+
+    <string name="cat_updates">Updates</string>
+    <string name="pref_auto_update">Automatic updates</string>
+    <string name="pref_auto_update_summary">Check GitHub once a day and download new versions on Wi-Fi</string>
+    <string name="pref_check_now">Check for updates now</string>
+    <string name="update_up_to_date">You are up to date (v%1$s)</string>
+    <string name="update_found">Version %1$s available — installing…</string>
+    <string name="update_deferred">Version %1$s found, will download on Wi-Fi</string>
+    <string name="update_error">Update failed: %1$s</string>
+    <string name="update_checking">Checking…</string>
+
+    <string name="cat_about">About</string>
+    <string name="pref_version">Version</string>
+
+    <!-- Accents -->
+    <string name="accent_cyan">Cyan pulse</string>
+    <string name="accent_purple">Violet drift</string>
+    <string name="accent_green">Aurora green</string>
+    <string name="accent_amber">Solar amber</string>
+    <string name="accent_pink">Neon pink</string>
+</resources>
