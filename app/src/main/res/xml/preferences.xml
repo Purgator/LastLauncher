@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory android:title="@string/cat_general">
+        <Preference
+            android:key="default_launcher"
+            android:title="@string/pref_default_launcher"
+            android:summary="@string/pref_default_launcher_summary" />
+        <SwitchPreferenceCompat
+            android:key="keyboard_always"
+            android:title="@string/pref_keyboard_always"
+            android:summary="@string/pref_keyboard_always_summary"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="haptics"
+            android:title="@string/pref_haptics"
+            android:summary="@string/pref_haptics_summary"
+            android:defaultValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_suggestions">
+        <SwitchPreferenceCompat
+            android:key="predictions"
+            android:title="@string/pref_predictions"
+            android:summary="@string/pref_predictions_summary"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="bt_signal"
+            android:title="@string/pref_bt_signal"
+            android:summary="@string/pref_bt_signal_summary"
+            android:defaultValue="true"
+            android:dependency="predictions" />
+        <Preference
+            android:key="reset_learning"
+            android:title="@string/pref_reset_learning"
+            android:summary="@string/pref_reset_learning_summary" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_gestures">
+        <SwitchPreferenceCompat
+            android:key="double_tap_lock"
+            android:title="@string/pref_double_tap_lock"
+            android:summary="@string/pref_double_tap_lock_summary"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="swipe_down_notifications"
+            android:title="@string/pref_swipe_down"
+            android:summary="@string/pref_swipe_down_summary"
+            android:defaultValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_appearance">
+        <ListPreference
+            android:key="accent"
+            android:title="@string/pref_accent"
+            android:entries="@array/accent_entries"
+            android:entryValues="@array/accent_values"
+            android:defaultValue="cyan"
+            app:useSimpleSummaryProvider="true" />
+        <SeekBarPreference
+            android:key="dim"
+            android:title="@string/pref_dim"
+            android:defaultValue="25"
+            android:max="80"
+            app:showSeekBarValue="true" />
+        <SwitchPreferenceCompat
+            android:key="show_clock"
+            android:title="@string/pref_show_clock"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="animations"
+            android:title="@string/pref_animations"
+            android:summary="@string/pref_animations_summary"
+            android:defaultValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_apps">
+        <Preference
+            android:key="hidden_apps"
+            android:title="@string/pref_hidden_apps"
+            android:summary="@string/pref_hidden_apps_summary" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_updates">
+        <SwitchPreferenceCompat
+            android:key="auto_update"
+            android:title="@string/pref_auto_update"
+            android:summary="@string/pref_auto_update_summary"
+            android:defaultValue="true" />
+        <Preference
+            android:key="check_now"
+            android:title="@string/pref_check_now" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_about">
+        <Preference
+            android:key="version"
+            android:title="@string/pref_version"
+            android:selectable="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

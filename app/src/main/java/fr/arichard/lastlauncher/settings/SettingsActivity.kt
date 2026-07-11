@@ -1,0 +1,170 @@
+package fr.arichard.lastlauncher.settings
+
+import android.app.role.RoleManager
+import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.preference.Preference
+import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.SwitchPreferenceCompat
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import fr.arichard.lastlauncher.BuildConfig
+import fr.arichard.lastlauncher.LauncherApp
+import fr.arichard.lastlauncher.R
+import fr.arichard.lastlauncher.lock.LockService
+import fr.arichard.lastlauncher.predict.PredictionEngine
+import fr.arichard.lastlauncher.update.UpdateManager
+import java.util.concurrent.Executors
+
+class SettingsActivity : AppCompatActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) {
+            supportFragmentManager.beginTransaction()
+                .replace(android.R.id.content, SettingsFragment())
+                .commit()
+        }
+    }
+
+    class SettingsFragment : PreferenceFragmentCompat() {
+
+        private val executor = Executors.newSingleThreadExecutor()
+
+        override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+            setPreferencesFromResource(R.xml.preferences, rootKey)
+
+            findPreference<Preference>("version")?.summary = BuildConfig.VERSION_NAME
+
+            findPreference<Preference>("default_launcher")?.setOnPreferenceClickListener {
+                requestDefaultLauncher()
+                true
+            }
+
+            findPreference<Preference>("reset_learning")?.setOnPreferenceClickListener {
+                confirmResetLearning()
+                true
+            }
+
+            findPreference<Preference>("hidden_apps")?.setOnPreferenceClickListener {
+                showHiddenAppsDialog()
+                true
+            }
+
+            findPreference<Preference>("check_now")?.setOnPreferenceClickListener { pref ->
+                checkForUpdatesNow(pref)
+                true
+            }
+
+            findPreference<SwitchPreferenceCompat>("double_tap_lock")
+                ?.setOnPreferenceChangeListener { _, newValue ->
+                    if (newValue == true && !LockService.isRunning) {
+                        promptEnableLockService()
+                    }
+                    true
+                }
+        }
+
+        override fun onDestroy() {
+            executor.shutdown()
+            super.onDestroy()
+        }
+
+        private fun requestDefaultLauncher() {
+            val context = requireContext()
+            try {
+                if (Build.VERSION.SDK_INT >= 29) {
+                    val rm = context.getSystemService(RoleManager::class.java)
+                    if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME) &&
+                        !rm.isRoleHeld(RoleManager.ROLE_HOME)
+                    ) {
+                        startActivity(rm.createRequestRoleIntent(RoleManager.ROLE_HOME))
+                        return
+                    }
+                }
+                startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+            } catch (e: Exception) {
+                Toast.makeText(context, e.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        private fun confirmResetLearning() {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.pref_reset_learning)
+                .setMessage(R.string.reset_learning_confirm)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    PredictionEngine.clearHistory(requireContext()) {
+                        context?.let {
+                            Toast.makeText(it, R.string.reset_learning_done, Toast.LENGTH_SHORT)
+                                .show()
+                        }
+                    }
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
+
+        private fun showHiddenAppsDialog() {
+            val context = requireContext()
+            val repo = (context.applicationContext as LauncherApp).repo
+            val prefs = Prefs(context)
+            val apps = repo.apps
+            if (apps.isEmpty()) return
+            val labels = apps.map { it.label }.toTypedArray()
+            val hidden = prefs.hiddenApps
+            val checked = BooleanArray(apps.size) { apps[it].packageName in hidden }
+            MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.pref_hidden_apps)
+                .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                    checked[which] = isChecked
+                }
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    prefs.hiddenApps = apps.indices
+                        .filter { checked[it] }
+                        .map { apps[it].packageName }
+                        .toSet()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
+
+        private fun checkForUpdatesNow(pref: Preference) {
+            val context = requireContext()
+            pref.summary = getString(R.string.update_checking)
+            pref.isEnabled = false
+            executor.execute {
+                val result = UpdateManager.check(context, allowDownload = true)
+                activity?.runOnUiThread {
+                    if (!isAdded) return@runOnUiThread
+                    pref.isEnabled = true
+                    pref.summary = when (result.status) {
+                        UpdateManager.Status.UP_TO_DATE ->
+                            getString(R.string.update_up_to_date, result.version)
+                        UpdateManager.Status.UPDATE_READY -> {
+                            UpdateManager.install(context, result.version!!)
+                            getString(R.string.update_found, result.version)
+                        }
+                        UpdateManager.Status.UPDATE_DEFERRED ->
+                            getString(R.string.update_deferred, result.version)
+                        UpdateManager.Status.ERROR ->
+                            getString(R.string.update_error, result.detail ?: "?")
+                    }
+                }
+            }
+        }
+
+        private fun promptEnableLockService() {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.lock_needs_service_title)
+                .setMessage(R.string.lock_needs_service_message)
+                .setPositiveButton(R.string.open_settings) { _, _ ->
+                    LockService.openAccessibilitySettings(requireContext())
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
+    }
+}
