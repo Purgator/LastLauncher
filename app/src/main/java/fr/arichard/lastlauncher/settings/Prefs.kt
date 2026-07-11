@@ -1,0 +1,71 @@
+package fr.arichard.lastlauncher.settings
+
+import android.content.Context
+import androidx.preference.PreferenceManager
+
+/** Typed access to the app's settings. All defaults live here. */
+class Prefs(context: Context) {
+
+    private val sp = PreferenceManager.getDefaultSharedPreferences(context)
+
+    val keyboardAlways: Boolean get() = sp.getBoolean(KEY_KEYBOARD_ALWAYS, true)
+    val predictions: Boolean get() = sp.getBoolean(KEY_PREDICTIONS, true)
+    val btSignal: Boolean get() = sp.getBoolean(KEY_BT_SIGNAL, true)
+    val doubleTapLock: Boolean get() = sp.getBoolean(KEY_DOUBLE_TAP_LOCK, true)
+    val swipeDownNotifications: Boolean get() = sp.getBoolean(KEY_SWIPE_DOWN, true)
+    val haptics: Boolean get() = sp.getBoolean(KEY_HAPTICS, true)
+    val animations: Boolean get() = sp.getBoolean(KEY_ANIMATIONS, true)
+    val showClock: Boolean get() = sp.getBoolean(KEY_SHOW_CLOCK, true)
+    val accent: String get() = sp.getString(KEY_ACCENT, "cyan") ?: "cyan"
+
+    /** Wallpaper dim, 0–80 percent. */
+    val dim: Int get() = sp.getInt(KEY_DIM, 25)
+
+    val autoUpdate: Boolean get() = sp.getBoolean(KEY_AUTO_UPDATE, true)
+    var lastUpdateCheck: Long
+        get() = sp.getLong(KEY_LAST_UPDATE_CHECK, 0)
+        set(value) = sp.edit().putLong(KEY_LAST_UPDATE_CHECK, value).apply()
+    var updateDeferred: Boolean
+        get() = sp.getBoolean(KEY_UPDATE_DEFERRED, false)
+        set(value) = sp.edit().putBoolean(KEY_UPDATE_DEFERRED, value).apply()
+
+    var hiddenApps: Set<String>
+        get() = sp.getStringSet(KEY_HIDDEN_APPS, emptySet()) ?: emptySet()
+        set(value) = sp.edit().putStringSet(KEY_HIDDEN_APPS, value).apply()
+
+    var btPermissionAsked: Boolean
+        get() = sp.getBoolean(KEY_BT_PERM_ASKED, false)
+        set(value) = sp.edit().putBoolean(KEY_BT_PERM_ASKED, value).apply()
+
+    /** Last app launched from the launcher; feeds the app-to-app transition signal. */
+    var lastLaunchedPkg: String?
+        get() = sp.getString(KEY_LAST_LAUNCHED, null)
+        set(value) = sp.edit().putString(KEY_LAST_LAUNCHED, value).apply()
+
+    fun hideApp(pkg: String) {
+        hiddenApps = hiddenApps + pkg
+    }
+
+    fun unhideApp(pkg: String) {
+        hiddenApps = hiddenApps - pkg
+    }
+
+    companion object {
+        const val KEY_KEYBOARD_ALWAYS = "keyboard_always"
+        const val KEY_PREDICTIONS = "predictions"
+        const val KEY_BT_SIGNAL = "bt_signal"
+        const val KEY_DOUBLE_TAP_LOCK = "double_tap_lock"
+        const val KEY_SWIPE_DOWN = "swipe_down_notifications"
+        const val KEY_HAPTICS = "haptics"
+        const val KEY_ANIMATIONS = "animations"
+        const val KEY_SHOW_CLOCK = "show_clock"
+        const val KEY_ACCENT = "accent"
+        const val KEY_DIM = "dim"
+        const val KEY_AUTO_UPDATE = "auto_update"
+        const val KEY_LAST_UPDATE_CHECK = "last_update_check"
+        const val KEY_UPDATE_DEFERRED = "update_deferred"
+        const val KEY_HIDDEN_APPS = "hidden_apps"
+        const val KEY_BT_PERM_ASKED = "bt_permission_asked"
+        const val KEY_LAST_LAUNCHED = "last_launched_pkg"
+    }
+}

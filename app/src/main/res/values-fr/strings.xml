@@ -1,0 +1,82 @@
+<resources>
+    <string name="app_name">LastLauncher</string>
+
+    <!-- Home -->
+    <string name="search_hint">Tapez pour lancer…</string>
+    <string name="assistant_button">Assistant</string>
+    <string name="all_apps_button">Toutes les applications</string>
+    <string name="no_match_web_search">Rechercher « %1$s » sur le web</string>
+    <string name="update_pill">Mise à jour %1$s prête — touchez pour installer</string>
+    <string name="suggestion_slot">Application suggérée</string>
+
+    <!-- App long-press menu -->
+    <string name="menu_app_info">Infos de l’application</string>
+    <string name="menu_uninstall">Désinstaller</string>
+    <string name="menu_hide">Masquer de la liste</string>
+    <string name="menu_unhide">Afficher à nouveau</string>
+
+    <!-- Lock / gestures -->
+    <string name="lock_service_label">Actions LastLauncher</string>
+    <string name="lock_service_description">Permet à LastLauncher de verrouiller l’écran d’un double appui et d’ouvrir le volet des notifications d’un glissement vers le bas. LastLauncher ne lit jamais le contenu de l’écran.</string>
+    <string name="lock_needs_service_title">Activer le verrouillage</string>
+    <string name="lock_needs_service_message">Pour verrouiller l’écran d’un double appui, activez « Actions LastLauncher » dans les paramètres d’accessibilité. Le service ne fait que verrouiller l’écran et ne lit jamais son contenu.</string>
+    <string name="open_settings">Ouvrir les paramètres</string>
+    <string name="cancel">Annuler</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Paramètres</string>
+    <string name="cat_general">Général</string>
+    <string name="pref_default_launcher">Définir comme lanceur par défaut</string>
+    <string name="pref_default_launcher_summary">Faire de LastLauncher votre écran d’accueil</string>
+    <string name="pref_keyboard_always">Clavier toujours prêt</string>
+    <string name="pref_keyboard_always_summary">Ouvre le clavier sur l’écran d’accueil pour taper immédiatement. Désactivé : glissez vers le haut pour chercher.</string>
+    <string name="pref_haptics">Retour haptique</string>
+    <string name="pref_haptics_summary">Légère vibration aux lancements et gestes</string>
+
+    <string name="cat_suggestions">Suggestions intelligentes</string>
+    <string name="pref_predictions">Prédire ma prochaine application</string>
+    <string name="pref_predictions_summary">Apprend de vos habitudes (heure, enchaînements d’applications, Bluetooth, écouteurs, charge) et suggère les applications que vous allez probablement ouvrir. Tout reste sur cet appareil.</string>
+    <string name="pref_bt_signal">Utiliser le Bluetooth comme signal</string>
+    <string name="pref_bt_signal_summary">Suggère les applications que vous ouvrez habituellement après une connexion Bluetooth (voiture, écouteurs…)</string>
+    <string name="pref_reset_learning">Tout oublier</string>
+    <string name="pref_reset_learning_summary">Supprime l’historique de lancements utilisé pour les prédictions</string>
+    <string name="reset_learning_confirm">Supprimer tout l’historique appris ? Les suggestions repartiront de zéro.</string>
+    <string name="reset_learning_done">Historique supprimé</string>
+
+    <string name="cat_gestures">Gestes</string>
+    <string name="pref_double_tap_lock">Double appui pour verrouiller</string>
+    <string name="pref_double_tap_lock_summary">Double appui sur une zone vide de l’accueil pour verrouiller le téléphone</string>
+    <string name="pref_swipe_down">Glisser vers le bas : notifications</string>
+    <string name="pref_swipe_down_summary">Glissez vers le bas sur l’accueil pour ouvrir le volet des notifications</string>
+
+    <string name="cat_appearance">Apparence</string>
+    <string name="pref_accent">Couleur d’accent</string>
+    <string name="pref_dim">Assombrissement du fond d’écran</string>
+    <string name="pref_animations">Animations</string>
+    <string name="pref_animations_summary">Effets discrets d’apparition et d’appui. Désactivez pour une autonomie maximale.</string>
+    <string name="pref_show_clock">Afficher l’horloge</string>
+
+    <string name="cat_apps">Applications</string>
+    <string name="pref_hidden_apps">Applications masquées</string>
+    <string name="pref_hidden_apps_summary">Choisissez les applications à masquer de la recherche et des suggestions</string>
+
+    <string name="cat_updates">Mises à jour</string>
+    <string name="pref_auto_update">Mises à jour automatiques</string>
+    <string name="pref_auto_update_summary">Vérifie GitHub une fois par jour et télécharge les nouvelles versions en Wi-Fi</string>
+    <string name="pref_check_now">Vérifier maintenant</string>
+    <string name="update_up_to_date">Vous êtes à jour (v%1$s)</string>
+    <string name="update_found">Version %1$s disponible — installation…</string>
+    <string name="update_deferred">Version %1$s trouvée, téléchargement en Wi-Fi</string>
+    <string name="update_error">Échec de la mise à jour : %1$s</string>
+    <string name="update_checking">Vérification…</string>
+
+    <string name="cat_about">À propos</string>
+    <string name="pref_version">Version</string>
+
+    <!-- Accents -->
+    <string name="accent_cyan">Pulsation cyan</string>
+    <string name="accent_purple">Dérive violette</string>
+    <string name="accent_green">Vert aurore</string>
+    <string name="accent_amber">Ambre solaire</string>
+    <string name="accent_pink">Rose néon</string>
+</resources>

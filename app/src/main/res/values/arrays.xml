@@ -1,0 +1,16 @@
+<resources>
+    <string-array name="accent_entries">
+        <item>@string/accent_cyan</item>
+        <item>@string/accent_purple</item>
+        <item>@string/accent_green</item>
+        <item>@string/accent_amber</item>
+        <item>@string/accent_pink</item>
+    </string-array>
+    <string-array name="accent_values">
+        <item>cyan</item>
+        <item>purple</item>
+        <item>green</item>
+        <item>amber</item>
+        <item>pink</item>
+    </string-array>
+</resources>

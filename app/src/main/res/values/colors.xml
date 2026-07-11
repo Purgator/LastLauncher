@@ -1,0 +1,14 @@
+<resources>
+    <color name="deep_space">#0A0E1A</color>
+    <color name="glass">#14FFFFFF</color>
+    <color name="glass_bright">#22FFFFFF</color>
+    <color name="glass_stroke">#2EFFFFFF</color>
+    <color name="text_primary">#F2F5FF</color>
+    <color name="text_secondary">#9BA3B7</color>
+
+    <color name="accent_cyan">#00E5FF</color>
+    <color name="accent_purple">#B388FF</color>
+    <color name="accent_green">#69F0AE</color>
+    <color name="accent_amber">#FFD740</color>
+    <color name="accent_pink">#FF80AB</color>
+</resources>
