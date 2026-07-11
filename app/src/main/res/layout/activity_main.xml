@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Dim layer over the wallpaper; alpha driven by settings. -->
+    <View
+        android:id="@+id/scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:alpha="0.25" />
+
+    <LinearLayout
+        android:id="@+id/content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:clipToPadding="false"
+        android:clipChildren="false">
+
+        <TextClock
+            android:id="@+id/clock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="28dp"
+            android:fontFamily="sans-serif-thin"
+            android:format12Hour="h:mm"
+            android:format24Hour="HH:mm"
+            android:textColor="@color/text_primary"
+            android:textSize="64sp"
+            tools:text="14:32" />
+
+        <TextClock
+            android:id="@+id/date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="-4dp"
+            android:fontFamily="sans-serif-light"
+            android:format12Hour="EEEE d MMMM"
+            android:format24Hour="EEEE d MMMM"
+            android:textColor="@color/text_secondary"
+            android:textSize="15sp"
+            tools:text="Friday 11 July" />
+
+        <TextView
+            android:id="@+id/updatePill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_glass_pill"
+            android:paddingHorizontal="18dp"
+            android:paddingVertical="9dp"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:visibility="gone"
+            tools:text="Update 1.1.0 ready — tap to install"
+            tools:visibility="visible" />
+
+        <FrameLayout
+            android:id="@+id/middle"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <!-- Predicted apps: big main button flanked by two runners-up. -->
+            <LinearLayout
+                android:id="@+id/suggestionsBlock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="26dp"
+                android:gravity="bottom"
+                android:orientation="horizontal"
+                android:clipChildren="false">
+
+                <LinearLayout
+                    android:id="@+id/suggestLeft"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal"
+                    android:layout_marginEnd="22dp"
+                    android:visibility="invisible">
+
+                    <FrameLayout
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:background="@drawable/bg_glass_circle">
+                        <ImageView
+                            android:id="@+id/suggestLeftIcon"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@string/suggestion_slot" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/suggestLeftLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:maxWidth="76dp"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        tools:text="Maps" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/suggestMain"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal"
+                    android:clipChildren="false"
+                    android:visibility="invisible">
+
+                    <FrameLayout
+                        android:layout_width="120dp"
+                        android:layout_height="120dp"
+                        android:clipChildren="false">
+
+                        <ImageView
+                            android:id="@+id/mainGlow"
+                            android:layout_width="120dp"
+                            android:layout_height="120dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/bg_glow_main"
+                            android:importantForAccessibility="no" />
+
+                        <FrameLayout
+                            android:layout_width="88dp"
+                            android:layout_height="88dp"
+                            android:layout_gravity="center"
+                            android:background="@drawable/bg_glass_circle">
+                            <ImageView
+                                android:id="@+id/suggestMainIcon"
+                                android:layout_width="54dp"
+                                android:layout_height="54dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@string/suggestion_slot" />
+                        </FrameLayout>
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/suggestMainLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:maxWidth="110dp"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        tools:text="Spotify" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/suggestRight"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal"
+                    android:layout_marginStart="22dp"
+                    android:visibility="invisible">
+
+                    <FrameLayout
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:background="@drawable/bg_glass_circle">
+                        <ImageView
+                            android:id="@+id/suggestRightIcon"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@string/suggestion_slot" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/suggestRightLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:maxWidth="76dp"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        tools:text="Chrome" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Search results / all apps. Fills the space above the search bar. -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/results"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginBottom="10dp"
+                android:background="@drawable/bg_results_panel"
+                android:paddingVertical="8dp"
+                android:clipToPadding="false"
+                android:overScrollMode="never"
+                android:visibility="gone"
+                tools:visibility="gone" />
+        </FrameLayout>
+
+        <!-- Command bar: assistant · type-to-launch · all apps. -->
+        <LinearLayout
+            android:id="@+id/searchBar"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/bg_glass_pill"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="6dp">
+
+            <ImageButton
+                android:id="@+id/assistantBtn"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/assistant_button"
+                android:src="@drawable/ic_assistant"
+                android:tint="@color/text_secondary" />
+
+            <EditText
+                android:id="@+id/searchInput"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="@string/search_hint"
+                android:imeOptions="actionGo|flagNoExtractUi"
+                android:importantForAutofill="no"
+                android:inputType="text"
+                android:maxLines="1"
+                android:paddingHorizontal="8dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="16sp" />
+
+            <ImageButton
+                android:id="@+id/allAppsBtn"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/all_apps_button"
+                android:src="@drawable/ic_apps"
+                android:tint="@color/text_secondary" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
