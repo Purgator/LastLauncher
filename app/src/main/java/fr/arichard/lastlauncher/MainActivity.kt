@@ -2,8 +2,6 @@ package fr.arichard.lastlauncher
 
 import android.Manifest
 import android.app.ActivityOptions
-import android.app.SearchManager
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.GradientDrawable
@@ -36,6 +34,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import fr.arichard.lastlauncher.apps.AppEntry
 import fr.arichard.lastlauncher.apps.AppRepository
 import fr.arichard.lastlauncher.command.CommandProcessor
+import fr.arichard.lastlauncher.command.SearchMode
 import fr.arichard.lastlauncher.databinding.ActivityMainBinding
 import fr.arichard.lastlauncher.gesture.GestureAction
 import fr.arichard.lastlauncher.gesture.GestureBinding
@@ -62,6 +61,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: AppAdapter
 
     private var allAppsOpen = false
+    private var searchMode = SearchMode.SMART
     private var pendingUpdateVersion: String? = null
     private val ioExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "main-io") }
     private val repoListener: () -> Unit = { onAppsChanged() }
@@ -230,8 +230,8 @@ class MainActivity : AppCompatActivity() {
             onAppClick = { entry, view -> launchApp(entry, view) },
             onAppLongClick = { entry, view -> showAppMenu(entry, view) },
             onCommand = { command -> runCommand(command) },
-            onWebSearch = { query -> webSearch(query) },
         )
+        searchMode = SearchMode.byId(prefs.searchModeId)
         binding.results.layoutManager = LinearLayoutManager(this).apply {
             // Best match sits at the bottom, right above the keyboard.
             reverseLayout = true
@@ -244,19 +244,46 @@ class MainActivity : AppCompatActivity() {
         }
         binding.searchInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO || actionId == EditorInfo.IME_ACTION_DONE) {
+                val query = binding.searchInput.text.toString().trim()
                 when (val row = adapter.primaryRow()) {
                     is AppAdapter.AppRow -> launchApp(row.entry, binding.searchInput)
                     is AppAdapter.CommandRow -> runCommand(row.command)
-                    is AppAdapter.WebRow -> webSearch(row.query)
-                    null -> {}
+                    null -> if (query.isNotEmpty()) launchAssistant()
                 }
                 true
             } else {
                 false
             }
         }
-        binding.assistantBtn.setOnClickListener { launchAssistant() }
+        // Left button is the mode wheel: tap to cycle, long-press for the assistant.
+        binding.modeBtn.setOnClickListener { cycleMode() }
+        binding.modeBtn.setOnLongClickListener { launchAssistant(); true }
         binding.allAppsBtn.setOnClickListener { if (allAppsOpen) resetToHome() else openAllApps() }
+    }
+
+    private fun cycleMode() {
+        searchMode = searchMode.next()
+        prefs.searchModeId = searchMode.id
+        haptic(binding.modeBtn)
+        updateModeUi()
+        Toast.makeText(
+            this, getString(R.string.mode_switched, getString(searchMode.labelRes)),
+            Toast.LENGTH_SHORT
+        ).show()
+        onQueryChanged(binding.searchInput.text.toString())
+    }
+
+    private fun updateModeUi() {
+        binding.modeBtn.setImageResource(searchMode.iconRes)
+        binding.modeBtn.setColorFilter(ColorUtils.setAlphaComponent(accentColor(), 0xCC))
+        binding.searchInput.hint = getString(
+            when (searchMode) {
+                SearchMode.SMART -> R.string.search_hint
+                SearchMode.APPS -> R.string.hint_apps_mode
+                SearchMode.SETTINGS -> R.string.hint_settings_mode
+                SearchMode.ASK -> R.string.hint_ask_mode
+            }
+        )
     }
 
     private fun setupSuggestionClicks() {
@@ -282,19 +309,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun onQueryChanged(raw: String) {
         val query = raw.trim()
-        if (query.isEmpty() && !allAppsOpen) {
+        val mode = searchMode
+        // Empty on the home screen returns to suggestions — except Settings mode, which
+        // browses the full settings list even when empty.
+        if (query.isEmpty() && !allAppsOpen && mode != SearchMode.SETTINGS) {
             binding.results.visibility = View.GONE
             binding.suggestionsBlock.visibility = View.VISIBLE
             startHints()
             return
         }
-        val list = if (query.isEmpty()) {
-            repo.visibleApps(prefs.hiddenApps).reversed() // reverseLayout: A at the bottom
-        } else {
-            repo.search(query, prefs.hiddenApps)
+
+        val showApps = mode == SearchMode.SMART || mode == SearchMode.APPS
+        val apps = when {
+            !showApps -> emptyList()
+            query.isEmpty() -> repo.visibleApps(prefs.hiddenApps).reversed()
+            else -> repo.search(query, prefs.hiddenApps)
         }
-        val commands = CommandProcessor.parse(query, commandCatalog, R.drawable.ic_calc, R.drawable.ic_link)
-        adapter.submit(list, commands, webSearchQuery = query)
+        val commands = buildCommands(query, mode, apps.size)
+        adapter.submit(apps, commands)
+
         binding.results.visibility = View.VISIBLE
         binding.suggestionsBlock.visibility = View.INVISIBLE
         binding.results.scrollToPosition(0)
@@ -302,6 +335,33 @@ class MainActivity : AppCompatActivity() {
         binding.hintLeft.visibility = View.GONE
         binding.hintRight.visibility = View.GONE
     }
+
+    /** Command rows for the current mode, including the "ask the assistant" row. */
+    private fun buildCommands(
+        query: String, mode: SearchMode, appMatches: Int,
+    ): List<CommandProcessor.Command> {
+        if (mode == SearchMode.ASK) {
+            if (query.isEmpty()) return emptyList()
+            return listOf(assistCommand(query))
+        }
+        val base = CommandProcessor.parse(
+            query, mode, commandCatalog, R.drawable.ic_calc, R.drawable.ic_link
+        )
+        if (mode == SearchMode.SMART && query.isNotEmpty()) {
+            // Route sentences/questions — or anything with no other match — to the assistant.
+            val wantAssist = CommandProcessor.isNaturalLanguage(query) ||
+                (appMatches == 0 && base.isEmpty())
+            if (wantAssist) return base + assistCommand(query)
+        }
+        return base
+    }
+
+    private fun assistCommand(query: String) = CommandProcessor.Command(
+        R.drawable.ic_chat,
+        getString(R.string.cmd_ask),
+        query,
+        CommandProcessor.Action.Assist(query),
+    )
 
     private fun openAllApps() {
         allAppsOpen = true
@@ -351,7 +411,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchAssistant() {
-        haptic(binding.assistantBtn)
+        haptic(binding.modeBtn)
         val candidates = listOf(
             Intent(Intent.ACTION_VOICE_COMMAND),
             Intent("android.intent.action.ASSIST"),
@@ -369,19 +429,31 @@ class MainActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------- commands
 
-    /** Quick-action palette shown by the `>` prefix in the command bar. */
+    /** Quick actions and settings destinations, matched by name in the command bar. */
     private val commandCatalog: List<CommandProcessor.QuickAction> by lazy {
         listOf(
-            CommandProcessor.QuickAction("lock", getString(R.string.cmd_lock), R.drawable.ic_lock, "lock secure"),
+            // Toggles / actions
+            CommandProcessor.QuickAction("lock", getString(R.string.cmd_lock), R.drawable.ic_lock, "lock secure screen"),
             CommandProcessor.QuickAction("quick_settings", getString(R.string.cmd_quick_settings), R.drawable.ic_tiles, "toggles panel"),
             CommandProcessor.QuickAction("notifications", getString(R.string.cmd_notifications), R.drawable.ic_bell, "shade alerts"),
-            CommandProcessor.QuickAction("flashlight", getString(R.string.cmd_flashlight), R.drawable.ic_flashlight, "torch light"),
-            CommandProcessor.QuickAction("wifi", getString(R.string.cmd_wifi), R.drawable.ic_wifi, "network internet"),
-            CommandProcessor.QuickAction("bluetooth", getString(R.string.cmd_bluetooth), R.drawable.ic_bluetooth, "bt"),
-            CommandProcessor.QuickAction("battery", getString(R.string.cmd_battery), R.drawable.ic_battery, "power"),
+            CommandProcessor.QuickAction("flashlight", getString(R.string.cmd_flashlight), R.drawable.ic_flashlight, "torch light lamp"),
             CommandProcessor.QuickAction("assistant", getString(R.string.cmd_assistant), R.drawable.ic_assistant, "gemini voice"),
             CommandProcessor.QuickAction("all_apps", getString(R.string.cmd_all_apps), R.drawable.ic_apps, "drawer list"),
-            CommandProcessor.QuickAction("settings", getString(R.string.cmd_settings), R.drawable.ic_settings, "system android"),
+            // Settings destinations
+            CommandProcessor.QuickAction("wifi", getString(R.string.cmd_wifi), R.drawable.ic_wifi, "wifi network internet"),
+            CommandProcessor.QuickAction("bluetooth", getString(R.string.cmd_bluetooth), R.drawable.ic_bluetooth, "bluetooth bt"),
+            CommandProcessor.QuickAction("battery", getString(R.string.cmd_battery), R.drawable.ic_battery, "battery power"),
+            CommandProcessor.QuickAction("display", getString(R.string.cmd_display), R.drawable.ic_settings, "display screen brightness"),
+            CommandProcessor.QuickAction("sound", getString(R.string.cmd_sound), R.drawable.ic_settings, "sound volume audio"),
+            CommandProcessor.QuickAction("apps_settings", getString(R.string.cmd_apps_settings), R.drawable.ic_settings, "apps applications"),
+            CommandProcessor.QuickAction("storage", getString(R.string.cmd_storage), R.drawable.ic_settings, "storage space memory"),
+            CommandProcessor.QuickAction("location", getString(R.string.cmd_location), R.drawable.ic_settings, "location gps"),
+            CommandProcessor.QuickAction("security", getString(R.string.cmd_security), R.drawable.ic_lock, "security lock"),
+            CommandProcessor.QuickAction("airplane", getString(R.string.cmd_airplane), R.drawable.ic_settings, "airplane flight mode"),
+            CommandProcessor.QuickAction("datetime", getString(R.string.cmd_datetime), R.drawable.ic_clock, "date time clock"),
+            CommandProcessor.QuickAction("language", getString(R.string.cmd_language), R.drawable.ic_settings, "language locale"),
+            CommandProcessor.QuickAction("about", getString(R.string.cmd_about), R.drawable.ic_settings, "about phone device info"),
+            CommandProcessor.QuickAction("settings", getString(R.string.cmd_settings), R.drawable.ic_settings, "system android settings"),
         )
     }
 
@@ -399,6 +471,7 @@ class MainActivity : AppCompatActivity() {
             }
             is CommandProcessor.Action.OpenUrl -> openUrl(action.url)
             is CommandProcessor.Action.Quick -> runQuickAction(action.id)
+            is CommandProcessor.Action.Assist -> launchAssistant()
         }
     }
 
@@ -408,11 +481,21 @@ class MainActivity : AppCompatActivity() {
             "quick_settings" -> if (!LockService.openQuickSettings()) LockService.openNotificationShade(this)
             "notifications" -> LockService.openNotificationShade(this)
             "flashlight" -> toggleFlashlight()
+            "assistant" -> launchAssistant()
+            "all_apps" -> openAllApps()
             "wifi" -> openSettingsAction(Settings.ACTION_WIFI_SETTINGS)
             "bluetooth" -> openSettingsAction(Settings.ACTION_BLUETOOTH_SETTINGS)
             "battery" -> openSettingsAction(Intent.ACTION_POWER_USAGE_SUMMARY)
-            "assistant" -> launchAssistant()
-            "all_apps" -> openAllApps()
+            "display" -> openSettingsAction(Settings.ACTION_DISPLAY_SETTINGS)
+            "sound" -> openSettingsAction(Settings.ACTION_SOUND_SETTINGS)
+            "apps_settings" -> openSettingsAction(Settings.ACTION_APPLICATION_SETTINGS)
+            "storage" -> openSettingsAction(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
+            "location" -> openSettingsAction(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            "security" -> openSettingsAction(Settings.ACTION_SECURITY_SETTINGS)
+            "airplane" -> openSettingsAction(Settings.ACTION_AIRPLANE_MODE_SETTINGS)
+            "datetime" -> openSettingsAction(Settings.ACTION_DATE_SETTINGS)
+            "language" -> openSettingsAction(Settings.ACTION_LOCALE_SETTINGS)
+            "about" -> openSettingsAction(Settings.ACTION_DEVICE_INFO_SETTINGS)
             "settings" -> openSettingsAction(Settings.ACTION_SETTINGS)
         }
         if (id != "all_apps") resetToHome()
@@ -461,27 +544,6 @@ class MainActivity : AppCompatActivity() {
             )
         } catch (e: Exception) {
             // no browser
-        }
-    }
-
-    private fun webSearch(query: String) {
-        try {
-            startActivity(
-                Intent(Intent.ACTION_WEB_SEARCH)
-                    .putExtra(SearchManager.QUERY, query)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        } catch (e: ActivityNotFoundException) {
-            try {
-                startActivity(
-                    Intent(
-                        Intent.ACTION_VIEW,
-                        Uri.parse("https://www.google.com/search?q=${Uri.encode(query)}")
-                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                )
-            } catch (e2: Exception) {
-                // no browser: nothing sensible to do
-            }
         }
     }
 
@@ -893,7 +955,7 @@ class MainActivity : AppCompatActivity() {
         })
         binding.updatePill.setTextColor(accent)
         binding.starterPill.setTextColor(accent)
-        binding.assistantBtn.setColorFilter(ColorUtils.setAlphaComponent(accent, 0xCC))
+        updateModeUi()
     }
 
     private fun accentColor(): Int = when (prefs.accent) {

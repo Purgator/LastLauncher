@@ -1,6 +1,7 @@
 package fr.arichard.lastlauncher
 
 import fr.arichard.lastlauncher.command.CommandProcessor
+import fr.arichard.lastlauncher.command.SearchMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -11,11 +12,12 @@ class CommandProcessorTest {
 
     private val catalog = listOf(
         CommandProcessor.QuickAction("lock", "Lock screen", 0, "secure"),
-        CommandProcessor.QuickAction("wifi", "Wi-Fi settings", 0, "network"),
+        CommandProcessor.QuickAction("wifi", "Wi-Fi settings", 0, "wifi network"),
         CommandProcessor.QuickAction("flashlight", "Flashlight", 0, "torch"),
     )
 
-    private fun parse(q: String) = CommandProcessor.parse(q, catalog, 1, 2)
+    private fun parse(q: String, mode: SearchMode = SearchMode.SMART) =
+        CommandProcessor.parse(q, mode, catalog, 1, 2)
 
     @Test
     fun evaluatesArithmeticWithPrecedence() {
@@ -59,7 +61,35 @@ class CommandProcessorTest {
         val wifi = parse(">net")
         assertEquals(1, wifi.size)
         assertEquals("wifi", (wifi[0].action as CommandProcessor.Action.Quick).id)
-        assertEquals("torch", "torch")
         assertEquals(1, parse(">torch").size)
+    }
+
+    @Test
+    fun smartModeDetectsSettingsByNameWithoutPrefix() {
+        val wifi = parse("wifi").filter { it.action is CommandProcessor.Action.Quick }
+        assertEquals(1, wifi.size)
+        assertEquals("wifi", (wifi[0].action as CommandProcessor.Action.Quick).id)
+        // Single letter is too short to surface settings noise.
+        assertTrue(parse("w").none { it.action is CommandProcessor.Action.Quick })
+    }
+
+    @Test
+    fun settingsModeBrowsesAndFilters() {
+        assertEquals(3, parse("", SearchMode.SETTINGS).size)   // all when empty
+        assertEquals(1, parse("torch", SearchMode.SETTINGS).size)
+    }
+
+    @Test
+    fun appsAndAskModesEmitNoInlineCommands() {
+        assertTrue(parse("wifi", SearchMode.APPS).isEmpty())
+        assertTrue(parse("wifi", SearchMode.ASK).isEmpty())
+    }
+
+    @Test
+    fun naturalLanguageDetection() {
+        assertTrue(CommandProcessor.isNaturalLanguage("what is the weather?"))
+        assertTrue(CommandProcessor.isNaturalLanguage("how do i get home"))
+        assertFalse(CommandProcessor.isNaturalLanguage("spotify"))
+        assertFalse(CommandProcessor.isNaturalLanguage("wifi"))
     }
 }

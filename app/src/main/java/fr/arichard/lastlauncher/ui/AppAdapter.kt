@@ -19,27 +19,21 @@ class AppAdapter(
     private val onAppClick: (AppEntry, View) -> Unit,
     private val onAppLongClick: (AppEntry, View) -> Unit,
     private val onCommand: (CommandProcessor.Command) -> Unit,
-    private val onWebSearch: (String) -> Unit,
 ) : RecyclerView.Adapter<AppAdapter.Holder>() {
 
     sealed interface Row
     data class AppRow(val entry: AppEntry) : Row
     data class CommandRow(val command: CommandProcessor.Command) : Row
-    data class WebRow(val query: String) : Row
 
     private var rows: List<Row> = emptyList()
 
     fun submit(
         apps: List<AppEntry>,
         commands: List<CommandProcessor.Command> = emptyList(),
-        webSearchQuery: String? = null,
     ) {
-        val list = ArrayList<Row>(commands.size + apps.size + 1)
+        val list = ArrayList<Row>(commands.size + apps.size)
         commands.forEach { list.add(CommandRow(it)) }
         apps.forEach { list.add(AppRow(it)) }
-        if (apps.isEmpty() && commands.isEmpty() && !webSearchQuery.isNullOrBlank()) {
-            list.add(WebRow(webSearchQuery))
-        }
         rows = list
         notifyDataSetChanged()
     }
@@ -58,7 +52,6 @@ class AppAdapter(
         when (val row = rows[position]) {
             is AppRow -> holder.bindApp(row.entry)
             is CommandRow -> holder.bindCommand(row.command)
-            is WebRow -> holder.bindWebSearch(row.query)
         }
     }
 
@@ -83,15 +76,6 @@ class AppAdapter(
                 if (command.subtitle.isNullOrEmpty()) View.GONE else View.VISIBLE
             binding.appIcon.setImageResource(command.iconRes)
             binding.root.setOnClickListener { onCommand(command) }
-            binding.root.setOnLongClickListener(null)
-        }
-
-        fun bindWebSearch(query: String) {
-            binding.appLabel.text =
-                binding.root.context.getString(R.string.no_match_web_search, query)
-            binding.appSubtitle.visibility = View.GONE
-            binding.appIcon.setImageResource(R.drawable.ic_search)
-            binding.root.setOnClickListener { onWebSearch(query) }
             binding.root.setOnLongClickListener(null)
         }
     }
