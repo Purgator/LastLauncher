@@ -174,6 +174,25 @@ object PredictionEngine {
         return picks.toList()
     }
 
+    /** Counts launches logged since local midnight; delivered on the main thread. */
+    fun launchesToday(context: Context, callback: (Int) -> Unit) {
+        val appContext = context.applicationContext
+        executor.execute {
+            val midnight = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val count = try {
+                db(appContext).countSince(midnight)
+            } catch (e: Exception) {
+                0
+            }
+            mainHandler.post { callback(count) }
+        }
+    }
+
     /** Deletes the learned history (settings: "forget everything"). */
     fun clearHistory(context: Context, onDone: () -> Unit) {
         val appContext = context.applicationContext

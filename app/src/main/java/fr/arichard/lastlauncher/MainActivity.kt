@@ -45,6 +45,7 @@ import fr.arichard.lastlauncher.settings.Prefs
 import fr.arichard.lastlauncher.settings.SettingsActivity
 import fr.arichard.lastlauncher.ui.AppAdapter
 import fr.arichard.lastlauncher.ui.AppPickerDialog
+import fr.arichard.lastlauncher.ui.StatusLine
 import fr.arichard.lastlauncher.update.UpdateManager
 import java.util.concurrent.Executors
 import kotlin.math.abs
@@ -100,11 +101,13 @@ class MainActivity : AppCompatActivity() {
         refreshSuggestions()
         maybeRequestBluetoothPermission()
         checkForUpdate()
+        setupStatusLine()
     }
 
     override fun onPause() {
         super.onPause()
         stopHints()
+        unregisterStatusReceiver()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -739,6 +742,81 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    // ---------------------------------------------------------- status line
+
+    private var statusReceiver: android.content.BroadcastReceiver? = null
+
+    private fun setupStatusLine() {
+        if (!prefs.showStatusLine) {
+            binding.statusLine.visibility = View.GONE
+            unregisterStatusReceiver()
+            return
+        }
+        binding.statusLine.setTextColor(
+            ColorUtils.setAlphaComponent(accentColor(), 0xC0)
+        )
+        refreshStatusLine()
+        if (statusReceiver == null) {
+            statusReceiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(c: android.content.Context?, i: Intent?) = refreshStatusLine()
+            }
+            val filter = android.content.IntentFilter().apply {
+                addAction(Intent.ACTION_BATTERY_CHANGED)
+                addAction(Intent.ACTION_TIME_TICK)
+                addAction(Intent.ACTION_POWER_CONNECTED)
+                addAction(Intent.ACTION_POWER_DISCONNECTED)
+            }
+            registerReceiver(statusReceiver, filter)
+        }
+    }
+
+    private fun unregisterStatusReceiver() {
+        statusReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                // already unregistered
+            }
+        }
+        statusReceiver = null
+    }
+
+    private fun refreshStatusLine() {
+        if (!prefs.showStatusLine) return
+        val battery = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = battery?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = battery?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100) ?: 100
+        val percent = if (level >= 0 && scale > 0) level * 100 / scale else 0
+        val status = battery?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+            status == android.os.BatteryManager.BATTERY_STATUS_FULL
+
+        PredictionEngine.launchesToday(this) { launches ->
+            val text = StatusLine.build(
+                percent, charging, currentNet(), nextAlarmText(), launches
+            )
+            binding.statusLine.text = text
+            binding.statusLine.visibility = View.VISIBLE
+        }
+    }
+
+    private fun currentNet(): StatusLine.Net {
+        val cm = getSystemService(android.net.ConnectivityManager::class.java)
+            ?: return StatusLine.Net.OFFLINE
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return StatusLine.Net.OFFLINE
+        return when {
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> StatusLine.Net.WIFI
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> StatusLine.Net.CELLULAR
+            else -> StatusLine.Net.OFFLINE
+        }
+    }
+
+    private fun nextAlarmText(): String? {
+        val am = getSystemService(android.app.AlarmManager::class.java) ?: return null
+        val info = am.nextAlarmClock ?: return null
+        return android.text.format.DateFormat.getTimeFormat(this).format(info.triggerTime)
     }
 
     // ----------------------------------------------------------- appearance

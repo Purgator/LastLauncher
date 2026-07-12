@@ -21,6 +21,7 @@ class Prefs(context: Context) {
     val haptics: Boolean get() = sp.getBoolean(KEY_HAPTICS, true)
     val animations: Boolean get() = sp.getBoolean(KEY_ANIMATIONS, true)
     val showClock: Boolean get() = sp.getBoolean(KEY_SHOW_CLOCK, true)
+    val showStatusLine: Boolean get() = sp.getBoolean(KEY_SHOW_STATUS_LINE, true)
     val accent: String get() = sp.getString(KEY_ACCENT, "cyan") ?: "cyan"
 
     /** Wallpaper dim, 0–80 percent. */
@@ -92,6 +93,7 @@ class Prefs(context: Context) {
         const val KEY_HAPTICS = "haptics"
         const val KEY_ANIMATIONS = "animations"
         const val KEY_SHOW_CLOCK = "show_clock"
+        const val KEY_SHOW_STATUS_LINE = "show_status_line"
         const val KEY_ACCENT = "accent"
         const val KEY_DIM = "dim"
         const val KEY_AUTO_UPDATE = "auto_update"
