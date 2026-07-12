@@ -75,6 +75,11 @@ class SettingsActivity : AppCompatActivity() {
                 true
             }
 
+            findPreference<Preference>("drawer_apps")?.setOnPreferenceClickListener {
+                showDrawerAppsDialog()
+                true
+            }
+
             findPreference<Preference>("check_now")?.setOnPreferenceClickListener { pref ->
                 checkForUpdatesNow(pref)
                 true
@@ -255,6 +260,22 @@ class SettingsActivity : AppCompatActivity() {
             ) {
                 prefs.favorites = apps.indices.filter { checked[it] }.map { apps[it].packageName }
                 prefs.onboardingDone = true
+            }
+        }
+
+        private fun showDrawerAppsDialog() {
+            val context = requireContext()
+            val repo = (context.applicationContext as LauncherApp).repo
+            val prefs = Prefs(context)
+            val apps = repo.apps
+            if (apps.isEmpty()) return
+            val current = prefs.drawerApps
+            val items = apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
+            val checked = BooleanArray(apps.size) { apps[it].componentKey in current }
+            AppPickerDialog.multiChoice(
+                context, getString(R.string.pref_drawer_apps), items, checked
+            ) {
+                prefs.drawerApps = apps.indices.filter { checked[it] }.map { apps[it].componentKey }
             }
         }
 

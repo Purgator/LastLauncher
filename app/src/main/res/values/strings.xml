@@ -16,7 +16,6 @@
     <string name="hint_apps_mode">Search apps…</string>
     <string name="update_pill">Update %1$s ready — tap to install</string>
     <string name="suggestion_slot">Suggested app</string>
-    <string name="cmd_open_url">Open in browser</string>
     <string name="cmd_lock">Lock screen</string>
     <string name="cmd_quick_settings">Quick settings</string>
     <string name="cmd_notifications">Notifications</string>
@@ -40,7 +39,6 @@
     <string name="cmd_copied">Copied “%1$s”</string>
     <string name="starter_pill">✨ Pick your go-to apps</string>
     <string name="starter_dialog_title">Your go-to apps</string>
-    <string name="no_thanks">No thanks</string>
 
     <!-- App long-press menu -->
     <string name="menu_app_info">App info</string>
@@ -82,6 +80,9 @@
     <!-- Gesture actions -->
     <string name="gesture_none">Nothing</string>
     <string name="gesture_search">Open command bar</string>
+    <string name="gesture_app_drawer">Slide-out app drawer</string>
+    <string name="pref_drawer_apps">App drawer contents</string>
+    <string name="pref_drawer_apps_summary">Choose the apps in the slide-out drawer (none = all apps)</string>
     <string name="gesture_camera">Camera</string>
     <string name="gesture_dialer">Phone dialer</string>
     <string name="gesture_open_app">Open an app…</string>

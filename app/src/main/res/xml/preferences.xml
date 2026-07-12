@@ -116,6 +116,10 @@
             android:key="hidden_apps"
             android:title="@string/pref_hidden_apps"
             android:summary="@string/pref_hidden_apps_summary" />
+        <Preference
+            android:key="drawer_apps"
+            android:title="@string/pref_drawer_apps"
+            android:summary="@string/pref_drawer_apps_summary" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/cat_updates">
