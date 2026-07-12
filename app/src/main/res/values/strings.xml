@@ -3,9 +3,17 @@
 
     <!-- Home -->
     <string name="search_hint">Type to launch…</string>
-    <string name="assistant_button">Assistant</string>
     <string name="all_apps_button">All apps</string>
-    <string name="no_match_web_search">Search the web for “%1$s”</string>
+    <string name="mode_button">Search mode</string>
+    <string name="mode_smart">Smart</string>
+    <string name="mode_apps">Apps only</string>
+    <string name="mode_settings">Settings</string>
+    <string name="mode_ask">Ask</string>
+    <string name="mode_switched">Mode: %1$s</string>
+    <string name="cmd_ask">Ask the assistant</string>
+    <string name="hint_settings_mode">Search a setting…</string>
+    <string name="hint_ask_mode">Ask anything…</string>
+    <string name="hint_apps_mode">Search apps…</string>
     <string name="update_pill">Update %1$s ready — tap to install</string>
     <string name="suggestion_slot">Suggested app</string>
     <string name="cmd_open_url">Open in browser</string>
@@ -19,6 +27,16 @@
     <string name="cmd_battery">Battery</string>
     <string name="cmd_all_apps">All apps</string>
     <string name="cmd_assistant">Assistant</string>
+    <string name="cmd_display">Display settings</string>
+    <string name="cmd_sound">Sound settings</string>
+    <string name="cmd_apps_settings">Apps settings</string>
+    <string name="cmd_storage">Storage settings</string>
+    <string name="cmd_location">Location settings</string>
+    <string name="cmd_security">Security settings</string>
+    <string name="cmd_airplane">Airplane mode</string>
+    <string name="cmd_datetime">Date &amp; time</string>
+    <string name="cmd_language">Language settings</string>
+    <string name="cmd_about">About phone</string>
     <string name="cmd_copied">Copied “%1$s”</string>
     <string name="starter_pill">✨ Pick your go-to apps</string>
     <string name="starter_dialog_title">Your go-to apps</string>

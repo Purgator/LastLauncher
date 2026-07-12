@@ -62,6 +62,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean(KEY_BT_PERM_ASKED, false)
         set(value) = sp.edit().putBoolean(KEY_BT_PERM_ASKED, value).apply()
 
+    /** Persisted command-bar mode id (smart/apps/settings/ask). */
+    var searchModeId: String
+        get() = sp.getString(KEY_SEARCH_MODE, "smart") ?: "smart"
+        set(value) = sp.edit().putString(KEY_SEARCH_MODE, value).apply()
+
     /** Last app launched from the launcher; feeds the app-to-app transition signal. */
     var lastLaunchedPkg: String?
         get() = sp.getString(KEY_LAST_LAUNCHED, null)
@@ -111,5 +116,6 @@ class Prefs(context: Context) {
         const val KEY_ONBOARDING_DONE = "onboarding_done"
         const val KEY_BT_PERM_ASKED = "bt_permission_asked"
         const val KEY_LAST_LAUNCHED = "last_launched_pkg"
+        const val KEY_SEARCH_MODE = "search_mode"
     }
 }

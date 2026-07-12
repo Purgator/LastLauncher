@@ -120,6 +120,7 @@ class AppRepository(private val context: Context) {
             n.split(' ', '-', '.').any { it.startsWith(q) } -> 80
             entry.initials.startsWith(q) -> 65
             n.contains(q) -> 50
+            entry.packageTokens.any { it.startsWith(q) } -> 45
             isSubsequence(q, n) -> 20
             else -> 0
         }

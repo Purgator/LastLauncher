@@ -3,9 +3,17 @@
 
     <!-- Home -->
     <string name="search_hint">Tapez pour lancer…</string>
-    <string name="assistant_button">Assistant</string>
     <string name="all_apps_button">Toutes les applications</string>
-    <string name="no_match_web_search">Rechercher « %1$s » sur le web</string>
+    <string name="mode_button">Mode de recherche</string>
+    <string name="mode_smart">Intelligent</string>
+    <string name="mode_apps">Applications</string>
+    <string name="mode_settings">Réglages</string>
+    <string name="mode_ask">Demander</string>
+    <string name="mode_switched">Mode : %1$s</string>
+    <string name="cmd_ask">Demander à l’assistant</string>
+    <string name="hint_settings_mode">Rechercher un réglage…</string>
+    <string name="hint_ask_mode">Posez une question…</string>
+    <string name="hint_apps_mode">Rechercher une application…</string>
     <string name="update_pill">Mise à jour %1$s prête — touchez pour installer</string>
     <string name="suggestion_slot">Application suggérée</string>
     <string name="cmd_open_url">Ouvrir dans le navigateur</string>
@@ -19,6 +27,16 @@
     <string name="cmd_battery">Batterie</string>
     <string name="cmd_all_apps">Toutes les applications</string>
     <string name="cmd_assistant">Assistant</string>
+    <string name="cmd_display">Paramètres d’affichage</string>
+    <string name="cmd_sound">Paramètres de son</string>
+    <string name="cmd_apps_settings">Paramètres des applications</string>
+    <string name="cmd_storage">Paramètres de stockage</string>
+    <string name="cmd_location">Paramètres de localisation</string>
+    <string name="cmd_security">Paramètres de sécurité</string>
+    <string name="cmd_airplane">Mode avion</string>
+    <string name="cmd_datetime">Date et heure</string>
+    <string name="cmd_language">Paramètres de langue</string>
+    <string name="cmd_about">À propos du téléphone</string>
     <string name="cmd_copied">« %1$s » copié</string>
     <string name="starter_pill">✨ Choisissez vos applications favorites</string>
     <string name="starter_dialog_title">Vos applications favorites</string>
