@@ -29,6 +29,20 @@ class Prefs(context: Context) {
         get() = sp.getBoolean(KEY_UPDATE_DEFERRED, false)
         set(value) = sp.edit().putBoolean(KEY_UPDATE_DEFERRED, value).apply()
 
+    /** App opened by tapping the clock; empty = the system clock app. */
+    val clockTapTarget: String get() = sp.getString(KEY_CLOCK_TAP, "") ?: ""
+
+    /** Ordered go-to apps: cold-start suggestions and the static mode's content. */
+    var favorites: List<String>
+        get() = (sp.getString(KEY_FAVORITES, "") ?: "")
+            .split(',').filter { it.isNotEmpty() }
+        set(value) = sp.edit().putString(KEY_FAVORITES, value.distinct().joinToString(",")).apply()
+
+    /** True once the starter-picks prompt has been answered (or declined). */
+    var onboardingDone: Boolean
+        get() = sp.getBoolean(KEY_ONBOARDING_DONE, false)
+        set(value) = sp.edit().putBoolean(KEY_ONBOARDING_DONE, value).apply()
+
     var hiddenApps: Set<String>
         get() = sp.getStringSet(KEY_HIDDEN_APPS, emptySet()) ?: emptySet()
         set(value) = sp.edit().putStringSet(KEY_HIDDEN_APPS, value).apply()
@@ -65,6 +79,9 @@ class Prefs(context: Context) {
         const val KEY_LAST_UPDATE_CHECK = "last_update_check"
         const val KEY_UPDATE_DEFERRED = "update_deferred"
         const val KEY_HIDDEN_APPS = "hidden_apps"
+        const val KEY_CLOCK_TAP = "clock_tap_app"
+        const val KEY_FAVORITES = "favorite_apps"
+        const val KEY_ONBOARDING_DONE = "onboarding_done"
         const val KEY_BT_PERM_ASKED = "bt_permission_asked"
         const val KEY_LAST_LAUNCHED = "last_launched_pkg"
     }

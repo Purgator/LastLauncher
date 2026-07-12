@@ -54,6 +54,19 @@ class SettingsActivity : AppCompatActivity() {
                 true
             }
 
+            findPreference<Preference>("clock_tap")?.let { pref ->
+                updateClockTapSummary(pref)
+                pref.setOnPreferenceClickListener {
+                    showClockTapDialog(pref)
+                    true
+                }
+            }
+
+            findPreference<Preference>("favorites")?.setOnPreferenceClickListener {
+                showFavoritesDialog()
+                true
+            }
+
             findPreference<Preference>("check_now")?.setOnPreferenceClickListener { pref ->
                 checkForUpdatesNow(pref)
                 true
@@ -126,6 +139,60 @@ class SettingsActivity : AppCompatActivity() {
                         .filter { checked[it] }
                         .map { apps[it].packageName }
                         .toSet()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
+
+        private fun updateClockTapSummary(pref: Preference) {
+            val context = requireContext()
+            val target = Prefs(context).clockTapTarget
+            val repo = (context.applicationContext as LauncherApp).repo
+            pref.summary = repo.apps.firstOrNull { it.componentKey == target }?.label
+                ?: getString(R.string.clock_tap_default)
+        }
+
+        private fun showClockTapDialog(pref: Preference) {
+            val context = requireContext()
+            val repo = (context.applicationContext as LauncherApp).repo
+            val prefs = Prefs(context)
+            val apps = repo.apps
+            val labels = arrayOf(getString(R.string.clock_tap_default)) +
+                apps.map { it.label }
+            val current = prefs.clockTapTarget
+            val checkedIndex = apps.indexOfFirst { it.componentKey == current } + 1
+            MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.pref_clock_tap)
+                .setSingleChoiceItems(labels, checkedIndex) { dialog, which ->
+                    val value = if (which == 0) "" else apps[which - 1].componentKey
+                    preferenceManager.sharedPreferences?.edit()
+                        ?.putString(Prefs.KEY_CLOCK_TAP, value)?.apply()
+                    updateClockTapSummary(pref)
+                    dialog.dismiss()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
+
+        private fun showFavoritesDialog() {
+            val context = requireContext()
+            val repo = (context.applicationContext as LauncherApp).repo
+            val prefs = Prefs(context)
+            val apps = repo.apps
+            if (apps.isEmpty()) return
+            val favorites = prefs.favorites
+            val labels = apps.map { it.label }.toTypedArray()
+            val checked = BooleanArray(apps.size) { apps[it].packageName in favorites }
+            MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.pref_favorites)
+                .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                    checked[which] = isChecked
+                }
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    prefs.favorites = apps.indices
+                        .filter { checked[it] }
+                        .map { apps[it].packageName }
+                    prefs.onboardingDone = true
                 }
                 .setNegativeButton(R.string.cancel, null)
                 .show()
