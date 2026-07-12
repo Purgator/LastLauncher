@@ -6,6 +6,20 @@
         <item>@string/accent_amber</item>
         <item>@string/accent_pink</item>
     </string-array>
+    <string-array name="status_token_entries">
+        <item>@string/token_battery</item>
+        <item>@string/token_network</item>
+        <item>@string/token_alarm</item>
+        <item>@string/token_launches</item>
+        <item>@string/token_storage</item>
+    </string-array>
+    <string-array name="status_token_values">
+        <item>battery</item>
+        <item>network</item>
+        <item>alarm</item>
+        <item>launches</item>
+        <item>storage</item>
+    </string-array>
     <string-array name="accent_values">
         <item>cyan</item>
         <item>purple</item>

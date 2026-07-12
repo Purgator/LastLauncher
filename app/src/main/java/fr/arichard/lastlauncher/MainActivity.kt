@@ -547,9 +547,44 @@ class MainActivity : AppCompatActivity() {
         }
         hintStep = 0
         hintHandler.post(hintRunnable)
+        startNudges()
     }
 
-    private fun stopHints() = hintHandler.removeCallbacks(hintRunnable)
+    private fun stopHints() {
+        hintHandler.removeCallbacks(hintRunnable)
+        stopNudges()
+    }
+
+    // A gentle, endless slide in each edge's swipe direction — the hint "leans" the
+    // way you should swipe. Independent of the fade that plays on a text change.
+    private var leftNudge: android.animation.ObjectAnimator? = null
+    private var rightNudge: android.animation.ObjectAnimator? = null
+
+    private fun startNudges() {
+        stopNudges()
+        if (!prefs.animations) return
+        val amp = 7 * resources.displayMetrics.density
+        leftNudge = nudge(binding.hintLeft, amp)
+        rightNudge = nudge(binding.hintRight, -amp)
+    }
+
+    private fun nudge(view: View, dx: Float): android.animation.ObjectAnimator =
+        android.animation.ObjectAnimator.ofFloat(view, View.TRANSLATION_X, 0f, dx).apply {
+            duration = 900
+            repeatCount = android.animation.ObjectAnimator.INFINITE
+            repeatMode = android.animation.ObjectAnimator.REVERSE
+            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+            start()
+        }
+
+    private fun stopNudges() {
+        leftNudge?.cancel()
+        rightNudge?.cancel()
+        leftNudge = null
+        rightNudge = null
+        binding.hintLeft.translationX = 0f
+        binding.hintRight.translationX = 0f
+    }
 
     /** Renders one edge frame: [step] 0 shows the one-finger binding, 1 the two-finger. */
     private fun renderHints(step: Int) {
@@ -793,13 +828,30 @@ class MainActivity : AppCompatActivity() {
         val charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
             status == android.os.BatteryManager.BATTERY_STATUS_FULL
 
+        val enabled = prefs.statusTokens
+        if (enabled.isEmpty()) {
+            binding.statusLine.visibility = View.GONE
+            return
+        }
         PredictionEngine.launchesToday(this) { launches ->
-            val text = StatusLine.build(
-                percent, charging, currentNet(), nextAlarmText(), launches
+            val values = StatusLine.Values(
+                batteryPercent = percent,
+                charging = charging,
+                net = currentNet(),
+                nextAlarm = nextAlarmText(),
+                launchesToday = launches,
+                freeStorageGb = freeStorageGb(),
             )
-            binding.statusLine.text = text
+            binding.statusLine.text = StatusLine.build(enabled, values)
             binding.statusLine.visibility = View.VISIBLE
         }
+    }
+
+    private fun freeStorageGb(): Double = try {
+        val stat = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+        stat.availableBytes.toDouble() / 1_000_000_000.0
+    } catch (e: Exception) {
+        0.0
     }
 
     private fun currentNet(): StatusLine.Net {

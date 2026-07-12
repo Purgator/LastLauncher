@@ -22,6 +22,11 @@ class Prefs(context: Context) {
     val animations: Boolean get() = sp.getBoolean(KEY_ANIMATIONS, true)
     val showClock: Boolean get() = sp.getBoolean(KEY_SHOW_CLOCK, true)
     val showStatusLine: Boolean get() = sp.getBoolean(KEY_SHOW_STATUS_LINE, true)
+
+    /** Which status-line tokens are enabled (battery/network/alarm/launches/storage). */
+    val statusTokens: Set<String>
+        get() = sp.getStringSet(KEY_STATUS_TOKENS, null)
+            ?: fr.arichard.lastlauncher.ui.StatusLine.DEFAULT_TOKENS
     val accent: String get() = sp.getString(KEY_ACCENT, "cyan") ?: "cyan"
 
     /** Wallpaper dim, 0–80 percent. */
@@ -94,6 +99,7 @@ class Prefs(context: Context) {
         const val KEY_ANIMATIONS = "animations"
         const val KEY_SHOW_CLOCK = "show_clock"
         const val KEY_SHOW_STATUS_LINE = "show_status_line"
+        const val KEY_STATUS_TOKENS = "status_tokens"
         const val KEY_ACCENT = "accent"
         const val KEY_DIM = "dim"
         const val KEY_AUTO_UPDATE = "auto_update"
