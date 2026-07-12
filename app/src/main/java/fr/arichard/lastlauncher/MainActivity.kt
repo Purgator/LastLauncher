@@ -79,6 +79,7 @@ class MainActivity : AppCompatActivity() {
         setupGestures()
         setupSearch()
         setupSuggestionClicks()
+        setupDrawer()
         binding.updatePill.setOnClickListener {
             pendingUpdateVersion?.let { v -> UpdateManager.install(this, v) }
         }
@@ -120,8 +121,9 @@ class MainActivity : AppCompatActivity() {
     @Suppress("MissingSuperCall")
     @android.annotation.SuppressLint("MissingSuperCall")
     override fun onBackPressed() {
-        // A launcher never finishes; back just collapses search.
-        if (allAppsOpen || binding.searchInput.text.isNotEmpty()) resetToHome()
+        // A launcher never finishes; back just closes overlays.
+        if (drawerOpen) closeDrawer(animate = true)
+        else if (allAppsOpen || binding.searchInput.text.isNotEmpty()) resetToHome()
     }
 
     // ---------------------------------------------------------------- setup
@@ -160,6 +162,8 @@ class MainActivity : AppCompatActivity() {
             }
         })
         binding.root.isClickable = true
+        val touchSlop = android.view.ViewConfiguration.get(this).scaledTouchSlop
+        val edgeZone = 40 * resources.displayMetrics.density
         binding.root.setOnTouchListener { v, event ->
             detector.onTouchEvent(event)
             when (event.actionMasked) {
@@ -168,16 +172,57 @@ class MainActivity : AppCompatActivity() {
                     downY = event.y
                     downTime = event.eventTime
                     maxPointers = 1
+                    drawerDragging = false
+                    drawerCandidateSide = drawerEdgeCandidate(event.x, v.width, edgeZone)
                 }
-                MotionEvent.ACTION_POINTER_DOWN ->
+                MotionEvent.ACTION_POINTER_DOWN -> {
                     maxPointers = maxOf(maxPointers, event.pointerCount)
-                MotionEvent.ACTION_UP -> {
+                    // The drawer is a one-finger edge pull; a second finger cancels it.
+                    drawerCandidateSide = 0
+                }
+                MotionEvent.ACTION_MOVE -> updateDrawerDrag(event, touchSlop)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     v.performClick()
-                    handleSwipe(event.x - downX, event.y - downY, event.eventTime - downTime)
+                    if (drawerDragging) {
+                        settleDrawer()
+                        drawerDragging = false
+                    } else if (event.actionMasked == MotionEvent.ACTION_UP) {
+                        handleSwipe(event.x - downX, event.y - downY, event.eventTime - downTime)
+                    }
+                    drawerCandidateSide = 0
                 }
             }
             true
         }
+    }
+
+    /** Which side (if any) an edge touch could pull the drawer from, per its binding. */
+    private fun drawerEdgeCandidate(x: Float, width: Int, edgeZone: Float): Int {
+        if (drawerOpen) return 0
+        if (x < edgeZone &&
+            GestureBinding.decode(prefs.gestureBinding(Prefs.KEY_GESTURE_LR_1)).action ==
+            GestureAction.APP_DRAWER
+        ) return -1
+        if (x > width - edgeZone &&
+            GestureBinding.decode(prefs.gestureBinding(Prefs.KEY_GESTURE_RL_1)).action ==
+            GestureAction.APP_DRAWER
+        ) return 1
+        return 0
+    }
+
+    private fun updateDrawerDrag(event: MotionEvent, touchSlop: Int) {
+        if (drawerCandidateSide == 0) return
+        val dx = event.x - downX
+        if (!drawerDragging) {
+            if (abs(dx) < touchSlop || abs(dx) <= abs(event.y - downY)) return
+            // Must pull inward: left edge drags right, right edge drags left.
+            val inward = (drawerCandidateSide < 0 && dx > 0) || (drawerCandidateSide > 0 && dx < 0)
+            if (!inward) { drawerCandidateSide = 0; return }
+            drawerDragging = true
+            beginDrawerDrag(drawerCandidateSide)
+        }
+        val progress = if (drawerSide < 0) dx / drawerWidthPx else -dx / drawerWidthPx
+        setDrawerProgress(progress)
     }
 
     private fun handleSwipe(dx: Float, dy: Float, dtMs: Long) {
@@ -193,7 +238,8 @@ class MainActivity : AppCompatActivity() {
                 fingers == 1 -> Prefs.KEY_GESTURE_RL_1
                 else -> Prefs.KEY_GESTURE_RL_2
             }
-            runGesture(GestureBinding.decode(prefs.gestureBinding(key)))
+            // A left→right swipe pulls the drawer from the left, and vice versa.
+            runGesture(GestureBinding.decode(prefs.gestureBinding(key)), drawerSide = if (dx > 0) -1 else 1)
         } else if (abs(dy) > abs(dx) && abs(dy) > minDist) {
             // Vertical stays fixed: up = all apps, down = notifications.
             if (dy < 0) openAllApps()
@@ -201,7 +247,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun runGesture(bindingSpec: GestureBinding) {
+    private fun runGesture(bindingSpec: GestureBinding, drawerSide: Int = -1) {
         haptic(binding.root)
         when (bindingSpec.action) {
             GestureAction.NONE -> {}
@@ -212,6 +258,7 @@ class MainActivity : AppCompatActivity() {
             GestureAction.FLASHLIGHT -> toggleFlashlight()
             GestureAction.ASSISTANT -> launchAssistant()
             GestureAction.ALL_APPS -> openAllApps()
+            GestureAction.APP_DRAWER -> openDrawer(drawerSide, animate = true)
             GestureAction.SEARCH -> focusSearch(show = true)
             GestureAction.CAMERA -> startActivitySafely(
                 Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
@@ -222,6 +269,101 @@ class MainActivity : AppCompatActivity() {
                     repo.apps.firstOrNull { it.componentKey == key }?.let { launchApp(it, binding.root) }
                 }
         }
+    }
+
+    // ------------------------------------------------------------- drawer
+
+    private lateinit var drawerAdapter: AppAdapter
+    private var drawerOpen = false
+    private var drawerSide = -1          // -1 anchored left, +1 anchored right
+    private var drawerWidthPx = 0f
+    private var drawerCandidateSide = 0  // edge the current touch could pull the drawer from
+    private var drawerDragging = false
+
+    private fun setupDrawer() {
+        drawerAdapter = AppAdapter(
+            repo,
+            onAppClick = { entry, view -> closeDrawer(animate = false); launchApp(entry, view) },
+            onAppLongClick = { entry, view -> showAppMenu(entry, view) },
+            onCommand = {},
+        )
+        binding.drawerList.layoutManager = LinearLayoutManager(this)
+        binding.drawerList.adapter = drawerAdapter
+        binding.drawerList.itemAnimator = null
+        binding.drawerScrim.setOnClickListener { closeDrawer(animate = true) }
+        drawerWidthPx = 320 * resources.displayMetrics.density
+    }
+
+    private fun drawerContents(): List<AppEntry> {
+        val keys = prefs.drawerApps
+        return if (keys.isEmpty()) repo.visibleApps(prefs.hiddenApps)
+        else keys.mapNotNull { key -> repo.apps.firstOrNull { it.componentKey == key } }
+    }
+
+    /** Positions the panel on [side] and applies a 0..1 open [progress]. */
+    private fun placeDrawer(side: Int) {
+        drawerSide = side
+        val lp = binding.drawerList.layoutParams as android.widget.FrameLayout.LayoutParams
+        lp.gravity = if (side < 0) android.view.Gravity.START else android.view.Gravity.END
+        binding.drawerList.layoutParams = lp
+    }
+
+    private fun closedTranslation(): Float =
+        if (drawerSide < 0) -drawerWidthPx else drawerWidthPx
+
+    private fun setDrawerProgress(progress: Float) {
+        val p = progress.coerceIn(0f, 1f)
+        binding.drawerList.visibility = View.VISIBLE
+        binding.drawerScrim.visibility = View.VISIBLE
+        binding.drawerList.translationX = closedTranslation() * (1f - p)
+        binding.drawerScrim.alpha = 0.55f * p
+    }
+
+    private fun beginDrawerDrag(side: Int) {
+        placeDrawer(side)
+        drawerAdapter.submit(drawerContents())
+        setDrawerProgress(0f)
+    }
+
+    private fun openDrawer(side: Int, animate: Boolean) {
+        if (!::drawerAdapter.isInitialized) return
+        placeDrawer(side)
+        drawerAdapter.submit(drawerContents())
+        binding.drawerList.visibility = View.VISIBLE
+        binding.drawerScrim.visibility = View.VISIBLE
+        drawerOpen = true
+        if (animate && prefs.animations) {
+            binding.drawerList.translationX = closedTranslation()
+            binding.drawerList.animate().translationX(0f).setDuration(220).start()
+            binding.drawerScrim.animate().alpha(0.55f).setDuration(220).start()
+        } else {
+            setDrawerProgress(1f)
+        }
+    }
+
+    private fun closeDrawer(animate: Boolean) {
+        if (!::drawerAdapter.isInitialized) return
+        drawerOpen = false
+        drawerDragging = false
+        val hide = {
+            binding.drawerList.visibility = View.GONE
+            binding.drawerScrim.visibility = View.GONE
+        }
+        if (animate && prefs.animations && binding.drawerList.visibility == View.VISIBLE) {
+            binding.drawerList.animate().translationX(closedTranslation()).setDuration(200)
+                .withEndAction(hide).start()
+            binding.drawerScrim.animate().alpha(0f).setDuration(200).start()
+        } else {
+            hide()
+        }
+    }
+
+    /** On release, snap to whichever state the drag was closer to. */
+    private fun settleDrawer() {
+        val closed = closedTranslation()
+        val progress = 1f - (binding.drawerList.translationX / closed).coerceIn(0f, 1f)
+        if (progress > 0.4f) openDrawer(drawerSide, animate = true)
+        else closeDrawer(animate = true)
     }
 
     private fun setupSearch() {
@@ -371,6 +513,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun resetToHome() {
         allAppsOpen = false
+        closeDrawer(animate = false)
         if (binding.searchInput.text.isNotEmpty()) {
             binding.searchInput.setText("")
         }

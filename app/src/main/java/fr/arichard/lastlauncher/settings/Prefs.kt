@@ -43,6 +43,12 @@ class Prefs(context: Context) {
     /** App opened by tapping the clock; empty = the system clock app. */
     val clockTapTarget: String get() = sp.getString(KEY_CLOCK_TAP, "") ?: ""
 
+    /** Apps shown in the slide-out drawer; empty means every app. */
+    var drawerApps: List<String>
+        get() = (sp.getString(KEY_DRAWER_APPS, "") ?: "")
+            .split(',').filter { it.isNotEmpty() }
+        set(value) = sp.edit().putString(KEY_DRAWER_APPS, value.distinct().joinToString(",")).apply()
+
     /** Ordered go-to apps: cold-start suggestions and the static mode's content. */
     var favorites: List<String>
         get() = (sp.getString(KEY_FAVORITES, "") ?: "")
@@ -113,6 +119,7 @@ class Prefs(context: Context) {
         const val KEY_HIDDEN_APPS = "hidden_apps"
         const val KEY_CLOCK_TAP = "clock_tap_app"
         const val KEY_FAVORITES = "favorite_apps"
+        const val KEY_DRAWER_APPS = "drawer_apps"
         const val KEY_ONBOARDING_DONE = "onboarding_done"
         const val KEY_BT_PERM_ASKED = "bt_permission_asked"
         const val KEY_LAST_LAUNCHED = "last_launched_pkg"
