@@ -19,6 +19,8 @@ class AppAdapter(
     private val onAppClick: (AppEntry, View) -> Unit,
     private val onAppLongClick: (AppEntry, View) -> Unit,
     private val onCommand: (CommandProcessor.Command) -> Unit,
+    /** Notification bubble count for a package; 0 hides the bubble. */
+    private val badgeCount: (String) -> Int = { 0 },
 ) : RecyclerView.Adapter<AppAdapter.Holder>() {
 
     sealed interface Row
@@ -62,6 +64,9 @@ class AppAdapter(
             binding.appLabel.text = entry.label
             binding.appSubtitle.visibility = View.GONE
             binding.appIcon.setImageDrawable(repo.icon(entry))
+            val count = badgeCount(entry.packageName)
+            binding.appBadge.visibility = if (count > 0) View.VISIBLE else View.GONE
+            if (count > 0) binding.appBadge.text = if (count > 99) "99+" else count.toString()
             binding.root.setOnClickListener { onAppClick(entry, binding.appIcon) }
             binding.root.setOnLongClickListener {
                 onAppLongClick(entry, binding.root)
@@ -75,6 +80,7 @@ class AppAdapter(
             binding.appSubtitle.visibility =
                 if (command.subtitle.isNullOrEmpty()) View.GONE else View.VISIBLE
             binding.appIcon.setImageResource(command.iconRes)
+            binding.appBadge.visibility = View.GONE
             binding.root.setOnClickListener { onCommand(command) }
             binding.root.setOnLongClickListener(null)
         }
