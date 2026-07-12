@@ -81,8 +81,6 @@
     <string name="gesture_none">Nothing</string>
     <string name="gesture_search">Open command bar</string>
     <string name="gesture_app_drawer">Slide-out app drawer</string>
-    <string name="pref_drawer_apps">App drawer contents</string>
-    <string name="pref_drawer_apps_summary">Choose the apps in the slide-out drawer (none = all apps)</string>
     <string name="gesture_camera">Camera</string>
     <string name="gesture_dialer">Phone dialer</string>
     <string name="gesture_open_app">Open an app…</string>
@@ -119,6 +117,30 @@
     <string name="cat_apps">Apps</string>
     <string name="pref_hidden_apps">Hidden apps</string>
     <string name="pref_hidden_apps_summary">Choose apps to hide from search and suggestions</string>
+
+    <!-- App drawers -->
+    <string name="pref_drawers">App drawers</string>
+    <string name="pref_drawers_summary">Create wheel-style drawers and bind them to edge swipes</string>
+    <string name="drawer_choose">Choose a drawer</string>
+    <string name="drawer_add">Add a drawer</string>
+    <string name="drawer_add_title">New drawer</string>
+    <string name="drawer_name_hint">Drawer name</string>
+    <string name="drawer_edit_apps">Choose apps (none = all apps)</string>
+    <string name="drawer_rename">Rename</string>
+    <string name="drawer_delete">Delete drawer</string>
+    <string name="drawer_action_named">Drawer: %1$s</string>
+    <string name="drawer_pick_for_gesture">Which drawer?</string>
+    <string name="drawer_count_summary">%1$d apps</string>
+
+    <!-- Notifications -->
+    <string name="cat_notifications">Notifications</string>
+    <string name="pref_notif_access">Notification access</string>
+    <string name="pref_notif_access_summary">Grant access so LastLauncher can show unread counts and messages. Read on-device only; nothing is stored or sent.</string>
+    <string name="pref_notif_access_on">Granted — tap to manage</string>
+    <string name="pref_notif_badges">Count bubbles on icons</string>
+    <string name="pref_notif_badges_summary">Show a bubble with the unread count on apps</string>
+    <string name="pref_message_ticker">Message ticker</string>
+    <string name="pref_message_ticker_summary">Cycle unread messages under the clock, one at a time. Shows message contents on the home screen.</string>
 
     <string name="cat_updates">Updates</string>
     <string name="pref_auto_update">Automatic updates</string>

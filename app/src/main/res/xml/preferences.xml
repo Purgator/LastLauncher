@@ -118,9 +118,26 @@
             android:title="@string/pref_hidden_apps"
             android:summary="@string/pref_hidden_apps_summary" />
         <Preference
-            android:key="drawer_apps"
-            android:title="@string/pref_drawer_apps"
-            android:summary="@string/pref_drawer_apps_summary" />
+            android:key="drawers"
+            android:title="@string/pref_drawers"
+            android:summary="@string/pref_drawers_summary" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_notifications">
+        <Preference
+            android:key="notif_access"
+            android:title="@string/pref_notif_access"
+            android:summary="@string/pref_notif_access_summary" />
+        <SwitchPreferenceCompat
+            android:key="notif_badges"
+            android:title="@string/pref_notif_badges"
+            android:summary="@string/pref_notif_badges_summary"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="message_ticker"
+            android:title="@string/pref_message_ticker"
+            android:summary="@string/pref_message_ticker_summary"
+            android:defaultValue="false" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/cat_updates">

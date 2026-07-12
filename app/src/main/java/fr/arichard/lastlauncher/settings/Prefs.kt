@@ -43,11 +43,76 @@ class Prefs(context: Context) {
     /** App opened by tapping the clock; empty = the system clock app. */
     val clockTapTarget: String get() = sp.getString(KEY_CLOCK_TAP, "") ?: ""
 
-    /** Apps shown in the slide-out drawer; empty means every app. */
-    var drawerApps: List<String>
-        get() = (sp.getString(KEY_DRAWER_APPS, "") ?: "")
+    // ------------------------------------------------------------ app drawers
+
+    /** One configurable slide-out drawer: a name plus its apps (empty = every app). */
+    data class Drawer(val index: Int, val name: String, val apps: List<String>)
+
+    /** All configured drawers; always at least one. Migrates the legacy single list. */
+    fun drawers(): List<Drawer> {
+        migrateLegacyDrawer()
+        val count = sp.getInt(KEY_DRAWER_COUNT, 1).coerceIn(1, MAX_DRAWERS)
+        return (0 until count).map { drawer(it) }
+    }
+
+    /** A single drawer; out-of-range indexes fall back to drawer 0. */
+    fun drawer(index: Int): Drawer {
+        migrateLegacyDrawer()
+        val count = sp.getInt(KEY_DRAWER_COUNT, 1).coerceIn(1, MAX_DRAWERS)
+        val i = if (index in 0 until count) index else 0
+        val name = sp.getString("$KEY_DRAWER_NAME_PREFIX$i", null) ?: "Drawer ${i + 1}"
+        val apps = (sp.getString("$KEY_DRAWER_APPS_PREFIX$i", "") ?: "")
             .split(',').filter { it.isNotEmpty() }
-        set(value) = sp.edit().putString(KEY_DRAWER_APPS, value.distinct().joinToString(",")).apply()
+        return Drawer(i, name, apps)
+    }
+
+    fun saveDrawer(index: Int, name: String, apps: List<String>) {
+        sp.edit()
+            .putString("$KEY_DRAWER_NAME_PREFIX$index", name.trim().ifEmpty { "Drawer ${index + 1}" })
+            .putString("$KEY_DRAWER_APPS_PREFIX$index", apps.distinct().joinToString(","))
+            .apply()
+    }
+
+    /** Appends a drawer and returns its index, or -1 when the cap is reached. */
+    fun addDrawer(name: String): Int {
+        val count = drawers().size
+        if (count >= MAX_DRAWERS) return -1
+        saveDrawer(count, name, emptyList())
+        sp.edit().putInt(KEY_DRAWER_COUNT, count + 1).apply()
+        return count
+    }
+
+    /** Removes a drawer (never the last one) and compacts the ones after it. */
+    fun deleteDrawer(index: Int) {
+        val list = drawers().filter { it.index != index }
+        if (list.isEmpty()) return
+        val editor = sp.edit()
+        list.forEachIndexed { i, d ->
+            editor.putString("$KEY_DRAWER_NAME_PREFIX$i", d.name)
+            editor.putString("$KEY_DRAWER_APPS_PREFIX$i", d.apps.joinToString(","))
+        }
+        editor.remove("$KEY_DRAWER_NAME_PREFIX${list.size}")
+        editor.remove("$KEY_DRAWER_APPS_PREFIX${list.size}")
+        editor.putInt(KEY_DRAWER_COUNT, list.size)
+        editor.apply()
+    }
+
+    /** One-time move of the pre-1.4 single drawer list into drawer 0. */
+    private fun migrateLegacyDrawer() {
+        val legacy = sp.getString(KEY_DRAWER_APPS, null) ?: return
+        sp.edit()
+            .putString("${KEY_DRAWER_APPS_PREFIX}0", legacy)
+            .remove(KEY_DRAWER_APPS)
+            .apply()
+    }
+
+    // -------------------------------------------------------- notifications
+
+    /** Show unread-count bubbles on app icons (needs notification access). */
+    val notifBadges: Boolean get() = sp.getBoolean(KEY_NOTIF_BADGES, true)
+
+    /** Home-screen ticker cycling through unread messages. Opt-in (privacy). */
+    val messageTicker: Boolean get() = sp.getBoolean(KEY_MESSAGE_TICKER, false)
 
     /** Ordered go-to apps: cold-start suggestions and the static mode's content. */
     var favorites: List<String>
@@ -119,7 +184,13 @@ class Prefs(context: Context) {
         const val KEY_HIDDEN_APPS = "hidden_apps"
         const val KEY_CLOCK_TAP = "clock_tap_app"
         const val KEY_FAVORITES = "favorite_apps"
-        const val KEY_DRAWER_APPS = "drawer_apps"
+        const val KEY_DRAWER_APPS = "drawer_apps" // legacy single drawer, migrated
+        const val KEY_DRAWER_COUNT = "drawer_count"
+        const val KEY_DRAWER_NAME_PREFIX = "drawer_name_"
+        const val KEY_DRAWER_APPS_PREFIX = "drawer_apps_"
+        const val MAX_DRAWERS = 5
+        const val KEY_NOTIF_BADGES = "notif_badges"
+        const val KEY_MESSAGE_TICKER = "message_ticker"
         const val KEY_ONBOARDING_DONE = "onboarding_done"
         const val KEY_BT_PERM_ASKED = "bt_permission_asked"
         const val KEY_LAST_LAUNCHED = "last_launched_pkg"
