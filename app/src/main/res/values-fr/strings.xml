@@ -87,6 +87,8 @@
     <string name="pref_animations">Animations</string>
     <string name="pref_animations_summary">Effets discrets d’apparition et d’appui. Désactivez pour une autonomie maximale.</string>
     <string name="pref_show_clock">Afficher l’horloge</string>
+    <string name="pref_status_line">Ligne d’état</string>
+    <string name="pref_status_line_summary">Un relevé façon terminal sous la date : batterie, réseau, prochaine alarme, applications lancées aujourd’hui</string>
 
     <string name="cat_apps">Applications</string>
     <string name="pref_hidden_apps">Applications masquées</string>

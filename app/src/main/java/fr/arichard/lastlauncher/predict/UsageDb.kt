@@ -71,6 +71,15 @@ class UsageDb(context: Context) :
         return rows
     }
 
+    /** Number of launches logged since [sinceTs]. */
+    fun countSince(sinceTs: Long): Int {
+        readableDatabase.rawQuery(
+            "SELECT COUNT(*) FROM launches WHERE ts >= ?", arrayOf(sinceTs.toString())
+        ).use { c ->
+            return if (c.moveToFirst()) c.getInt(0) else 0
+        }
+    }
+
     /** Caps the table so it can never grow unbounded. */
     fun prune() {
         writableDatabase.execSQL(
