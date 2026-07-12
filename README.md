@@ -18,8 +18,9 @@ The most likely app is the big glowing button; two runners-up flank it. Everythi
 
 - 🧠 **Launcher memory** — on-device prediction from time of day, weekday rhythm, app-to-app sequences, and context triggers (Bluetooth, headphones, charging)
 - ⌨️ **Command bar with modes** — the wheel on its left cycles **Smart · Apps · Settings · Ask**. Smart mode launches apps *and* jumps to settings by name (`wifi` → Wi‑Fi settings, no prefix), does quick math (`12*7` → tap to copy) and opens URLs; a `>` prefix forces the quick-action palette. Long or question-like text routes to the assistant — no web search. App search even matches package keywords (`music` finds Spotify).
-- 🖐️ **Configurable edge gestures** — one- and two-finger swipes on each side (`>`, `>>`, `<`, `<<` in the launcher's CLI notation), each mappable to any action or app. Monospace hints on the screen edges gently lean the way you should swipe and fade as they cycle.
-- 🗄️ **Slide-out app drawer** — bind it to an edge swipe and a configurable app drawer follows your finger as you pull it in from the side.
+- 🖐️ **Configurable edge gestures** — one- and two-finger swipes on each side (`>`, `>>`, `<`, `<<` in the launcher's CLI notation), each mappable to any action or app. Monospace hints on the screen edges travel the way you should swipe, fading in and out as they cycle.
+- 🗄️ **Wheel app drawers** — create several named drawers (each with its own apps) and bind any of them to an edge swipe. The panel follows your finger as you pull it in, scrolls like a rotating wheel, and a drag back toward the edge closes it.
+- 🔔 **Notification bubbles & message ticker** *(opt-in)* — a count bubble on app icons for unread notifications, and an optional ticker under the clock that cycles your unread messages one at a time, fading between them. Reads notifications on-device only; nothing is stored or sent.
 - 🖥️ **Customizable CLI status line** — an optional terminal-style readout under the date; pick which fields show (battery, network, next alarm, apps launched today, free storage).
 - 👆 **Double-tap to lock** the screen (tiny accessibility service, never reads screen content)
 - 📲 **One page, zero friction** — swipe up for all apps (keyboard opens with it), swipe down for notifications, long-press for settings
