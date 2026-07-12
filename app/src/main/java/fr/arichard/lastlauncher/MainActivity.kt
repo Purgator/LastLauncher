@@ -37,6 +37,8 @@ import fr.arichard.lastlauncher.apps.AppEntry
 import fr.arichard.lastlauncher.apps.AppRepository
 import fr.arichard.lastlauncher.command.CommandProcessor
 import fr.arichard.lastlauncher.databinding.ActivityMainBinding
+import fr.arichard.lastlauncher.gesture.GestureAction
+import fr.arichard.lastlauncher.gesture.GestureBinding
 import fr.arichard.lastlauncher.lock.LockService
 import fr.arichard.lastlauncher.predict.PredictionEngine
 import fr.arichard.lastlauncher.settings.Prefs
@@ -100,6 +102,11 @@ class MainActivity : AppCompatActivity() {
         checkForUpdate()
     }
 
+    override fun onPause() {
+        super.onPause()
+        stopHints()
+    }
+
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         // Home pressed while already home: return to the clean state.
@@ -129,7 +136,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Manual swipe tracking so we know the finger count, which GestureDetector hides.
+    private var downX = 0f
+    private var downY = 0f
+    private var downTime = 0L
+    private var maxPointers = 1
+
     private fun setupGestures() {
+        // Double-tap and long-press still come from GestureDetector; swipes are tracked
+        // manually below to distinguish one- from two-finger horizontal gestures.
         val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDoubleTap(e: MotionEvent): Boolean {
                 if (prefs.doubleTapLock) lockScreen()
@@ -140,24 +155,69 @@ class MainActivity : AppCompatActivity() {
                 haptic(binding.root)
                 startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
             }
-
-            override fun onFling(
-                e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float,
-            ): Boolean {
-                if (e1 == null || abs(vy) < 800 || abs(vy) < abs(vx)) return false
-                if (vy < 0) {
-                    openAllApps()
-                } else if (prefs.swipeDownNotifications) {
-                    LockService.openNotificationShade(this@MainActivity)
-                }
-                return true
-            }
         })
         binding.root.isClickable = true
         binding.root.setOnTouchListener { v, event ->
-            if (event.action == MotionEvent.ACTION_UP) v.performClick()
             detector.onTouchEvent(event)
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                    downTime = event.eventTime
+                    maxPointers = 1
+                }
+                MotionEvent.ACTION_POINTER_DOWN ->
+                    maxPointers = maxOf(maxPointers, event.pointerCount)
+                MotionEvent.ACTION_UP -> {
+                    v.performClick()
+                    handleSwipe(event.x - downX, event.y - downY, event.eventTime - downTime)
+                }
+            }
             true
+        }
+    }
+
+    private fun handleSwipe(dx: Float, dy: Float, dtMs: Long) {
+        if (dtMs > 700) return
+        val density = resources.displayMetrics.density
+        val minDist = 90 * density
+        val fingers = maxPointers.coerceIn(1, 2)
+        if (abs(dx) > abs(dy) && abs(dx) > minDist) {
+            // Horizontal: direction picks the edge set, finger count picks the slot.
+            val key = when {
+                dx > 0 && fingers == 1 -> Prefs.KEY_GESTURE_LR_1
+                dx > 0 -> Prefs.KEY_GESTURE_LR_2
+                fingers == 1 -> Prefs.KEY_GESTURE_RL_1
+                else -> Prefs.KEY_GESTURE_RL_2
+            }
+            runGesture(GestureBinding.decode(prefs.gestureBinding(key)))
+        } else if (abs(dy) > abs(dx) && abs(dy) > minDist) {
+            // Vertical stays fixed: up = all apps, down = notifications.
+            if (dy < 0) openAllApps()
+            else if (prefs.swipeDownNotifications) LockService.openNotificationShade(this)
+        }
+    }
+
+    private fun runGesture(bindingSpec: GestureBinding) {
+        haptic(binding.root)
+        when (bindingSpec.action) {
+            GestureAction.NONE -> {}
+            GestureAction.NOTIFICATIONS -> LockService.openNotificationShade(this)
+            GestureAction.QUICK_SETTINGS ->
+                if (!LockService.openQuickSettings()) LockService.openNotificationShade(this)
+            GestureAction.LOCK -> lockScreen()
+            GestureAction.FLASHLIGHT -> toggleFlashlight()
+            GestureAction.ASSISTANT -> launchAssistant()
+            GestureAction.ALL_APPS -> openAllApps()
+            GestureAction.SEARCH -> focusSearch(show = true)
+            GestureAction.CAMERA -> startActivitySafely(
+                Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
+            )
+            GestureAction.DIALER -> startActivitySafely(Intent(Intent.ACTION_DIAL))
+            GestureAction.OPEN_APP ->
+                bindingSpec.appKey?.let { key ->
+                    repo.apps.firstOrNull { it.componentKey == key }?.let { launchApp(it, binding.root) }
+                }
         }
     }
 
@@ -222,6 +282,7 @@ class MainActivity : AppCompatActivity() {
         if (query.isEmpty() && !allAppsOpen) {
             binding.results.visibility = View.GONE
             binding.suggestionsBlock.visibility = View.VISIBLE
+            startHints()
             return
         }
         val list = if (query.isEmpty()) {
@@ -234,6 +295,9 @@ class MainActivity : AppCompatActivity() {
         binding.results.visibility = View.VISIBLE
         binding.suggestionsBlock.visibility = View.INVISIBLE
         binding.results.scrollToPosition(0)
+        stopHints()
+        binding.hintLeft.visibility = View.GONE
+        binding.hintRight.visibility = View.GONE
     }
 
     private fun openAllApps() {
@@ -249,6 +313,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.results.visibility = View.GONE
         binding.suggestionsBlock.visibility = View.VISIBLE
+        startHints()
         if (prefs.keyboardAlways) {
             focusSearch(show = true)
         } else {
@@ -378,6 +443,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun startActivitySafely(intent: Intent) {
+        try {
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            // nothing resolves this intent on the device
+        }
+    }
+
     private fun openUrl(url: String) {
         try {
             startActivity(
@@ -445,6 +518,85 @@ class MainActivity : AppCompatActivity() {
             updateStarterPill()
             refreshSuggestions()
         }
+    }
+
+    // -------------------------------------------------------- gesture hints
+
+    // Each edge cycles between its one- and two-finger bindings.
+    private val hintHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var hintStep = 0
+    private val hintRunnable = object : Runnable {
+        override fun run() {
+            renderHints(hintStep)
+            hintStep = hintStep xor 1
+            hintHandler.postDelayed(this, 2600)
+        }
+    }
+
+    private fun startHints() {
+        hintHandler.removeCallbacks(hintRunnable)
+        val show = prefs.showGestureHints &&
+            binding.results.visibility != View.VISIBLE
+        if (!show) {
+            binding.hintLeft.visibility = View.GONE
+            binding.hintRight.visibility = View.GONE
+            return
+        }
+        hintStep = 0
+        hintHandler.post(hintRunnable)
+    }
+
+    private fun stopHints() = hintHandler.removeCallbacks(hintRunnable)
+
+    /** Renders one edge frame: [step] 0 shows the one-finger binding, 1 the two-finger. */
+    private fun renderHints(step: Int) {
+        val accent = accentColor()
+        val leftKey = if (step == 0) Prefs.KEY_GESTURE_LR_1 else Prefs.KEY_GESTURE_LR_2
+        val rightKey = if (step == 0) Prefs.KEY_GESTURE_RL_1 else Prefs.KEY_GESTURE_RL_2
+        val arrows = if (step == 0) 1 else 2
+        crossfadeHint(binding.hintLeft, leftEdgeText(leftKey, arrows), accent)
+        crossfadeHint(binding.hintRight, rightEdgeText(rightKey, arrows), accent)
+    }
+
+    private fun leftEdgeText(key: String, arrows: Int): String? {
+        val label = bindingLabel(prefs.gestureBinding(key)) ?: return null
+        return "${">".repeat(arrows)} $label"
+    }
+
+    private fun rightEdgeText(key: String, arrows: Int): String? {
+        val label = bindingLabel(prefs.gestureBinding(key)) ?: return null
+        return "$label ${"<".repeat(arrows)}"
+    }
+
+    /** Human label for an encoded binding, or null for NONE (hint hidden). */
+    private fun bindingLabel(encoded: String): String? {
+        val spec = GestureBinding.decode(encoded)
+        if (spec.action == GestureAction.NONE) return null
+        if (spec.action == GestureAction.OPEN_APP) {
+            val app = spec.appKey?.let { key -> repo.apps.firstOrNull { it.componentKey == key } }
+                ?: return null
+            return app.label
+        }
+        return getString(spec.action.labelRes)
+    }
+
+    private fun crossfadeHint(view: TextView, text: String?, accent: Int) {
+        if (text == null) {
+            view.visibility = View.GONE
+            return
+        }
+        view.setTextColor(ColorUtils.setAlphaComponent(accent, 0xB0))
+        if (!prefs.animations) {
+            view.text = text
+            view.visibility = View.VISIBLE
+            view.alpha = 0.85f
+            return
+        }
+        view.animate().alpha(0f).setDuration(200).withEndAction {
+            view.text = text
+            view.visibility = View.VISIBLE
+            view.animate().alpha(0.85f).setDuration(200).start()
+        }.start()
     }
 
     private fun updateStarterPill() {
