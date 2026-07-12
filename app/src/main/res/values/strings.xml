@@ -87,6 +87,8 @@
     <string name="pref_animations">Animations</string>
     <string name="pref_animations_summary">Subtle entrance and press effects. Turn off for maximum battery savings.</string>
     <string name="pref_show_clock">Show clock</string>
+    <string name="pref_status_line">Status line</string>
+    <string name="pref_status_line_summary">A terminal-style readout under the date: battery, network, next alarm, apps launched today</string>
 
     <string name="cat_apps">Apps</string>
     <string name="pref_hidden_apps">Hidden apps</string>
