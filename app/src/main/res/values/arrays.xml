@@ -20,6 +20,12 @@
         <item>launches</item>
         <item>storage</item>
     </string-array>
+    <!-- Must match StatusLine.DEFAULT_TOKENS so the picker and the home screen agree. -->
+    <string-array name="status_token_defaults">
+        <item>network</item>
+        <item>alarm</item>
+        <item>launches</item>
+    </string-array>
     <string-array name="accent_values">
         <item>cyan</item>
         <item>purple</item>

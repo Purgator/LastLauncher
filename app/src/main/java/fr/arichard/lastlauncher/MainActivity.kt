@@ -2,6 +2,7 @@ package fr.arichard.lastlauncher
 
 import android.Manifest
 import android.app.ActivityOptions
+import android.app.SearchManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.GradientDrawable
@@ -165,30 +166,47 @@ class MainActivity : AppCompatActivity() {
         val touchSlop = android.view.ViewConfiguration.get(this).scaledTouchSlop
         val edgeZone = 40 * resources.displayMetrics.density
         binding.root.setOnTouchListener { v, event ->
+            // ACTION_DOWN must be handled before the detector sees it: a pending drawer pull
+            // disables long-press so a hesitant edge grab doesn't open Settings instead.
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                downX = event.x
+                downY = event.y
+                downTime = event.eventTime
+                maxPointers = 1
+                drawerDragging = false
+                drawerCandidateSide = drawerEdgeCandidate(event.x, v.width, edgeZone)
+                detector.setIsLongpressEnabled(drawerCandidateSide == 0)
+                if (drawerCandidateSide != 0) {
+                    velocityTracker = android.view.VelocityTracker.obtain()
+                    velocityTracker?.addMovement(event)
+                }
+            }
             detector.onTouchEvent(event)
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    downX = event.x
-                    downY = event.y
-                    downTime = event.eventTime
-                    maxPointers = 1
-                    drawerDragging = false
-                    drawerCandidateSide = drawerEdgeCandidate(event.x, v.width, edgeZone)
-                }
                 MotionEvent.ACTION_POINTER_DOWN -> {
                     maxPointers = maxOf(maxPointers, event.pointerCount)
                     // The drawer is a one-finger edge pull; a second finger cancels it.
                     drawerCandidateSide = 0
                 }
-                MotionEvent.ACTION_MOVE -> updateDrawerDrag(event, touchSlop)
+                MotionEvent.ACTION_MOVE -> {
+                    velocityTracker?.addMovement(event)
+                    updateDrawerDrag(event, touchSlop)
+                }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     v.performClick()
                     if (drawerDragging) {
-                        settleDrawer()
+                        val vx = velocityTracker?.let {
+                            it.addMovement(event)
+                            it.computeCurrentVelocity(1000)
+                            it.xVelocity
+                        } ?: 0f
+                        settleDrawer(vx)
                         drawerDragging = false
                     } else if (event.actionMasked == MotionEvent.ACTION_UP) {
                         handleSwipe(event.x - downX, event.y - downY, event.eventTime - downTime)
                     }
+                    velocityTracker?.recycle()
+                    velocityTracker = null
                     drawerCandidateSide = 0
                 }
             }
@@ -196,18 +214,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Which side (if any) an edge touch could pull the drawer from, per its binding. */
+    /**
+     * Which side (if any) an edge touch could pull the drawer from. The interactive pull
+     * is a one-finger gesture, so it engages when APP_DRAWER is bound to either slot of
+     * that edge's direction — the finger count only matters for the fling path.
+     */
     private fun drawerEdgeCandidate(x: Float, width: Int, edgeZone: Float): Int {
         if (drawerOpen) return 0
-        if (x < edgeZone &&
-            GestureBinding.decode(prefs.gestureBinding(Prefs.KEY_GESTURE_LR_1)).action ==
-            GestureAction.APP_DRAWER
-        ) return -1
-        if (x > width - edgeZone &&
-            GestureBinding.decode(prefs.gestureBinding(Prefs.KEY_GESTURE_RL_1)).action ==
-            GestureAction.APP_DRAWER
-        ) return 1
+        if (x < edgeZone && edgeBoundToDrawer(Prefs.KEY_GESTURE_LR_1, Prefs.KEY_GESTURE_LR_2)) return -1
+        if (x > width - edgeZone && edgeBoundToDrawer(Prefs.KEY_GESTURE_RL_1, Prefs.KEY_GESTURE_RL_2)) return 1
         return 0
+    }
+
+    private fun edgeBoundToDrawer(vararg keys: String): Boolean = keys.any {
+        GestureBinding.decode(prefs.gestureBinding(it)).action == GestureAction.APP_DRAWER
     }
 
     private fun updateDrawerDrag(event: MotionEvent, touchSlop: Int) {
@@ -221,7 +241,7 @@ class MainActivity : AppCompatActivity() {
             drawerDragging = true
             beginDrawerDrag(drawerCandidateSide)
         }
-        val progress = if (drawerSide < 0) dx / drawerWidthPx else -dx / drawerWidthPx
+        val progress = if (drawerSide < 0) dx / drawerOffset() else -dx / drawerOffset()
         setDrawerProgress(progress)
     }
 
@@ -266,7 +286,7 @@ class MainActivity : AppCompatActivity() {
             GestureAction.DIALER -> startActivitySafely(Intent(Intent.ACTION_DIAL))
             GestureAction.OPEN_APP ->
                 bindingSpec.appKey?.let { key ->
-                    repo.apps.firstOrNull { it.componentKey == key }?.let { launchApp(it, binding.root) }
+                    repo.byComponentKey(key)?.let { launchApp(it, binding.root) }
                 }
         }
     }
@@ -276,9 +296,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var drawerAdapter: AppAdapter
     private var drawerOpen = false
     private var drawerSide = -1          // -1 anchored left, +1 anchored right
-    private var drawerWidthPx = 0f
     private var drawerCandidateSide = 0  // edge the current touch could pull the drawer from
     private var drawerDragging = false
+    private var velocityTracker: android.view.VelocityTracker? = null
 
     private fun setupDrawer() {
         drawerAdapter = AppAdapter(
@@ -291,16 +311,15 @@ class MainActivity : AppCompatActivity() {
         binding.drawerList.adapter = drawerAdapter
         binding.drawerList.itemAnimator = null
         binding.drawerScrim.setOnClickListener { closeDrawer(animate = true) }
-        drawerWidthPx = 320 * resources.displayMetrics.density
     }
 
     private fun drawerContents(): List<AppEntry> {
         val keys = prefs.drawerApps
         return if (keys.isEmpty()) repo.visibleApps(prefs.hiddenApps)
-        else keys.mapNotNull { key -> repo.apps.firstOrNull { it.componentKey == key } }
+        else keys.mapNotNull { repo.byComponentKey(it) }
     }
 
-    /** Positions the panel on [side] and applies a 0..1 open [progress]. */
+    /** Anchors the panel to the given [side] (-1 left, +1 right) via its layout gravity. */
     private fun placeDrawer(side: Int) {
         drawerSide = side
         val lp = binding.drawerList.layoutParams as android.widget.FrameLayout.LayoutParams
@@ -308,8 +327,16 @@ class MainActivity : AppCompatActivity() {
         binding.drawerList.layoutParams = lp
     }
 
+    /** Off-screen distance for the closed panel: measured width + its outer margin. */
+    private fun drawerOffset(): Float {
+        val lp = binding.drawerList.layoutParams as android.view.ViewGroup.MarginLayoutParams
+        val margin = if (drawerSide < 0) lp.leftMargin else lp.rightMargin
+        val w = binding.drawerList.width
+        return if (w > 0) (w + margin).toFloat() else 320 * resources.displayMetrics.density
+    }
+
     private fun closedTranslation(): Float =
-        if (drawerSide < 0) -drawerWidthPx else drawerWidthPx
+        if (drawerSide < 0) -drawerOffset() else drawerOffset()
 
     private fun setDrawerProgress(progress: Float) {
         val p = progress.coerceIn(0f, 1f)
@@ -327,13 +354,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun openDrawer(side: Int, animate: Boolean) {
         if (!::drawerAdapter.isInitialized) return
+        // Already visible (settling from a drag) → animate on from the finger position,
+        // don't snap back to fully closed first.
+        val wasVisible = binding.drawerList.visibility == View.VISIBLE
         placeDrawer(side)
         drawerAdapter.submit(drawerContents())
         binding.drawerList.visibility = View.VISIBLE
         binding.drawerScrim.visibility = View.VISIBLE
         drawerOpen = true
         if (animate && prefs.animations) {
-            binding.drawerList.translationX = closedTranslation()
+            if (!wasVisible) binding.drawerList.translationX = closedTranslation()
             binding.drawerList.animate().translationX(0f).setDuration(220).start()
             binding.drawerScrim.animate().alpha(0.55f).setDuration(220).start()
         } else {
@@ -358,11 +388,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** On release, snap to whichever state the drag was closer to. */
-    private fun settleDrawer() {
+    /**
+     * On release, settle open or closed. A decisive flick wins by its direction (so a
+     * fast short pull still opens); otherwise fall back to how far it was dragged.
+     */
+    private fun settleDrawer(velocityX: Float) {
+        val fast = abs(velocityX) > 800 * resources.displayMetrics.density
+        val opening = if (drawerSide < 0) velocityX > 0 else velocityX < 0
         val closed = closedTranslation()
         val progress = 1f - (binding.drawerList.translationX / closed).coerceIn(0f, 1f)
-        if (progress > 0.4f) openDrawer(drawerSide, animate = true)
+        val open = if (fast) opening else progress > 0.4f
+        if (open) openDrawer(drawerSide, animate = true)
         else closeDrawer(animate = true)
     }
 
@@ -390,7 +426,10 @@ class MainActivity : AppCompatActivity() {
                 when (val row = adapter.primaryRow()) {
                     is AppAdapter.AppRow -> launchApp(row.entry, binding.searchInput)
                     is AppAdapter.CommandRow -> runCommand(row.command)
-                    null -> if (query.isNotEmpty()) launchAssistant()
+                    // Nothing matched: only the assistant-oriented modes fall through to it.
+                    null -> if (query.isNotEmpty() &&
+                        (searchMode == SearchMode.SMART || searchMode == SearchMode.ASK)
+                    ) launchAssistant(query)
                 }
                 true
             } else {
@@ -452,22 +491,23 @@ class MainActivity : AppCompatActivity() {
     private fun onQueryChanged(raw: String) {
         val query = raw.trim()
         val mode = searchMode
-        // Empty on the home screen returns to suggestions — except Settings mode, which
-        // browses the full settings list even when empty.
-        if (query.isEmpty() && !allAppsOpen && mode != SearchMode.SETTINGS) {
+        // Empty with no active view is the home screen — suggestions + hints, mode-independent.
+        if (query.isEmpty() && !allAppsOpen) {
             binding.results.visibility = View.GONE
             binding.suggestionsBlock.visibility = View.VISIBLE
             startHints()
             return
         }
 
-        val showApps = mode == SearchMode.SMART || mode == SearchMode.APPS
+        // "All apps" is a dedicated affordance: it always lists (and filters) apps, whatever
+        // the command-bar mode, and shows no command rows. Otherwise the mode governs.
+        val listApps = allAppsOpen || mode == SearchMode.SMART || mode == SearchMode.APPS
         val apps = when {
-            !showApps -> emptyList()
+            !listApps -> emptyList()
             query.isEmpty() -> repo.visibleApps(prefs.hiddenApps).reversed()
             else -> repo.search(query, prefs.hiddenApps)
         }
-        val commands = buildCommands(query, mode, apps.size)
+        val commands = if (allAppsOpen) emptyList() else buildCommands(query, mode, apps.size)
         adapter.submit(apps, commands)
 
         binding.results.visibility = View.VISIBLE
@@ -553,13 +593,28 @@ class MainActivity : AppCompatActivity() {
         binding.root.postDelayed({ resetToHome() }, 400)
     }
 
-    private fun launchAssistant() {
+    /**
+     * Opens the assistant. When [query] is given (Ask mode / "ask the assistant" row),
+     * the text is carried along: Android has no universal "ask the assistant this text"
+     * intent, so we deliver it via the query-bearing search intent the Google app and
+     * most assistants handle, falling back to the plain voice/assist entry points.
+     */
+    private fun launchAssistant(query: String? = null) {
         haptic(binding.modeBtn)
-        val candidates = listOf(
-            Intent(Intent.ACTION_VOICE_COMMAND),
-            Intent("android.intent.action.ASSIST"),
-            Intent(Intent.ACTION_WEB_SEARCH),
-        )
+        val q = query?.trim().orEmpty()
+        val candidates = if (q.isNotEmpty()) {
+            listOf(
+                Intent(Intent.ACTION_ASSIST).putExtra(SearchManager.QUERY, q),
+                Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, q),
+                Intent(Intent.ACTION_VOICE_COMMAND),
+            )
+        } else {
+            listOf(
+                Intent(Intent.ACTION_VOICE_COMMAND),
+                Intent(Intent.ACTION_ASSIST),
+                Intent(Intent.ACTION_WEB_SEARCH),
+            )
+        }
         for (intent in candidates) {
             try {
                 startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -614,7 +669,7 @@ class MainActivity : AppCompatActivity() {
             }
             is CommandProcessor.Action.OpenUrl -> openUrl(action.url)
             is CommandProcessor.Action.Quick -> runQuickAction(action.id)
-            is CommandProcessor.Action.Assist -> launchAssistant()
+            is CommandProcessor.Action.Assist -> launchAssistant(action.query)
         }
     }
 
@@ -681,13 +736,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openUrl(url: String) {
-        try {
-            startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        } catch (e: Exception) {
-            // no browser
-        }
+        startActivitySafely(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
 
     /** Tapping the clock opens the configured app (system clock by default). */
@@ -695,18 +744,12 @@ class MainActivity : AppCompatActivity() {
         haptic(binding.clock)
         val target = prefs.clockTapTarget
         if (target.isNotEmpty()) {
-            repo.apps.firstOrNull { it.componentKey == target }?.let {
+            repo.byComponentKey(target)?.let {
                 launchApp(it, binding.clock)
                 return
             }
         }
-        try {
-            startActivity(
-                Intent(AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        } catch (e: Exception) {
-            // No clock app resolvable: nothing sensible to do.
-        }
+        startActivitySafely(Intent(AlarmClock.ACTION_SHOW_ALARMS))
     }
 
     /**
@@ -989,27 +1032,30 @@ class MainActivity : AppCompatActivity() {
     private var statusReceiver: android.content.BroadcastReceiver? = null
 
     private fun setupStatusLine() {
+        unregisterStatusReceiver()
         if (!prefs.showStatusLine) {
             binding.statusLine.visibility = View.GONE
-            unregisterStatusReceiver()
             return
         }
-        binding.statusLine.setTextColor(
-            ColorUtils.setAlphaComponent(accentColor(), 0xC0)
-        )
-        refreshStatusLine()
-        if (statusReceiver == null) {
-            statusReceiver = object : android.content.BroadcastReceiver() {
-                override fun onReceive(c: android.content.Context?, i: Intent?) = refreshStatusLine()
-            }
-            val filter = android.content.IntentFilter().apply {
-                addAction(Intent.ACTION_BATTERY_CHANGED)
-                addAction(Intent.ACTION_TIME_TICK)
-                addAction(Intent.ACTION_POWER_CONNECTED)
-                addAction(Intent.ACTION_POWER_DISCONNECTED)
-            }
-            registerReceiver(statusReceiver, filter)
+        val enabled = prefs.statusTokens
+        if (enabled.isEmpty()) {
+            binding.statusLine.visibility = View.GONE
+            return
         }
+        binding.statusLine.setTextColor(ColorUtils.setAlphaComponent(accentColor(), 0xC0))
+        refreshStatusLine()
+        // A minute tick covers alarm/launches/network; only subscribe to the (frequent)
+        // battery broadcasts when the battery token is actually shown.
+        statusReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context?, i: Intent?) = refreshStatusLine()
+        }
+        val filter = android.content.IntentFilter(Intent.ACTION_TIME_TICK)
+        if (StatusLine.BATTERY in enabled) {
+            filter.addAction(Intent.ACTION_BATTERY_CHANGED)
+            filter.addAction(Intent.ACTION_POWER_CONNECTED)
+            filter.addAction(Intent.ACTION_POWER_DISCONNECTED)
+        }
+        registerReceiver(statusReceiver, filter)
     }
 
     private fun unregisterStatusReceiver() {
@@ -1025,31 +1071,38 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshStatusLine() {
         if (!prefs.showStatusLine) return
-        val battery = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        val level = battery?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = battery?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100) ?: 100
-        val percent = if (level >= 0 && scale > 0) level * 100 / scale else 0
-        val status = battery?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
-        val charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
-            status == android.os.BatteryManager.BATTERY_STATUS_FULL
-
         val enabled = prefs.statusTokens
         if (enabled.isEmpty()) {
             binding.statusLine.visibility = View.GONE
             return
         }
-        PredictionEngine.launchesToday(this) { launches ->
-            val values = StatusLine.Values(
-                batteryPercent = percent,
-                charging = charging,
-                net = currentNet(),
-                nextAlarm = nextAlarmText(),
-                launchesToday = launches,
-                freeStorageGb = freeStorageGb(),
+        // Compute only the fields that are actually shown.
+        var percent = 0
+        var charging = false
+        if (StatusLine.BATTERY in enabled) {
+            val battery = registerReceiver(
+                null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
             )
-            binding.statusLine.text = StatusLine.build(enabled, values)
+            val level = battery?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = battery?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100) ?: 100
+            percent = if (level >= 0 && scale > 0) level * 100 / scale else 0
+            val status = battery?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+            charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                status == android.os.BatteryManager.BATTERY_STATUS_FULL
+        }
+        val net = if (StatusLine.NETWORK in enabled) currentNet() else StatusLine.Net.OFFLINE
+        val alarm = if (StatusLine.ALARM in enabled) nextAlarmText() else null
+        val storage = if (StatusLine.STORAGE in enabled) freeStorageGb() else 0.0
+
+        fun render(launches: Int) {
+            binding.statusLine.text = StatusLine.build(
+                enabled,
+                StatusLine.Values(percent, charging, net, alarm, launches, storage)
+            )
             binding.statusLine.visibility = View.VISIBLE
         }
+        if (StatusLine.LAUNCHES in enabled) PredictionEngine.launchesToday(this) { render(it) }
+        else render(0)
     }
 
     private fun freeStorageGb(): Double = try {

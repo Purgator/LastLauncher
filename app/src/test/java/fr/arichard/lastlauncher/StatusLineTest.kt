@@ -37,6 +37,18 @@ class StatusLineTest {
     }
 
     @Test
+    fun storageUsesDotDecimalRegardlessOfLocale() {
+        val previous = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.FRANCE) // comma decimal locale
+            val line = StatusLine.build(setOf(StatusLine.STORAGE), values(storage = 41.2))
+            assertTrue(line.contains("41.2G"))
+        } finally {
+            java.util.Locale.setDefault(previous)
+        }
+    }
+
+    @Test
     fun emptyOptionalsAreOmitted() {
         val line = StatusLine.build(
             StatusLine.ALL_TOKENS.toSet(),

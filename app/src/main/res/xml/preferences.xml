@@ -103,6 +103,7 @@
             android:summary="@string/pref_status_tokens_summary"
             android:entries="@array/status_token_entries"
             android:entryValues="@array/status_token_values"
+            android:defaultValue="@array/status_token_defaults"
             android:dependency="show_status_line" />
         <SwitchPreferenceCompat
             android:key="animations"
