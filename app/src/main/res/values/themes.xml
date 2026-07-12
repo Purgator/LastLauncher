@@ -10,6 +10,24 @@
         <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
     </style>
 
+    <!-- Notification count bubble on suggestion icons. -->
+    <style name="SuggestionBadge">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_gravity">top|end</item>
+        <item name="android:layout_marginTop">-2dp</item>
+        <item name="android:layout_marginEnd">-2dp</item>
+        <item name="android:background">@drawable/bg_badge</item>
+        <item name="android:gravity">center</item>
+        <item name="android:minWidth">18dp</item>
+        <item name="android:minHeight">18dp</item>
+        <item name="android:paddingHorizontal">4dp</item>
+        <item name="android:textColor">@color/deep_space</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:visibility">gone</item>
+    </style>
+
     <!-- Home screen: transparent over the live wallpaper, edge to edge. -->
     <style name="Theme.LastLauncher.Home">
         <item name="android:windowShowWallpaper">true</item>

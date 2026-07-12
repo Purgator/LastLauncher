@@ -66,6 +66,18 @@
                 android:resource="@xml/lock_service_config" />
         </service>
 
+        <!-- Powers notification count bubbles and the message ticker. Only active once
+             the user grants notification access; reads state in memory, stores nothing. -->
+        <service
+            android:name=".notify.NotifListener"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- PackageInstaller status callbacks for self-updates. -->
         <receiver
             android:name=".update.ApkInstaller$Receiver"
