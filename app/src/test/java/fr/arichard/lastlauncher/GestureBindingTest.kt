@@ -25,6 +25,20 @@ class GestureBindingTest {
     }
 
     @Test
+    fun appDrawerCarriesDrawerIndex() {
+        val binding = GestureBinding(GestureAction.APP_DRAWER, "2")
+        assertEquals("app_drawer:2", binding.encode())
+        val decoded = GestureBinding.decode(binding.encode())
+        assertEquals(GestureAction.APP_DRAWER, decoded.action)
+        assertEquals(2, decoded.drawerIndex)
+    }
+
+    @Test
+    fun appDrawerWithoutPayloadDefaultsToFirst() {
+        assertEquals(0, GestureBinding.decode("app_drawer").drawerIndex)
+    }
+
+    @Test
     fun blankOrUnknownDecodesToNone() {
         assertEquals(GestureAction.NONE, GestureBinding.decode(null).action)
         assertEquals(GestureAction.NONE, GestureBinding.decode("").action)

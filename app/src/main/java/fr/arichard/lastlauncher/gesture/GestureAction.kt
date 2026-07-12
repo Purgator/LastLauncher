@@ -29,14 +29,17 @@ enum class GestureAction(val id: String, val labelRes: Int) {
 }
 
 /**
- * A resolved gesture binding: an action plus, for [GestureAction.OPEN_APP], the target
- * app's component key. Serialised to a single preference string.
+ * A resolved gesture binding: an action plus an optional payload — the target app's
+ * component key for [GestureAction.OPEN_APP], the drawer index for
+ * [GestureAction.APP_DRAWER]. Serialised to a single preference string.
  */
 data class GestureBinding(val action: GestureAction, val appKey: String? = null) {
 
+    /** Which configured drawer an APP_DRAWER binding opens (default: the first). */
+    val drawerIndex: Int get() = appKey?.toIntOrNull() ?: 0
+
     fun encode(): String =
-        if (action == GestureAction.OPEN_APP && appKey != null) "${action.id}:$appKey"
-        else action.id
+        if (appKey != null) "${action.id}:$appKey" else action.id
 
     companion object {
         fun decode(raw: String?): GestureBinding {

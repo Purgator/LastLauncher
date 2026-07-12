@@ -81,8 +81,6 @@
     <string name="gesture_none">Rien</string>
     <string name="gesture_search">Ouvrir la barre de commande</string>
     <string name="gesture_app_drawer">Tiroir d’applications coulissant</string>
-    <string name="pref_drawer_apps">Contenu du tiroir</string>
-    <string name="pref_drawer_apps_summary">Choisissez les applications du tiroir coulissant (aucune = toutes)</string>
     <string name="gesture_camera">Appareil photo</string>
     <string name="gesture_dialer">Téléphone</string>
     <string name="gesture_open_app">Ouvrir une application…</string>
@@ -119,6 +117,30 @@
     <string name="cat_apps">Applications</string>
     <string name="pref_hidden_apps">Applications masquées</string>
     <string name="pref_hidden_apps_summary">Choisissez les applications à masquer de la recherche et des suggestions</string>
+
+    <!-- Tiroirs d’applications -->
+    <string name="pref_drawers">Tiroirs d’applications</string>
+    <string name="pref_drawers_summary">Créez des tiroirs en molette et associez-les aux balayages de bord</string>
+    <string name="drawer_choose">Choisir un tiroir</string>
+    <string name="drawer_add">Ajouter un tiroir</string>
+    <string name="drawer_add_title">Nouveau tiroir</string>
+    <string name="drawer_name_hint">Nom du tiroir</string>
+    <string name="drawer_edit_apps">Choisir les applications (aucune = toutes)</string>
+    <string name="drawer_rename">Renommer</string>
+    <string name="drawer_delete">Supprimer le tiroir</string>
+    <string name="drawer_action_named">Tiroir : %1$s</string>
+    <string name="drawer_pick_for_gesture">Quel tiroir ?</string>
+    <string name="drawer_count_summary">%1$d applications</string>
+
+    <!-- Notifications -->
+    <string name="cat_notifications">Notifications</string>
+    <string name="pref_notif_access">Accès aux notifications</string>
+    <string name="pref_notif_access_summary">Autorisez l’accès pour afficher les compteurs et messages non lus. Lecture sur l’appareil uniquement ; rien n’est stocké ni envoyé.</string>
+    <string name="pref_notif_access_on">Accordé — touchez pour gérer</string>
+    <string name="pref_notif_badges">Bulles de compteur sur les icônes</string>
+    <string name="pref_notif_badges_summary">Affiche une bulle avec le nombre de non-lus sur les applications</string>
+    <string name="pref_message_ticker">Bandeau de messages</string>
+    <string name="pref_message_ticker_summary">Fait défiler les messages non lus sous l’horloge, un à un. Affiche le contenu des messages sur l’écran d’accueil.</string>
 
     <string name="cat_updates">Mises à jour</string>
     <string name="pref_auto_update">Mises à jour automatiques</string>

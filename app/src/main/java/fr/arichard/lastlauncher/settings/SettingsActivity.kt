@@ -17,6 +17,7 @@ import fr.arichard.lastlauncher.R
 import fr.arichard.lastlauncher.gesture.GestureAction
 import fr.arichard.lastlauncher.gesture.GestureBinding
 import fr.arichard.lastlauncher.lock.LockService
+import fr.arichard.lastlauncher.notify.NotifListener
 import fr.arichard.lastlauncher.predict.PredictionEngine
 import fr.arichard.lastlauncher.ui.AppPickerDialog
 import fr.arichard.lastlauncher.update.UpdateManager
@@ -75,9 +76,17 @@ class SettingsActivity : AppCompatActivity() {
                 true
             }
 
-            findPreference<Preference>("drawer_apps")?.setOnPreferenceClickListener {
-                showDrawerAppsDialog()
+            findPreference<Preference>("drawers")?.setOnPreferenceClickListener {
+                showDrawersDialog()
                 true
+            }
+
+            findPreference<Preference>("notif_access")?.let { pref ->
+                updateNotifAccessSummary(pref)
+                pref.setOnPreferenceClickListener {
+                    NotifListener.requestAccess(requireContext())
+                    true
+                }
             }
 
             findPreference<Preference>("check_now")?.setOnPreferenceClickListener { pref ->
@@ -104,9 +113,23 @@ class SettingsActivity : AppCompatActivity() {
                 }
         }
 
+        override fun onResume() {
+            super.onResume()
+            // Access is granted on another screen; refresh the summary on return.
+            findPreference<Preference>("notif_access")?.let { updateNotifAccessSummary(it) }
+        }
+
         override fun onDestroy() {
             executor.shutdown()
             super.onDestroy()
+        }
+
+        private fun updateNotifAccessSummary(pref: Preference) {
+            pref.summary = if (NotifListener.hasAccess(requireContext())) {
+                getString(R.string.pref_notif_access_on)
+            } else {
+                getString(R.string.pref_notif_access_summary)
+            }
         }
 
         private fun requestDefaultLauncher() {
@@ -166,12 +189,14 @@ class SettingsActivity : AppCompatActivity() {
             val context = requireContext()
             val repo = (context.applicationContext as LauncherApp).repo
             val spec = GestureBinding.decode(Prefs(context).gestureBinding(key))
-            pref.summary = when {
-                spec.action == GestureAction.OPEN_APP -> {
+            pref.summary = when (spec.action) {
+                GestureAction.OPEN_APP -> {
                     val app = spec.appKey?.let { repo.byComponentKey(it) }
                     if (app != null) getString(R.string.gesture_open_app_named, app.label)
                     else getString(GestureAction.NONE.labelRes)
                 }
+                GestureAction.APP_DRAWER ->
+                    getString(R.string.drawer_action_named, Prefs(context).drawer(spec.drawerIndex).name)
                 else -> getString(spec.action.labelRes)
             }
         }
@@ -187,13 +212,32 @@ class SettingsActivity : AppCompatActivity() {
             AppPickerDialog.singleChoice(
                 context, pref.title ?: "", items, selected
             ) { which ->
-                val action = actions[which]
-                if (action == GestureAction.OPEN_APP) {
-                    pickGestureApp(pref, key)
-                } else {
-                    saveGesture(key, GestureBinding(action))
-                    updateGestureSummary(pref, key)
+                when (val action = actions[which]) {
+                    GestureAction.OPEN_APP -> pickGestureApp(pref, key)
+                    GestureAction.APP_DRAWER -> pickGestureDrawer(pref, key)
+                    else -> {
+                        saveGesture(key, GestureBinding(action))
+                        updateGestureSummary(pref, key)
+                    }
                 }
+            }
+        }
+
+        /** Bind an edge swipe to a specific drawer (or the only one, without asking). */
+        private fun pickGestureDrawer(pref: Preference, key: String) {
+            val context = requireContext()
+            val drawers = Prefs(context).drawers()
+            if (drawers.size == 1) {
+                saveGesture(key, GestureBinding(GestureAction.APP_DRAWER, "0"))
+                updateGestureSummary(pref, key)
+                return
+            }
+            val items = drawers.map { AppPickerDialog.Item(it.name, null) }
+            AppPickerDialog.singleChoice(
+                context, getString(R.string.drawer_pick_for_gesture), items, -1
+            ) { which ->
+                saveGesture(key, GestureBinding(GestureAction.APP_DRAWER, drawers[which].index.toString()))
+                updateGestureSummary(pref, key)
             }
         }
 
@@ -263,20 +307,94 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        private fun showDrawerAppsDialog() {
+        /** Lists the configured drawers; pick one to edit, or add a new one. */
+        private fun showDrawersDialog() {
+            val context = requireContext()
+            val prefs = Prefs(context)
+            val drawers = prefs.drawers()
+            val labels = drawers.map {
+                AppPickerDialog.Item(it.name, null)
+            } + AppPickerDialog.Item("＋ " + getString(R.string.drawer_add), null)
+            AppPickerDialog.singleChoice(
+                context, getString(R.string.pref_drawers), labels, -1
+            ) { which ->
+                if (which < drawers.size) editDrawer(drawers[which].index)
+                else addDrawerFlow()
+            }
+        }
+
+        private fun addDrawerFlow() {
+            val context = requireContext()
+            promptText(getString(R.string.drawer_add_title), "") { name ->
+                val index = Prefs(context).addDrawer(name)
+                if (index >= 0) editDrawer(index)
+                else Toast.makeText(context, R.string.pref_drawers, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        /** Edit one drawer: choose its apps, plus rename / delete actions. */
+        private fun editDrawer(index: Int) {
             val context = requireContext()
             val repo = (context.applicationContext as LauncherApp).repo
             val prefs = Prefs(context)
             val apps = repo.apps
             if (apps.isEmpty()) return
-            val current = prefs.drawerApps
-            val items = apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
-            val checked = BooleanArray(apps.size) { apps[it].componentKey in current }
-            AppPickerDialog.multiChoice(
-                context, getString(R.string.pref_drawer_apps), items, checked
-            ) {
-                prefs.drawerApps = apps.indices.filter { checked[it] }.map { apps[it].componentKey }
+            val drawer = prefs.drawer(index)
+            val actions = mutableListOf(
+                AppPickerDialog.Item(getString(R.string.drawer_edit_apps), null),
+                AppPickerDialog.Item(getString(R.string.drawer_rename), null),
+            )
+            if (prefs.drawers().size > 1) {
+                actions.add(AppPickerDialog.Item(getString(R.string.drawer_delete), null))
             }
+            AppPickerDialog.singleChoice(context, drawer.name, actions, -1) { which ->
+                when (which) {
+                    0 -> pickDrawerApps(index)
+                    1 -> promptText(getString(R.string.drawer_rename), drawer.name) { name ->
+                        prefs.saveDrawer(index, name, drawer.apps)
+                    }
+                    2 -> prefs.deleteDrawer(index)
+                }
+            }
+        }
+
+        private fun pickDrawerApps(index: Int) {
+            val context = requireContext()
+            val repo = (context.applicationContext as LauncherApp).repo
+            val prefs = Prefs(context)
+            val apps = repo.apps
+            val drawer = prefs.drawer(index)
+            val items = apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
+            val checked = BooleanArray(apps.size) { apps[it].componentKey in drawer.apps }
+            AppPickerDialog.multiChoice(context, drawer.name, items, checked) {
+                prefs.saveDrawer(
+                    index, drawer.name,
+                    apps.indices.filter { checked[it] }.map { apps[it].componentKey }
+                )
+            }
+        }
+
+        /** Small single-field text prompt for drawer names. */
+        private fun promptText(title: String, initial: String, onOk: (String) -> Unit) {
+            val context = requireContext()
+            val input = android.widget.EditText(context).apply {
+                setText(initial)
+                setSingleLine()
+                setHint(R.string.drawer_name_hint)
+            }
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            val container = android.widget.FrameLayout(context).apply {
+                setPadding(pad, pad / 2, pad, 0)
+                addView(input)
+            }
+            MaterialAlertDialogBuilder(context)
+                .setTitle(title)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    onOk(input.text.toString().trim())
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
         }
 
         private fun checkForUpdatesNow(pref: Preference) {
