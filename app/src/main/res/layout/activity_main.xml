@@ -295,12 +295,12 @@
             android:paddingHorizontal="6dp">
 
             <ImageButton
-                android:id="@+id/assistantBtn"
+                android:id="@+id/modeBtn"
                 android:layout_width="46dp"
                 android:layout_height="46dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/assistant_button"
-                android:src="@drawable/ic_assistant"
+                android:contentDescription="@string/mode_button"
+                android:src="@drawable/ic_mode_smart"
                 app:tint="@color/text_secondary" />
 
             <EditText
