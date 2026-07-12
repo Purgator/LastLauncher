@@ -61,11 +61,25 @@
     <string name="reset_learning_confirm">Delete all learned launch history? Suggestions will start from scratch.</string>
     <string name="reset_learning_done">Launch history deleted</string>
 
+    <!-- Gesture actions -->
+    <string name="gesture_none">Nothing</string>
+    <string name="gesture_search">Open command bar</string>
+    <string name="gesture_camera">Camera</string>
+    <string name="gesture_dialer">Phone dialer</string>
+    <string name="gesture_open_app">Open an app…</string>
+    <string name="gesture_open_app_named">Open %1$s</string>
+
     <string name="cat_gestures">Gestures</string>
     <string name="pref_double_tap_lock">Double tap to lock</string>
     <string name="pref_double_tap_lock_summary">Double-tap an empty area of the home screen to lock the phone</string>
     <string name="pref_swipe_down">Swipe down for notifications</string>
     <string name="pref_swipe_down_summary">Swipe down on the home screen to open the notification shade</string>
+    <string name="pref_gesture_lr_1">Swipe → (one finger, left to right)</string>
+    <string name="pref_gesture_lr_2">Swipe →→ (two fingers, left to right)</string>
+    <string name="pref_gesture_rl_1">Swipe ← (one finger, right to left)</string>
+    <string name="pref_gesture_rl_2">Swipe ←← (two fingers, right to left)</string>
+    <string name="pref_gesture_hints">Show gesture hints</string>
+    <string name="pref_gesture_hints_summary">Cycle the CLI-style “&gt; action” cues on the screen edges</string>
 
     <string name="cat_appearance">Appearance</string>
     <string name="pref_accent">Accent color</string>
