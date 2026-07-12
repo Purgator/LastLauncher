@@ -17,7 +17,9 @@ The most likely app is the big glowing button; two runners-up flank it. Everythi
 ## Features
 
 - 🧠 **Launcher memory** — on-device prediction from time of day, weekday rhythm, app-to-app sequences, and context triggers (Bluetooth, headphones, charging)
-- ⌨️ **Type to launch** — the keyboard can stay always ready; two letters + Enter opens the best match (accent-insensitive, initials work too: "gm" → Google Maps)
+- ⌨️ **Command bar, not just search** — type two letters to launch an app, or go further: do quick math (`12*7` → tap to copy), open a URL (`example.com`), or hit the `>` palette for lock, quick settings, torch, Wi‑Fi/Bluetooth, assistant and more. The apps button stays on the right.
+- 🖐️ **Configurable edge gestures** — one- and two-finger swipes on each side (`>`, `>>`, `<`, `<<` in the launcher's CLI notation), each mappable to any action or app. Animated monospace hints on the screen edges show what each swipe does.
+- 🖥️ **CLI status line** — an optional terminal-style readout under the date: battery, network, next alarm, apps launched today.
 - 👆 **Double-tap to lock** the screen (tiny accessibility service, never reads screen content)
 - 📲 **One page, zero friction** — swipe up for all apps (keyboard opens with it), swipe down for notifications, long-press for settings
 - ✦ **Assistant button** — summons Gemini / Google Assistant from the command bar
