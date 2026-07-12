@@ -16,6 +16,7 @@ import fr.arichard.lastlauncher.LauncherApp
 import fr.arichard.lastlauncher.R
 import fr.arichard.lastlauncher.lock.LockService
 import fr.arichard.lastlauncher.predict.PredictionEngine
+import fr.arichard.lastlauncher.ui.AppPickerDialog
 import fr.arichard.lastlauncher.update.UpdateManager
 import java.util.concurrent.Executors
 
@@ -126,22 +127,17 @@ class SettingsActivity : AppCompatActivity() {
             val prefs = Prefs(context)
             val apps = repo.apps
             if (apps.isEmpty()) return
-            val labels = apps.map { it.label }.toTypedArray()
             val hidden = prefs.hiddenApps
+            val items = apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
             val checked = BooleanArray(apps.size) { apps[it].packageName in hidden }
-            MaterialAlertDialogBuilder(context)
-                .setTitle(R.string.pref_hidden_apps)
-                .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
-                    checked[which] = isChecked
-                }
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    prefs.hiddenApps = apps.indices
-                        .filter { checked[it] }
-                        .map { apps[it].packageName }
-                        .toSet()
-                }
-                .setNegativeButton(R.string.cancel, null)
-                .show()
+            AppPickerDialog.multiChoice(
+                context, getString(R.string.pref_hidden_apps), items, checked
+            ) {
+                prefs.hiddenApps = apps.indices
+                    .filter { checked[it] }
+                    .map { apps[it].packageName }
+                    .toSet()
+            }
         }
 
         private fun updateClockTapSummary(pref: Preference) {
@@ -157,21 +153,21 @@ class SettingsActivity : AppCompatActivity() {
             val repo = (context.applicationContext as LauncherApp).repo
             val prefs = Prefs(context)
             val apps = repo.apps
-            val labels = arrayOf(getString(R.string.clock_tap_default)) +
-                apps.map { it.label }
+            val clockIcon = androidx.core.content.ContextCompat.getDrawable(
+                context, R.drawable.ic_clock
+            )
+            val items = listOf(AppPickerDialog.Item(getString(R.string.clock_tap_default), clockIcon)) +
+                apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
             val current = prefs.clockTapTarget
             val checkedIndex = apps.indexOfFirst { it.componentKey == current } + 1
-            MaterialAlertDialogBuilder(context)
-                .setTitle(R.string.pref_clock_tap)
-                .setSingleChoiceItems(labels, checkedIndex) { dialog, which ->
-                    val value = if (which == 0) "" else apps[which - 1].componentKey
-                    preferenceManager.sharedPreferences?.edit()
-                        ?.putString(Prefs.KEY_CLOCK_TAP, value)?.apply()
-                    updateClockTapSummary(pref)
-                    dialog.dismiss()
-                }
-                .setNegativeButton(R.string.cancel, null)
-                .show()
+            AppPickerDialog.singleChoice(
+                context, getString(R.string.pref_clock_tap), items, checkedIndex
+            ) { which ->
+                val value = if (which == 0) "" else apps[which - 1].componentKey
+                preferenceManager.sharedPreferences?.edit()
+                    ?.putString(Prefs.KEY_CLOCK_TAP, value)?.apply()
+                updateClockTapSummary(pref)
+            }
         }
 
         private fun showFavoritesDialog() {
@@ -181,21 +177,14 @@ class SettingsActivity : AppCompatActivity() {
             val apps = repo.apps
             if (apps.isEmpty()) return
             val favorites = prefs.favorites
-            val labels = apps.map { it.label }.toTypedArray()
+            val items = apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
             val checked = BooleanArray(apps.size) { apps[it].packageName in favorites }
-            MaterialAlertDialogBuilder(context)
-                .setTitle(R.string.pref_favorites)
-                .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
-                    checked[which] = isChecked
-                }
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    prefs.favorites = apps.indices
-                        .filter { checked[it] }
-                        .map { apps[it].packageName }
-                    prefs.onboardingDone = true
-                }
-                .setNegativeButton(R.string.cancel, null)
-                .show()
+            AppPickerDialog.multiChoice(
+                context, getString(R.string.pref_favorites), items, checked
+            ) {
+                prefs.favorites = apps.indices.filter { checked[it] }.map { apps[it].packageName }
+                prefs.onboardingDone = true
+            }
         }
 
         private fun checkForUpdatesNow(pref: Preference) {
