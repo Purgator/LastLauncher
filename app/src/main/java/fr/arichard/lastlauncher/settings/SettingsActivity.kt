@@ -168,7 +168,7 @@ class SettingsActivity : AppCompatActivity() {
             val spec = GestureBinding.decode(Prefs(context).gestureBinding(key))
             pref.summary = when {
                 spec.action == GestureAction.OPEN_APP -> {
-                    val app = repo.apps.firstOrNull { it.componentKey == spec.appKey }
+                    val app = spec.appKey?.let { repo.byComponentKey(it) }
                     if (app != null) getString(R.string.gesture_open_app_named, app.label)
                     else getString(GestureAction.NONE.labelRes)
                 }
@@ -220,7 +220,7 @@ class SettingsActivity : AppCompatActivity() {
             val context = requireContext()
             val target = Prefs(context).clockTapTarget
             val repo = (context.applicationContext as LauncherApp).repo
-            pref.summary = repo.apps.firstOrNull { it.componentKey == target }?.label
+            pref.summary = repo.byComponentKey(target)?.label
                 ?: getString(R.string.clock_tap_default)
         }
 

@@ -45,7 +45,7 @@ object StatusLine {
         NETWORK -> v.net.token
         ALARM -> v.nextAlarm?.let { "⏰$it" }
         LAUNCHES -> if (v.launchesToday > 0) "↑${v.launchesToday}" else null
-        STORAGE -> "▤ ${"%.1f".format(v.freeStorageGb)}G"
+        STORAGE -> "▤ ${"%.1f".format(java.util.Locale.US, v.freeStorageGb)}G"
         else -> null
     }
 }
