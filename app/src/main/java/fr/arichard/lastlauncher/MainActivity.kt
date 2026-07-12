@@ -39,6 +39,7 @@ import fr.arichard.lastlauncher.predict.PredictionEngine
 import fr.arichard.lastlauncher.settings.Prefs
 import fr.arichard.lastlauncher.settings.SettingsActivity
 import fr.arichard.lastlauncher.ui.AppAdapter
+import fr.arichard.lastlauncher.ui.AppPickerDialog
 import fr.arichard.lastlauncher.update.UpdateManager
 import java.util.concurrent.Executors
 import kotlin.math.abs
@@ -338,27 +339,14 @@ class MainActivity : AppCompatActivity() {
         val apps = repo.visibleApps(prefs.hiddenApps)
         if (apps.isEmpty()) return
         val current = prefs.favorites.ifEmpty { PredictionEngine.defaultPicks(this) }
-        val labels = apps.map { it.label }.toTypedArray()
+        val items = apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
         val checked = BooleanArray(apps.size) { apps[it].packageName in current }
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.starter_dialog_title)
-            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
-                checked[which] = isChecked
-            }
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                prefs.favorites = apps.indices
-                    .filter { checked[it] }
-                    .map { apps[it].packageName }
-                prefs.onboardingDone = true
-                updateStarterPill()
-                refreshSuggestions()
-            }
-            .setNegativeButton(R.string.no_thanks) { _, _ ->
-                prefs.onboardingDone = true
-                updateStarterPill()
-            }
-            .setNeutralButton(R.string.cancel, null)
-            .show()
+        AppPickerDialog.multiChoice(this, getString(R.string.starter_dialog_title), items, checked) {
+            prefs.favorites = apps.indices.filter { checked[it] }.map { apps[it].packageName }
+            prefs.onboardingDone = true
+            updateStarterPill()
+            refreshSuggestions()
+        }
     }
 
     private fun updateStarterPill() {
