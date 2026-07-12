@@ -15,15 +15,34 @@
         android:importantForAccessibility="no"
         tools:src="@mipmap/ic_launcher" />
 
-    <TextView
-        android:id="@+id/appLabel"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:layout_marginStart="16dp"
-        android:singleLine="true"
-        android:ellipsize="end"
-        android:textColor="@color/text_primary"
-        android:textSize="16sp"
-        tools:text="Signal" />
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/appLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            tools:text="Signal" />
+
+        <TextView
+            android:id="@+id/appSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:visibility="gone"
+            tools:text="= 12 * 7"
+            tools:visibility="visible" />
+    </LinearLayout>
 </LinearLayout>
