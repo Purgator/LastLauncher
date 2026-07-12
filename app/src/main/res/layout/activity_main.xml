@@ -216,6 +216,44 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- CLI-style gesture hints pinned to each edge, vertically centered. -->
+            <TextView
+                android:id="@+id/hintLeft"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start|center_vertical"
+                android:fontFamily="monospace"
+                android:maxWidth="150dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="8dp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:importantForAccessibility="no"
+                android:visibility="gone"
+                tools:text="&gt; Quick settings"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/hintRight"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|center_vertical"
+                android:fontFamily="monospace"
+                android:maxWidth="150dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="4dp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textAlignment="viewEnd"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:importantForAccessibility="no"
+                android:visibility="gone"
+                tools:text="Camera &lt;"
+                tools:visibility="visible" />
+
             <!-- Search results / all apps. Fills the space above the search bar. -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/results"

@@ -55,6 +55,23 @@
             android:title="@string/pref_swipe_down"
             android:summary="@string/pref_swipe_down_summary"
             android:defaultValue="true" />
+        <Preference
+            android:key="gesture_lr_1"
+            android:title="@string/pref_gesture_lr_1" />
+        <Preference
+            android:key="gesture_lr_2"
+            android:title="@string/pref_gesture_lr_2" />
+        <Preference
+            android:key="gesture_rl_1"
+            android:title="@string/pref_gesture_rl_1" />
+        <Preference
+            android:key="gesture_rl_2"
+            android:title="@string/pref_gesture_rl_2" />
+        <SwitchPreferenceCompat
+            android:key="show_gesture_hints"
+            android:title="@string/pref_gesture_hints"
+            android:summary="@string/pref_gesture_hints_summary"
+            android:defaultValue="true" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/cat_appearance">

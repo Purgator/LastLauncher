@@ -14,6 +14,8 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import fr.arichard.lastlauncher.BuildConfig
 import fr.arichard.lastlauncher.LauncherApp
 import fr.arichard.lastlauncher.R
+import fr.arichard.lastlauncher.gesture.GestureAction
+import fr.arichard.lastlauncher.gesture.GestureBinding
 import fr.arichard.lastlauncher.lock.LockService
 import fr.arichard.lastlauncher.predict.PredictionEngine
 import fr.arichard.lastlauncher.ui.AppPickerDialog
@@ -34,6 +36,11 @@ class SettingsActivity : AppCompatActivity() {
     class SettingsFragment : PreferenceFragmentCompat() {
 
         private val executor = Executors.newSingleThreadExecutor()
+
+        private val GESTURE_KEYS = listOf(
+            Prefs.KEY_GESTURE_LR_1, Prefs.KEY_GESTURE_LR_2,
+            Prefs.KEY_GESTURE_RL_1, Prefs.KEY_GESTURE_RL_2,
+        )
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.preferences, rootKey)
@@ -71,6 +78,16 @@ class SettingsActivity : AppCompatActivity() {
             findPreference<Preference>("check_now")?.setOnPreferenceClickListener { pref ->
                 checkForUpdatesNow(pref)
                 true
+            }
+
+            for (key in GESTURE_KEYS) {
+                findPreference<Preference>(key)?.let { pref ->
+                    updateGestureSummary(pref, key)
+                    pref.setOnPreferenceClickListener {
+                        showGestureDialog(pref, key)
+                        true
+                    }
+                }
             }
 
             findPreference<SwitchPreferenceCompat>("double_tap_lock")
@@ -138,6 +155,60 @@ class SettingsActivity : AppCompatActivity() {
                     .map { apps[it].packageName }
                     .toSet()
             }
+        }
+
+        private fun updateGestureSummary(pref: Preference, key: String) {
+            val context = requireContext()
+            val repo = (context.applicationContext as LauncherApp).repo
+            val spec = GestureBinding.decode(Prefs(context).gestureBinding(key))
+            pref.summary = when {
+                spec.action == GestureAction.OPEN_APP -> {
+                    val app = repo.apps.firstOrNull { it.componentKey == spec.appKey }
+                    if (app != null) getString(R.string.gesture_open_app_named, app.label)
+                    else getString(GestureAction.NONE.labelRes)
+                }
+                else -> getString(spec.action.labelRes)
+            }
+        }
+
+        private fun showGestureDialog(pref: Preference, key: String) {
+            val context = requireContext()
+            val actions = GestureAction.entries
+            val current = GestureBinding.decode(Prefs(context).gestureBinding(key)).action
+            val items = actions.map {
+                AppPickerDialog.Item(getString(it.labelRes), null)
+            }
+            val selected = actions.indexOf(current).coerceAtLeast(0)
+            AppPickerDialog.singleChoice(
+                context, pref.title ?: "", items, selected
+            ) { which ->
+                val action = actions[which]
+                if (action == GestureAction.OPEN_APP) {
+                    pickGestureApp(pref, key)
+                } else {
+                    saveGesture(key, GestureBinding(action))
+                    updateGestureSummary(pref, key)
+                }
+            }
+        }
+
+        private fun pickGestureApp(pref: Preference, key: String) {
+            val context = requireContext()
+            val repo = (context.applicationContext as LauncherApp).repo
+            val apps = repo.apps
+            if (apps.isEmpty()) return
+            val items = apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
+            AppPickerDialog.singleChoice(
+                context, getString(R.string.gesture_open_app), items, -1
+            ) { which ->
+                saveGesture(key, GestureBinding(GestureAction.OPEN_APP, apps[which].componentKey))
+                updateGestureSummary(pref, key)
+            }
+        }
+
+        private fun saveGesture(key: String, binding: GestureBinding) {
+            preferenceManager.sharedPreferences?.edit()
+                ?.putString(key, binding.encode())?.apply()
         }
 
         private fun updateClockTapSummary(pref: Preference) {

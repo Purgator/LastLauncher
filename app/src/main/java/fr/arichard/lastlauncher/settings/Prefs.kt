@@ -13,6 +13,11 @@ class Prefs(context: Context) {
     val btSignal: Boolean get() = sp.getBoolean(KEY_BT_SIGNAL, true)
     val doubleTapLock: Boolean get() = sp.getBoolean(KEY_DOUBLE_TAP_LOCK, true)
     val swipeDownNotifications: Boolean get() = sp.getBoolean(KEY_SWIPE_DOWN, true)
+    val showGestureHints: Boolean get() = sp.getBoolean(KEY_GESTURE_HINTS, true)
+
+    /** Raw encoded binding for an edge-swipe slot; see GestureBinding. */
+    fun gestureBinding(key: String): String =
+        sp.getString(key, GESTURE_DEFAULTS[key]) ?: "none"
     val haptics: Boolean get() = sp.getBoolean(KEY_HAPTICS, true)
     val animations: Boolean get() = sp.getBoolean(KEY_ANIMATIONS, true)
     val showClock: Boolean get() = sp.getBoolean(KEY_SHOW_CLOCK, true)
@@ -70,6 +75,20 @@ class Prefs(context: Context) {
         const val KEY_BT_SIGNAL = "bt_signal"
         const val KEY_DOUBLE_TAP_LOCK = "double_tap_lock"
         const val KEY_SWIPE_DOWN = "swipe_down_notifications"
+        const val KEY_GESTURE_HINTS = "show_gesture_hints"
+
+        // Edge-swipe slots, in CLI notation: LR = left→right (>), RL = right→left (<).
+        const val KEY_GESTURE_LR_1 = "gesture_lr_1"
+        const val KEY_GESTURE_LR_2 = "gesture_lr_2"
+        const val KEY_GESTURE_RL_1 = "gesture_rl_1"
+        const val KEY_GESTURE_RL_2 = "gesture_rl_2"
+
+        val GESTURE_DEFAULTS = mapOf(
+            KEY_GESTURE_LR_1 to "quick_settings",
+            KEY_GESTURE_LR_2 to "assistant",
+            KEY_GESTURE_RL_1 to "camera",
+            KEY_GESTURE_RL_2 to "flashlight",
+        )
         const val KEY_HAPTICS = "haptics"
         const val KEY_ANIMATIONS = "animations"
         const val KEY_SHOW_CLOCK = "show_clock"
