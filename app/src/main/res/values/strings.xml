@@ -88,7 +88,14 @@
     <string name="pref_animations_summary">Subtle entrance and press effects. Turn off for maximum battery savings.</string>
     <string name="pref_show_clock">Show clock</string>
     <string name="pref_status_line">Status line</string>
-    <string name="pref_status_line_summary">A terminal-style readout under the date: battery, network, next alarm, apps launched today</string>
+    <string name="pref_status_line_summary">A terminal-style readout under the date</string>
+    <string name="pref_status_tokens">Status line fields</string>
+    <string name="pref_status_tokens_summary">Choose what the status line shows</string>
+    <string name="token_battery">Battery</string>
+    <string name="token_network">Network</string>
+    <string name="token_alarm">Next alarm</string>
+    <string name="token_launches">Apps launched today</string>
+    <string name="token_storage">Free storage</string>
 
     <string name="cat_apps">Apps</string>
     <string name="pref_hidden_apps">Hidden apps</string>

@@ -97,6 +97,13 @@
             android:title="@string/pref_status_line"
             android:summary="@string/pref_status_line_summary"
             android:defaultValue="true" />
+        <MultiSelectListPreference
+            android:key="status_tokens"
+            android:title="@string/pref_status_tokens"
+            android:summary="@string/pref_status_tokens_summary"
+            android:entries="@array/status_token_entries"
+            android:entryValues="@array/status_token_values"
+            android:dependency="show_status_line" />
         <SwitchPreferenceCompat
             android:key="animations"
             android:title="@string/pref_animations"
