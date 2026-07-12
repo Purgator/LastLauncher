@@ -16,6 +16,7 @@ enum class GestureAction(val id: String, val labelRes: Int) {
     FLASHLIGHT("flashlight", R.string.cmd_flashlight),
     ASSISTANT("assistant", R.string.cmd_assistant),
     ALL_APPS("all_apps", R.string.cmd_all_apps),
+    APP_DRAWER("app_drawer", R.string.gesture_app_drawer),
     SEARCH("search", R.string.gesture_search),
     CAMERA("camera", R.string.gesture_camera),
     DIALER("dialer", R.string.gesture_dialer),

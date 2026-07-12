@@ -329,4 +329,25 @@
                 app:tint="@color/text_secondary" />
         </LinearLayout>
     </LinearLayout>
+
+    <!-- Slide-out app drawer: dim scrim + a panel that tracks the finger. -->
+    <View
+        android:id="@+id/drawerScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:alpha="0"
+        android:visibility="gone" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/drawerList"
+        android:layout_width="300dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:layout_margin="10dp"
+        android:background="@drawable/bg_drawer_panel"
+        android:paddingVertical="16dp"
+        android:clipToPadding="false"
+        android:overScrollMode="never"
+        android:visibility="gone" />
 </FrameLayout>
