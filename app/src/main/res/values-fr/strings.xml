@@ -8,6 +8,9 @@
     <string name="no_match_web_search">Rechercher « %1$s » sur le web</string>
     <string name="update_pill">Mise à jour %1$s prête — touchez pour installer</string>
     <string name="suggestion_slot">Application suggérée</string>
+    <string name="starter_pill">✨ Choisissez vos applications favorites</string>
+    <string name="starter_dialog_title">Vos applications favorites</string>
+    <string name="no_thanks">Non merci</string>
 
     <!-- App long-press menu -->
     <string name="menu_app_info">Infos de l’application</string>
@@ -31,12 +34,16 @@
     <string name="pref_keyboard_always_summary">Ouvre le clavier sur l’écran d’accueil pour taper immédiatement. Désactivé : glissez vers le haut pour chercher.</string>
     <string name="pref_haptics">Retour haptique</string>
     <string name="pref_haptics_summary">Légère vibration aux lancements et gestes</string>
+    <string name="pref_clock_tap">Un appui sur l’horloge ouvre</string>
+    <string name="clock_tap_default">Horloge (application système)</string>
 
     <string name="cat_suggestions">Suggestions intelligentes</string>
     <string name="pref_predictions">Prédire ma prochaine application</string>
     <string name="pref_predictions_summary">Apprend de vos habitudes (heure, enchaînements d’applications, Bluetooth, écouteurs, charge) et suggère les applications que vous allez probablement ouvrir. Tout reste sur cet appareil.</string>
     <string name="pref_bt_signal">Utiliser le Bluetooth comme signal</string>
     <string name="pref_bt_signal_summary">Suggère les applications que vous ouvrez habituellement après une connexion Bluetooth (voiture, écouteurs…)</string>
+    <string name="pref_favorites">Applications favorites</string>
+    <string name="pref_favorites_summary">Occupent les suggestions tant que le lanceur n’a pas appris vos habitudes — et quand les prédictions sont désactivées</string>
     <string name="pref_reset_learning">Tout oublier</string>
     <string name="pref_reset_learning_summary">Supprime l’historique de lancements utilisé pour les prédictions</string>
     <string name="reset_learning_confirm">Supprimer tout l’historique appris ? Les suggestions repartiront de zéro.</string>

@@ -8,6 +8,9 @@
     <string name="no_match_web_search">Search the web for “%1$s”</string>
     <string name="update_pill">Update %1$s ready — tap to install</string>
     <string name="suggestion_slot">Suggested app</string>
+    <string name="starter_pill">✨ Pick your go-to apps</string>
+    <string name="starter_dialog_title">Your go-to apps</string>
+    <string name="no_thanks">No thanks</string>
 
     <!-- App long-press menu -->
     <string name="menu_app_info">App info</string>
@@ -31,12 +34,16 @@
     <string name="pref_keyboard_always_summary">Open the keyboard on the home screen so you can type instantly. When off, swipe up to search.</string>
     <string name="pref_haptics">Haptic feedback</string>
     <string name="pref_haptics_summary">Vibrate lightly on launches and gestures</string>
+    <string name="pref_clock_tap">Clock tap opens</string>
+    <string name="clock_tap_default">Clock (system default)</string>
 
     <string name="cat_suggestions">Smart suggestions</string>
     <string name="pref_predictions">Predict my next app</string>
     <string name="pref_predictions_summary">Learn from your habits (time, app sequences, Bluetooth, headphones, charging) and suggest the apps you are most likely to open. Everything stays on this device.</string>
     <string name="pref_bt_signal">Use Bluetooth as a signal</string>
     <string name="pref_bt_signal_summary">Suggest apps you usually open after connecting to a Bluetooth device (car, headphones…)</string>
+    <string name="pref_favorites">Go-to apps</string>
+    <string name="pref_favorites_summary">Fill the suggestion slots until the launcher has learned your habits — and whenever predictions are off</string>
     <string name="pref_reset_learning">Forget everything learned</string>
     <string name="pref_reset_learning_summary">Delete all launch history used for predictions</string>
     <string name="reset_learning_confirm">Delete all learned launch history? Suggestions will start from scratch.</string>
