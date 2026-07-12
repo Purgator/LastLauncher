@@ -10,6 +10,7 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.AlarmClock
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.GestureDetector
@@ -74,6 +75,8 @@ class MainActivity : AppCompatActivity() {
         binding.updatePill.setOnClickListener {
             pendingUpdateVersion?.let { v -> UpdateManager.install(this, v) }
         }
+        binding.clock.setOnClickListener { launchClockTarget() }
+        binding.starterPill.setOnClickListener { showStarterPicker() }
         repo.addListener(repoListener)
     }
 
@@ -87,6 +90,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         applyAppearance()
         resetToHome()
+        updateStarterPill()
         refreshSuggestions()
         maybeRequestBluetoothPermission()
         checkForUpdate()
@@ -306,6 +310,62 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Tapping the clock opens the configured app (system clock by default). */
+    private fun launchClockTarget() {
+        haptic(binding.clock)
+        val target = prefs.clockTapTarget
+        if (target.isNotEmpty()) {
+            repo.apps.firstOrNull { it.componentKey == target }?.let {
+                launchApp(it, binding.clock)
+                return
+            }
+        }
+        try {
+            startActivity(
+                Intent(AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: Exception) {
+            // No clock app resolvable: nothing sensible to do.
+        }
+    }
+
+    /**
+     * One-time cold-start helper: lets the user pick go-to apps that fill the
+     * suggestion slots until the prediction engine has learned enough. Pre-checks
+     * sensible guesses (phone, SMS, browser, camera).
+     */
+    private fun showStarterPicker() {
+        val apps = repo.visibleApps(prefs.hiddenApps)
+        if (apps.isEmpty()) return
+        val current = prefs.favorites.ifEmpty { PredictionEngine.defaultPicks(this) }
+        val labels = apps.map { it.label }.toTypedArray()
+        val checked = BooleanArray(apps.size) { apps[it].packageName in current }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.starter_dialog_title)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                prefs.favorites = apps.indices
+                    .filter { checked[it] }
+                    .map { apps[it].packageName }
+                prefs.onboardingDone = true
+                updateStarterPill()
+                refreshSuggestions()
+            }
+            .setNegativeButton(R.string.no_thanks) { _, _ ->
+                prefs.onboardingDone = true
+                updateStarterPill()
+            }
+            .setNeutralButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun updateStarterPill() {
+        binding.starterPill.visibility =
+            if (prefs.predictions && !prefs.onboardingDone) View.VISIBLE else View.GONE
+    }
+
     private fun lockScreen() {
         if (LockService.lockScreen()) {
             haptic(binding.root)
@@ -357,30 +417,35 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshSuggestions() {
         if (!prefs.predictions) {
-            suggestions = listOf(null, null, null)
-            binding.suggestMain.visibility = View.INVISIBLE
-            binding.suggestLeft.visibility = View.INVISIBLE
-            binding.suggestRight.visibility = View.INVISIBLE
+            // Static mode: the user's go-to apps, nothing learned or logged.
+            val hidden = prefs.hiddenApps
+            val favs = prefs.favorites
+                .filter { it !in hidden }
+                .mapNotNull { repo.byPackage(it) }
+            applySuggestions(favs, animate = false)
             return
         }
         PredictionEngine.computeSuggestions(this, 3) { ranked, scores ->
             repo.usageBoost = scores
-            val entries = ranked.map { repo.byPackage(it) }
-            suggestions = entries
-            bindSuggestion(
-                entries.getOrNull(0), binding.suggestMain,
-                binding.suggestMainIcon, binding.suggestMainLabel
-            )
-            bindSuggestion(
-                entries.getOrNull(1), binding.suggestLeft,
-                binding.suggestLeftIcon, binding.suggestLeftLabel
-            )
-            bindSuggestion(
-                entries.getOrNull(2), binding.suggestRight,
-                binding.suggestRightIcon, binding.suggestRightLabel
-            )
-            if (prefs.animations) animateSuggestionsIn()
+            applySuggestions(ranked.mapNotNull { repo.byPackage(it) }, animate = true)
         }
+    }
+
+    private fun applySuggestions(entries: List<AppEntry>, animate: Boolean) {
+        suggestions = listOf(entries.getOrNull(0), entries.getOrNull(1), entries.getOrNull(2))
+        bindSuggestion(
+            suggestions[0], binding.suggestMain,
+            binding.suggestMainIcon, binding.suggestMainLabel
+        )
+        bindSuggestion(
+            suggestions[1], binding.suggestLeft,
+            binding.suggestLeftIcon, binding.suggestLeftLabel
+        )
+        bindSuggestion(
+            suggestions[2], binding.suggestRight,
+            binding.suggestRightIcon, binding.suggestRightLabel
+        )
+        if (animate && prefs.animations) animateSuggestionsIn()
     }
 
     private fun bindSuggestion(
@@ -459,6 +524,7 @@ class MainActivity : AppCompatActivity() {
             )
         })
         binding.updatePill.setTextColor(accent)
+        binding.starterPill.setTextColor(accent)
         binding.assistantBtn.setColorFilter(ColorUtils.setAlphaComponent(accent, 0xCC))
     }
 

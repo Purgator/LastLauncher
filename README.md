@@ -22,6 +22,8 @@ The most likely app is the big glowing button; two runners-up flank it. Everythi
 - 📲 **One page, zero friction** — swipe up for all apps (keyboard opens with it), swipe down for notifications, long-press for settings
 - ✦ **Assistant button** — summons Gemini / Google Assistant from the command bar
 - 🕶️ **Futuristic glass UI** over your wallpaper — accent colors, wallpaper dimming, subtle animations (all optional)
+- 🚀 **Starter picks** — on first run, choose your go-to apps (smart guesses pre-checked); they fill the suggestion slots until the launcher has learned your habits, and become a static-favorites mode if you turn predictions off
+- 🕐 **Clock tap** opens the clock app — or any app you choose in settings
 - 🫥 **Hidden apps**, app info / uninstall on long-press, web-search fallback when nothing matches
 - 🔄 **Auto-updates** straight from GitHub releases — checked once a day, downloaded on Wi-Fi, installed after your tap
 - 🪶 **Lightweight & battery-friendly** — a single ~1.8 MB APK, no background services, no wakelocks, no trackers, no network calls except the update check

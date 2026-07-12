@@ -17,6 +17,9 @@
             android:title="@string/pref_haptics"
             android:summary="@string/pref_haptics_summary"
             android:defaultValue="true" />
+        <Preference
+            android:key="clock_tap"
+            android:title="@string/pref_clock_tap" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/cat_suggestions">
@@ -31,6 +34,10 @@
             android:summary="@string/pref_bt_signal_summary"
             android:defaultValue="true"
             android:dependency="predictions" />
+        <Preference
+            android:key="favorites"
+            android:title="@string/pref_favorites"
+            android:summary="@string/pref_favorites_summary" />
         <Preference
             android:key="reset_learning"
             android:title="@string/pref_reset_learning"

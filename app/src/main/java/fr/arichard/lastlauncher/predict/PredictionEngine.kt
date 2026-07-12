@@ -39,6 +39,10 @@ object PredictionEngine {
     private const val W_TRANSITION = 2.5
     private const val W_TRIGGER = 3.5
 
+    // A learned candidate only takes a suggestion slot from the user's go-to apps
+    // once its score is at least this (≈ one recent, contextually matching launch).
+    private const val MIN_CONFIDENCE = 1.0
+
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "predict") }
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -100,17 +104,22 @@ object PredictionEngine {
             val prefs = Prefs(appContext)
             val hidden = prefs.hiddenApps
             val prev = prefs.lastLaunchedPkg
+            fun eligible(pkg: String) = pkg !in hidden && pkg != prev
+
+            // Confident learned predictions first…
             val ranked = result.entries.asSequence()
-                .filter { it.key !in hidden && it.key != prev }
+                .filter { eligible(it.key) && it.value >= MIN_CONFIDENCE }
                 .sortedByDescending { it.value }
                 .map { it.key }
                 .take(count)
                 .toMutableList()
-            if (ranked.size < count) {
-                for (pkg in fallbackDefaults(appContext)) {
-                    if (ranked.size >= count) break
-                    if (pkg !in ranked && pkg !in hidden && pkg != prev) ranked.add(pkg)
-                }
+            // …then the user's go-to apps and sensible defaults while the memory is
+            // young, and finally any low-confidence leftovers.
+            val fillers = prefs.favorites + defaultPicks(appContext) +
+                result.entries.sortedByDescending { it.value }.map { it.key }
+            for (pkg in fillers) {
+                if (ranked.size >= count) break
+                if (pkg !in ranked && eligible(pkg)) ranked.add(pkg)
             }
             mainHandler.post { callback(ranked, result) }
         }
@@ -142,7 +151,7 @@ object PredictionEngine {
     }
 
     /** Sensible cold-start picks before any history exists: phone, SMS, browser, camera. */
-    private fun fallbackDefaults(context: Context): List<String> {
+    fun defaultPicks(context: Context): List<String> {
         val pm = context.packageManager
         val picks = LinkedHashSet<String>()
         fun resolve(intent: Intent) {
