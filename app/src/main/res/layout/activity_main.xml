@@ -64,6 +64,22 @@
             tools:text="› 82%⚡  ·  wifi  ·  ⏰07:00  ·  ↑23"
             tools:visibility="visible" />
 
+        <!-- Message ticker: one unread message at a time, fading between them. -->
+        <TextView
+            android:id="@+id/ticker"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="10dp"
+            android:maxWidth="320dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:visibility="gone"
+            tools:text="WhatsApp · Marie — On arrive !"
+            tools:visibility="visible" />
+
         <TextView
             android:id="@+id/updatePill"
             android:layout_width="wrap_content"
@@ -125,13 +141,19 @@
                     <FrameLayout
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:background="@drawable/bg_glass_circle">
+                        android:background="@drawable/bg_glass_circle"
+                        android:clipChildren="false">
                         <ImageView
                             android:id="@+id/suggestLeftIcon"
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/suggestion_slot" />
+                        <TextView
+                            android:id="@+id/suggestLeftBadge"
+                            style="@style/SuggestionBadge"
+                            tools:text="2"
+                            tools:visibility="visible" />
                     </FrameLayout>
 
                     <TextView
@@ -173,13 +195,19 @@
                             android:layout_width="88dp"
                             android:layout_height="88dp"
                             android:layout_gravity="center"
-                            android:background="@drawable/bg_glass_circle">
+                            android:background="@drawable/bg_glass_circle"
+                            android:clipChildren="false">
                             <ImageView
                                 android:id="@+id/suggestMainIcon"
                                 android:layout_width="54dp"
                                 android:layout_height="54dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@string/suggestion_slot" />
+                            <TextView
+                                android:id="@+id/suggestMainBadge"
+                                style="@style/SuggestionBadge"
+                                tools:text="5"
+                                tools:visibility="visible" />
                         </FrameLayout>
                     </FrameLayout>
 
@@ -208,13 +236,19 @@
                     <FrameLayout
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:background="@drawable/bg_glass_circle">
+                        android:background="@drawable/bg_glass_circle"
+                        android:clipChildren="false">
                         <ImageView
                             android:id="@+id/suggestRightIcon"
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/suggestion_slot" />
+                        <TextView
+                            android:id="@+id/suggestRightBadge"
+                            style="@style/SuggestionBadge"
+                            tools:text="1"
+                            tools:visibility="visible" />
                     </FrameLayout>
 
                     <TextView

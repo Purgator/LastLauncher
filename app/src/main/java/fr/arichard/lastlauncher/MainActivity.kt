@@ -40,6 +40,7 @@ import fr.arichard.lastlauncher.databinding.ActivityMainBinding
 import fr.arichard.lastlauncher.gesture.GestureAction
 import fr.arichard.lastlauncher.gesture.GestureBinding
 import fr.arichard.lastlauncher.lock.LockService
+import fr.arichard.lastlauncher.notify.NotifListener
 import fr.arichard.lastlauncher.predict.PredictionEngine
 import fr.arichard.lastlauncher.settings.Prefs
 import fr.arichard.lastlauncher.settings.SettingsActivity
@@ -66,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     private var pendingUpdateVersion: String? = null
     private val ioExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "main-io") }
     private val repoListener: () -> Unit = { onAppsChanged() }
+    private val notifListener: () -> Unit = { onNotificationsChanged() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,10 +89,12 @@ class MainActivity : AppCompatActivity() {
         binding.clock.setOnClickListener { launchClockTarget() }
         binding.starterPill.setOnClickListener { showStarterPicker() }
         repo.addListener(repoListener)
+        NotifListener.addListener(notifListener)
     }
 
     override fun onDestroy() {
         repo.removeListener(repoListener)
+        NotifListener.removeListener(notifListener)
         ioExecutor.shutdown()
         super.onDestroy()
     }
@@ -104,11 +108,14 @@ class MainActivity : AppCompatActivity() {
         maybeRequestBluetoothPermission()
         checkForUpdate()
         setupStatusLine()
+        NotifListener.ensureBound(this)
+        startTicker()
     }
 
     override fun onPause() {
         super.onPause()
         stopHints()
+        stopTicker()
         unregisterStatusReceiver()
     }
 
@@ -221,13 +228,25 @@ class MainActivity : AppCompatActivity() {
      */
     private fun drawerEdgeCandidate(x: Float, width: Int, edgeZone: Float): Int {
         if (drawerOpen) return 0
-        if (x < edgeZone && edgeBoundToDrawer(Prefs.KEY_GESTURE_LR_1, Prefs.KEY_GESTURE_LR_2)) return -1
-        if (x > width - edgeZone && edgeBoundToDrawer(Prefs.KEY_GESTURE_RL_1, Prefs.KEY_GESTURE_RL_2)) return 1
+        if (x < edgeZone) {
+            edgeDrawerIndex(Prefs.KEY_GESTURE_LR_1, Prefs.KEY_GESTURE_LR_2)?.let {
+                drawerCandidateIndex = it
+                return -1
+            }
+        }
+        if (x > width - edgeZone) {
+            edgeDrawerIndex(Prefs.KEY_GESTURE_RL_1, Prefs.KEY_GESTURE_RL_2)?.let {
+                drawerCandidateIndex = it
+                return 1
+            }
+        }
         return 0
     }
 
-    private fun edgeBoundToDrawer(vararg keys: String): Boolean = keys.any {
-        GestureBinding.decode(prefs.gestureBinding(it)).action == GestureAction.APP_DRAWER
+    /** Drawer index bound to one of [keys], or null when none targets a drawer. */
+    private fun edgeDrawerIndex(vararg keys: String): Int? = keys.firstNotNullOfOrNull {
+        val spec = GestureBinding.decode(prefs.gestureBinding(it))
+        if (spec.action == GestureAction.APP_DRAWER) spec.drawerIndex else null
     }
 
     private fun updateDrawerDrag(event: MotionEvent, touchSlop: Int) {
@@ -239,7 +258,7 @@ class MainActivity : AppCompatActivity() {
             val inward = (drawerCandidateSide < 0 && dx > 0) || (drawerCandidateSide > 0 && dx < 0)
             if (!inward) { drawerCandidateSide = 0; return }
             drawerDragging = true
-            beginDrawerDrag(drawerCandidateSide)
+            beginDrawerDrag(drawerCandidateSide, drawerCandidateIndex)
         }
         val progress = if (drawerSide < 0) dx / drawerOffset() else -dx / drawerOffset()
         setDrawerProgress(progress)
@@ -278,7 +297,8 @@ class MainActivity : AppCompatActivity() {
             GestureAction.FLASHLIGHT -> toggleFlashlight()
             GestureAction.ASSISTANT -> launchAssistant()
             GestureAction.ALL_APPS -> openAllApps()
-            GestureAction.APP_DRAWER -> openDrawer(drawerSide, animate = true)
+            GestureAction.APP_DRAWER ->
+                openDrawer(drawerSide, bindingSpec.drawerIndex, animate = true)
             GestureAction.SEARCH -> focusSearch(show = true)
             GestureAction.CAMERA -> startActivitySafely(
                 Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
@@ -296,7 +316,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var drawerAdapter: AppAdapter
     private var drawerOpen = false
     private var drawerSide = -1          // -1 anchored left, +1 anchored right
+    private var drawerIndex = 0          // which configured drawer is showing
     private var drawerCandidateSide = 0  // edge the current touch could pull the drawer from
+    private var drawerCandidateIndex = 0 // drawer bound to that edge
     private var drawerDragging = false
     private var velocityTracker: android.view.VelocityTracker? = null
 
@@ -306,15 +328,122 @@ class MainActivity : AppCompatActivity() {
             onAppClick = { entry, view -> closeDrawer(animate = false); launchApp(entry, view) },
             onAppLongClick = { entry, view -> showAppMenu(entry, view) },
             onCommand = {},
+            badgeCount = { pkg -> badgeFor(pkg) },
         )
         binding.drawerList.layoutManager = LinearLayoutManager(this)
         binding.drawerList.adapter = drawerAdapter
         binding.drawerList.itemAnimator = null
         binding.drawerScrim.setOnClickListener { closeDrawer(animate = true) }
+        setupDrawerWheel()
+        setupDrawerSwipeBack()
     }
 
-    private fun drawerContents(): List<AppEntry> {
-        val keys = prefs.drawerApps
+    /**
+     * The "wheel": rows bulge toward the screen center at the panel's vertical middle
+     * and tuck back near the edges, with a matching alpha/scale falloff — scrolling
+     * feels like rotating a cylinder. Pure per-child transforms, recomputed on scroll
+     * and layout; no allocation, no extra invalidation.
+     */
+    private fun setupDrawerWheel() {
+        val list = binding.drawerList
+        list.clipChildren = false
+        list.clipToPadding = false
+        list.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+            override fun onScrolled(rv: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) =
+                applyWheelTransform()
+        })
+        list.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyWheelTransform() }
+    }
+
+    private fun applyWheelTransform() {
+        val list = binding.drawerList
+        val height = list.height
+        if (height == 0) return
+        val center = height / 2f
+        val bulge = 16 * resources.displayMetrics.density
+        // Positive bulge pushes rows inward (right for a left drawer, left for a right one).
+        val direction = if (drawerSide < 0) 1f else -1f
+        for (i in 0 until list.childCount) {
+            val child = list.getChildAt(i)
+            val childCenter = (child.top + child.bottom) / 2f
+            // t: 0 at the vertical middle, 1 at the panel edges.
+            val t = ((childCenter - center) / center).coerceIn(-1f, 1f)
+            val curve = kotlin.math.cos(t * (Math.PI.toFloat() / 2f)) // 1 center → 0 edge
+            child.translationX = direction * bulge * curve
+            child.alpha = 0.45f + 0.55f * curve
+            val scale = 0.92f + 0.08f * curve
+            child.scaleX = scale
+            child.scaleY = scale
+        }
+    }
+
+    /** Horizontal drag on the open drawer toward its edge closes it, tracking the finger. */
+    private fun setupDrawerSwipeBack() {
+        val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop
+        binding.drawerList.addOnItemTouchListener(
+            object : androidx.recyclerview.widget.RecyclerView.SimpleOnItemTouchListener() {
+                private var startX = 0f
+                private var startY = 0f
+                private var stealing = false
+                private var tracker: android.view.VelocityTracker? = null
+
+                override fun onInterceptTouchEvent(
+                    rv: androidx.recyclerview.widget.RecyclerView, e: MotionEvent,
+                ): Boolean {
+                    when (e.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> {
+                            // Raw coords: the panel itself moves during the drag.
+                            startX = e.rawX
+                            startY = e.rawY
+                            stealing = false
+                            tracker?.recycle()
+                            tracker = android.view.VelocityTracker.obtain()
+                            tracker?.addMovement(e)
+                        }
+                        MotionEvent.ACTION_MOVE -> {
+                            tracker?.addMovement(e)
+                            val dx = e.rawX - startX
+                            val dy = e.rawY - startY
+                            val outward = if (drawerSide < 0) dx < 0 else dx > 0
+                            if (!stealing && outward && abs(dx) > slop && abs(dx) > abs(dy)) {
+                                stealing = true
+                            }
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            tracker?.recycle()
+                            tracker = null
+                        }
+                    }
+                    return stealing
+                }
+
+                override fun onTouchEvent(
+                    rv: androidx.recyclerview.widget.RecyclerView, e: MotionEvent,
+                ) {
+                    tracker?.addMovement(e)
+                    when (e.actionMasked) {
+                        MotionEvent.ACTION_MOVE -> {
+                            val outwardDist = if (drawerSide < 0) startX - e.rawX else e.rawX - startX
+                            setDrawerProgress(1f - outwardDist / drawerOffset())
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            val vx = tracker?.let {
+                                it.computeCurrentVelocity(1000)
+                                it.xVelocity
+                            } ?: 0f
+                            tracker?.recycle()
+                            tracker = null
+                            stealing = false
+                            settleDrawer(vx)
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    private fun drawerContents(index: Int): List<AppEntry> {
+        val keys = prefs.drawer(index).apps
         return if (keys.isEmpty()) repo.visibleApps(prefs.hiddenApps)
         else keys.mapNotNull { repo.byComponentKey(it) }
     }
@@ -346,19 +475,22 @@ class MainActivity : AppCompatActivity() {
         binding.drawerScrim.alpha = 0.55f * p
     }
 
-    private fun beginDrawerDrag(side: Int) {
+    private fun beginDrawerDrag(side: Int, index: Int) {
         placeDrawer(side)
-        drawerAdapter.submit(drawerContents())
+        drawerIndex = index
+        drawerAdapter.submit(drawerContents(index))
         setDrawerProgress(0f)
+        binding.drawerList.post { applyWheelTransform() }
     }
 
-    private fun openDrawer(side: Int, animate: Boolean) {
+    private fun openDrawer(side: Int, index: Int, animate: Boolean) {
         if (!::drawerAdapter.isInitialized) return
         // Already visible (settling from a drag) → animate on from the finger position,
         // don't snap back to fully closed first.
         val wasVisible = binding.drawerList.visibility == View.VISIBLE
         placeDrawer(side)
-        drawerAdapter.submit(drawerContents())
+        drawerIndex = index
+        drawerAdapter.submit(drawerContents(index))
         binding.drawerList.visibility = View.VISIBLE
         binding.drawerScrim.visibility = View.VISIBLE
         drawerOpen = true
@@ -369,6 +501,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             setDrawerProgress(1f)
         }
+        binding.drawerList.post { applyWheelTransform() }
     }
 
     private fun closeDrawer(animate: Boolean) {
@@ -398,7 +531,7 @@ class MainActivity : AppCompatActivity() {
         val closed = closedTranslation()
         val progress = 1f - (binding.drawerList.translationX / closed).coerceIn(0f, 1f)
         val open = if (fast) opening else progress > 0.4f
-        if (open) openDrawer(drawerSide, animate = true)
+        if (open) openDrawer(drawerSide, drawerIndex, animate = true)
         else closeDrawer(animate = true)
     }
 
@@ -408,6 +541,7 @@ class MainActivity : AppCompatActivity() {
             onAppClick = { entry, view -> launchApp(entry, view) },
             onAppLongClick = { entry, view -> showAppMenu(entry, view) },
             onCommand = { command -> runCommand(command) },
+            badgeCount = { pkg -> badgeFor(pkg) },
         )
         searchMode = SearchMode.byId(prefs.searchModeId)
         binding.results.layoutManager = LinearLayoutManager(this).apply {
@@ -773,75 +907,108 @@ class MainActivity : AppCompatActivity() {
 
     // -------------------------------------------------------- gesture hints
 
-    // Each edge cycles between its one- and two-finger bindings.
+    // Each edge cycles between its one- and two-finger bindings. One cycle = the hint
+    // travels its short course in the swipe's direction while fading in, cruising,
+    // then fading out at the end of the course; then the texts advance (`>` → `>>`).
     private val hintHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var hintStep = 0
-    private val hintRunnable = object : Runnable {
-        override fun run() {
-            renderHints(hintStep)
-            hintStep = hintStep xor 1
-            hintHandler.postDelayed(this, 2600)
-        }
-    }
+    private var hintAnimator: android.animation.ValueAnimator? = null
 
     private fun startHints() {
-        hintHandler.removeCallbacks(hintRunnable)
+        stopHints()
         val show = prefs.showGestureHints &&
             binding.results.visibility != View.VISIBLE
-        if (!show) {
+        if (!show || !hasAnyHint()) {
             binding.hintLeft.visibility = View.GONE
             binding.hintRight.visibility = View.GONE
             return
         }
         hintStep = 0
-        hintHandler.post(hintRunnable)
-        startNudges()
+        if (!prefs.animations) {
+            // Static fallback: show the one-finger bindings, no motion, no cycling.
+            setHintText(binding.hintLeft, leftEdgeText(Prefs.KEY_GESTURE_LR_1, 1), 0.85f)
+            setHintText(binding.hintRight, rightEdgeText(Prefs.KEY_GESTURE_RL_1, 1), 0.85f)
+            return
+        }
+        runHintCycle()
     }
 
     private fun stopHints() {
-        hintHandler.removeCallbacks(hintRunnable)
-        stopNudges()
-    }
-
-    // A gentle, endless slide in each edge's swipe direction — the hint "leans" the
-    // way you should swipe. Independent of the fade that plays on a text change.
-    private var leftNudge: android.animation.ObjectAnimator? = null
-    private var rightNudge: android.animation.ObjectAnimator? = null
-
-    private fun startNudges() {
-        stopNudges()
-        if (!prefs.animations) return
-        val amp = 7 * resources.displayMetrics.density
-        leftNudge = nudge(binding.hintLeft, amp)
-        rightNudge = nudge(binding.hintRight, -amp)
-    }
-
-    private fun nudge(view: View, dx: Float): android.animation.ObjectAnimator =
-        android.animation.ObjectAnimator.ofFloat(view, View.TRANSLATION_X, 0f, dx).apply {
-            duration = 900
-            repeatCount = android.animation.ObjectAnimator.INFINITE
-            repeatMode = android.animation.ObjectAnimator.REVERSE
-            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
-            start()
+        hintHandler.removeCallbacksAndMessages(null)
+        hintAnimator?.let {
+            it.removeAllUpdateListeners()
+            it.removeAllListeners()
+            it.cancel()
         }
-
-    private fun stopNudges() {
-        leftNudge?.cancel()
-        rightNudge?.cancel()
-        leftNudge = null
-        rightNudge = null
+        hintAnimator = null
         binding.hintLeft.translationX = 0f
         binding.hintRight.translationX = 0f
     }
 
-    /** Renders one edge frame: [step] 0 shows the one-finger binding, 1 the two-finger. */
-    private fun renderHints(step: Int) {
-        val accent = accentColor()
-        val leftKey = if (step == 0) Prefs.KEY_GESTURE_LR_1 else Prefs.KEY_GESTURE_LR_2
-        val rightKey = if (step == 0) Prefs.KEY_GESTURE_RL_1 else Prefs.KEY_GESTURE_RL_2
-        val arrows = if (step == 0) 1 else 2
-        crossfadeHint(binding.hintLeft, leftEdgeText(leftKey, arrows), accent)
-        crossfadeHint(binding.hintRight, rightEdgeText(rightKey, arrows), accent)
+    private fun hasAnyHint(): Boolean = listOf(
+        Prefs.KEY_GESTURE_LR_1, Prefs.KEY_GESTURE_LR_2,
+        Prefs.KEY_GESTURE_RL_1, Prefs.KEY_GESTURE_RL_2,
+    ).any { bindingLabel(prefs.gestureBinding(it)) != null }
+
+    /**
+     * One travel-and-fade pass for the current step, then advance. The alpha envelope
+     * (in → cruise → out) plays over the same slow slide, so the hint dies exactly at
+     * the end of its course — like a passing light trail.
+     */
+    private fun runHintCycle() {
+        val arrows = if (hintStep == 0) 1 else 2
+        val leftKey = if (hintStep == 0) Prefs.KEY_GESTURE_LR_1 else Prefs.KEY_GESTURE_LR_2
+        val rightKey = if (hintStep == 0) Prefs.KEY_GESTURE_RL_1 else Prefs.KEY_GESTURE_RL_2
+        val hasLeft = setHintText(binding.hintLeft, leftEdgeText(leftKey, arrows), 0f)
+        val hasRight = setHintText(binding.hintRight, rightEdgeText(rightKey, arrows), 0f)
+        if (!hasLeft && !hasRight) {
+            // This step is unbound on both edges; show the other one next pass.
+            hintStep = hintStep xor 1
+            hintHandler.postDelayed({ runHintCycle() }, 250)
+            return
+        }
+        val travel = 26 * resources.displayMetrics.density
+        hintAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 3600
+            interpolator = android.view.animation.LinearInterpolator()
+            addUpdateListener { anim ->
+                val f = anim.animatedValue as Float
+                val alpha = 0.85f * when {
+                    f < 0.22f -> f / 0.22f            // fade in at the start of the course
+                    f > 0.72f -> (1f - f) / 0.28f     // fade out as it reaches the end
+                    else -> 1f
+                }
+                if (hasLeft) {
+                    binding.hintLeft.translationX = travel * f
+                    binding.hintLeft.alpha = alpha
+                }
+                if (hasRight) {
+                    binding.hintRight.translationX = -travel * f
+                    binding.hintRight.alpha = alpha
+                }
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    hintStep = hintStep xor 1
+                    hintHandler.postDelayed({ runHintCycle() }, 250)
+                }
+            })
+            start()
+        }
+    }
+
+    /** Applies text/color to a hint; null text hides it. Returns whether it is shown. */
+    private fun setHintText(view: TextView, text: String?, alpha: Float): Boolean {
+        if (text == null) {
+            view.visibility = View.GONE
+            return false
+        }
+        view.setTextColor(ColorUtils.setAlphaComponent(accentColor(), 0xB0))
+        view.text = text
+        view.alpha = alpha
+        view.translationX = 0f
+        view.visibility = View.VISIBLE
+        return true
     }
 
     private fun leftEdgeText(key: String, arrows: Int): String? {
@@ -857,32 +1024,12 @@ class MainActivity : AppCompatActivity() {
     /** Human label for an encoded binding, or null for NONE (hint hidden). */
     private fun bindingLabel(encoded: String): String? {
         val spec = GestureBinding.decode(encoded)
-        if (spec.action == GestureAction.NONE) return null
-        if (spec.action == GestureAction.OPEN_APP) {
-            val app = spec.appKey?.let { key -> repo.apps.firstOrNull { it.componentKey == key } }
-                ?: return null
-            return app.label
+        return when (spec.action) {
+            GestureAction.NONE -> null
+            GestureAction.OPEN_APP -> spec.appKey?.let { repo.byComponentKey(it) }?.label
+            GestureAction.APP_DRAWER -> prefs.drawer(spec.drawerIndex).name
+            else -> getString(spec.action.labelRes)
         }
-        return getString(spec.action.labelRes)
-    }
-
-    private fun crossfadeHint(view: TextView, text: String?, accent: Int) {
-        if (text == null) {
-            view.visibility = View.GONE
-            return
-        }
-        view.setTextColor(ColorUtils.setAlphaComponent(accent, 0xB0))
-        if (!prefs.animations) {
-            view.text = text
-            view.visibility = View.VISIBLE
-            view.alpha = 0.85f
-            return
-        }
-        view.animate().alpha(0f).setDuration(200).withEndAction {
-            view.text = text
-            view.visibility = View.VISIBLE
-            view.animate().alpha(0.85f).setDuration(200).start()
-        }.start()
     }
 
     private fun updateStarterPill() {
@@ -959,21 +1106,21 @@ class MainActivity : AppCompatActivity() {
         suggestions = listOf(entries.getOrNull(0), entries.getOrNull(1), entries.getOrNull(2))
         bindSuggestion(
             suggestions[0], binding.suggestMain,
-            binding.suggestMainIcon, binding.suggestMainLabel
+            binding.suggestMainIcon, binding.suggestMainLabel, binding.suggestMainBadge
         )
         bindSuggestion(
             suggestions[1], binding.suggestLeft,
-            binding.suggestLeftIcon, binding.suggestLeftLabel
+            binding.suggestLeftIcon, binding.suggestLeftLabel, binding.suggestLeftBadge
         )
         bindSuggestion(
             suggestions[2], binding.suggestRight,
-            binding.suggestRightIcon, binding.suggestRightLabel
+            binding.suggestRightIcon, binding.suggestRightLabel, binding.suggestRightBadge
         )
         if (animate && prefs.animations) animateSuggestionsIn()
     }
 
     private fun bindSuggestion(
-        entry: AppEntry?, container: View, icon: ImageView, label: TextView,
+        entry: AppEntry?, container: View, icon: ImageView, label: TextView, badge: TextView,
     ) {
         if (entry == null) {
             container.visibility = View.INVISIBLE
@@ -982,6 +1129,9 @@ class MainActivity : AppCompatActivity() {
         container.visibility = View.VISIBLE
         icon.setImageDrawable(repo.icon(entry))
         label.text = entry.label
+        val count = badgeFor(entry.packageName)
+        badge.visibility = if (count > 0) View.VISIBLE else View.GONE
+        if (count > 0) badge.text = if (count > 99) "99+" else count.toString()
     }
 
     private fun animateSuggestionsIn() {
@@ -1003,6 +1153,85 @@ class MainActivity : AppCompatActivity() {
         if (binding.results.visibility == View.VISIBLE) {
             onQueryChanged(binding.searchInput.text.toString())
         }
+    }
+
+    // ------------------------------------------- notification badges & ticker
+
+    /** Bubble count for a package; 0 when badges are off or access is missing. */
+    private fun badgeFor(pkg: String): Int =
+        if (prefs.notifBadges) NotifListener.count(pkg) else 0
+
+    /** Active-notification set changed: refresh every visible badge and the ticker. */
+    private fun onNotificationsChanged() {
+        // Suggestions: re-bind badges only, no re-prediction.
+        for ((entry, badge) in listOf(
+            suggestions.getOrNull(0) to binding.suggestMainBadge,
+            suggestions.getOrNull(1) to binding.suggestLeftBadge,
+            suggestions.getOrNull(2) to binding.suggestRightBadge,
+        )) {
+            if (entry == null) continue
+            val count = badgeFor(entry.packageName)
+            badge.visibility = if (count > 0) View.VISIBLE else View.GONE
+            if (count > 0) badge.text = if (count > 99) "99+" else count.toString()
+        }
+        if (binding.results.visibility == View.VISIBLE) adapter.notifyDataSetChanged()
+        if (drawerOpen) drawerAdapter.notifyDataSetChanged()
+        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            startTicker()
+        }
+    }
+
+    // The ticker shows one unread message at a time: fade in, hold, fade to the next.
+    private val tickerHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var tickerIndex = 0
+    private val tickerRunnable = object : Runnable {
+        override fun run() {
+            showNextTickerMessage()
+            tickerHandler.postDelayed(this, TICKER_PERIOD_MS)
+        }
+    }
+
+    private fun startTicker() {
+        tickerHandler.removeCallbacks(tickerRunnable)
+        val active = prefs.messageTicker && NotifListener.messages.isNotEmpty()
+        if (!active) {
+            binding.ticker.visibility = View.GONE
+            return
+        }
+        tickerIndex = 0
+        tickerHandler.post(tickerRunnable)
+    }
+
+    private fun stopTicker() {
+        tickerHandler.removeCallbacks(tickerRunnable)
+    }
+
+    private fun showNextTickerMessage() {
+        val messages = NotifListener.messages
+        if (messages.isEmpty()) {
+            binding.ticker.visibility = View.GONE
+            tickerHandler.removeCallbacks(tickerRunnable)
+            return
+        }
+        val msg = messages[tickerIndex % messages.size]
+        tickerIndex++
+        val appLabel = repo.byPackage(msg.pkg)?.label ?: msg.pkg
+        val text = "$appLabel · ${msg.title} — ${msg.text}"
+        binding.ticker.setOnClickListener {
+            repo.byPackage(msg.pkg)?.let { entry -> launchApp(entry, binding.ticker) }
+        }
+        if (!prefs.animations) {
+            binding.ticker.text = text
+            binding.ticker.alpha = 0.9f
+            binding.ticker.visibility = View.VISIBLE
+            return
+        }
+        binding.ticker.animate().alpha(0f).setDuration(250).withEndAction {
+            binding.ticker.text = text
+            binding.ticker.translationY = 6 * resources.displayMetrics.density
+            binding.ticker.visibility = View.VISIBLE
+            binding.ticker.animate().alpha(0.9f).translationY(0f).setDuration(350).start()
+        }.start()
     }
 
     // ------------------------------------------------------------- updates
@@ -1194,5 +1423,9 @@ class MainActivity : AppCompatActivity() {
         }
         prefs.btPermissionAsked = true
         requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1)
+    }
+
+    private companion object {
+        const val TICKER_PERIOD_MS = 4200L
     }
 }
