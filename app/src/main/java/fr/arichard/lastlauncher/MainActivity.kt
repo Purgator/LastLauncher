@@ -7,6 +7,8 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.GradientDrawable
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -33,6 +35,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import fr.arichard.lastlauncher.apps.AppEntry
 import fr.arichard.lastlauncher.apps.AppRepository
+import fr.arichard.lastlauncher.command.CommandProcessor
 import fr.arichard.lastlauncher.databinding.ActivityMainBinding
 import fr.arichard.lastlauncher.lock.LockService
 import fr.arichard.lastlauncher.predict.PredictionEngine
@@ -161,8 +164,9 @@ class MainActivity : AppCompatActivity() {
     private fun setupSearch() {
         adapter = AppAdapter(
             repo,
-            onClick = { entry, view -> launchApp(entry, view) },
-            onLongClick = { entry, view -> showAppMenu(entry, view) },
+            onAppClick = { entry, view -> launchApp(entry, view) },
+            onAppLongClick = { entry, view -> showAppMenu(entry, view) },
+            onCommand = { command -> runCommand(command) },
             onWebSearch = { query -> webSearch(query) },
         )
         binding.results.layoutManager = LinearLayoutManager(this).apply {
@@ -177,8 +181,12 @@ class MainActivity : AppCompatActivity() {
         }
         binding.searchInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO || actionId == EditorInfo.IME_ACTION_DONE) {
-                adapter.firstApp()?.let { launchApp(it, binding.searchInput) }
-                    ?: adapter.currentWebQuery()?.let { webSearch(it) }
+                when (val row = adapter.primaryRow()) {
+                    is AppAdapter.AppRow -> launchApp(row.entry, binding.searchInput)
+                    is AppAdapter.CommandRow -> runCommand(row.command)
+                    is AppAdapter.WebRow -> webSearch(row.query)
+                    null -> {}
+                }
                 true
             } else {
                 false
@@ -221,7 +229,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             repo.search(query, prefs.hiddenApps)
         }
-        adapter.submit(list, webSearchQuery = query)
+        val commands = CommandProcessor.parse(query, commandCatalog, R.drawable.ic_calc, R.drawable.ic_link)
+        adapter.submit(list, commands, webSearchQuery = query)
         binding.results.visibility = View.VISIBLE
         binding.suggestionsBlock.visibility = View.INVISIBLE
         binding.results.scrollToPosition(0)
@@ -287,6 +296,95 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 // try the next one
             }
+        }
+    }
+
+    // ------------------------------------------------------------- commands
+
+    /** Quick-action palette shown by the `>` prefix in the command bar. */
+    private val commandCatalog: List<CommandProcessor.QuickAction> by lazy {
+        listOf(
+            CommandProcessor.QuickAction("lock", getString(R.string.cmd_lock), R.drawable.ic_lock, "lock secure"),
+            CommandProcessor.QuickAction("quick_settings", getString(R.string.cmd_quick_settings), R.drawable.ic_tiles, "toggles panel"),
+            CommandProcessor.QuickAction("notifications", getString(R.string.cmd_notifications), R.drawable.ic_bell, "shade alerts"),
+            CommandProcessor.QuickAction("flashlight", getString(R.string.cmd_flashlight), R.drawable.ic_flashlight, "torch light"),
+            CommandProcessor.QuickAction("wifi", getString(R.string.cmd_wifi), R.drawable.ic_wifi, "network internet"),
+            CommandProcessor.QuickAction("bluetooth", getString(R.string.cmd_bluetooth), R.drawable.ic_bluetooth, "bt"),
+            CommandProcessor.QuickAction("battery", getString(R.string.cmd_battery), R.drawable.ic_battery, "power"),
+            CommandProcessor.QuickAction("assistant", getString(R.string.cmd_assistant), R.drawable.ic_assistant, "gemini voice"),
+            CommandProcessor.QuickAction("all_apps", getString(R.string.cmd_all_apps), R.drawable.ic_apps, "drawer list"),
+            CommandProcessor.QuickAction("settings", getString(R.string.cmd_settings), R.drawable.ic_settings, "system android"),
+        )
+    }
+
+    private fun runCommand(command: CommandProcessor.Command) {
+        haptic(binding.searchInput)
+        when (val action = command.action) {
+            is CommandProcessor.Action.Copy -> {
+                val clipboard = getSystemService(android.content.ClipboardManager::class.java)
+                clipboard?.setPrimaryClip(
+                    android.content.ClipData.newPlainText("result", action.text)
+                )
+                Toast.makeText(
+                    this, getString(R.string.cmd_copied, action.text), Toast.LENGTH_SHORT
+                ).show()
+            }
+            is CommandProcessor.Action.OpenUrl -> openUrl(action.url)
+            is CommandProcessor.Action.Quick -> runQuickAction(action.id)
+        }
+    }
+
+    private fun runQuickAction(id: String) {
+        when (id) {
+            "lock" -> lockScreen()
+            "quick_settings" -> if (!LockService.openQuickSettings()) LockService.openNotificationShade(this)
+            "notifications" -> LockService.openNotificationShade(this)
+            "flashlight" -> toggleFlashlight()
+            "wifi" -> openSettingsAction(Settings.ACTION_WIFI_SETTINGS)
+            "bluetooth" -> openSettingsAction(Settings.ACTION_BLUETOOTH_SETTINGS)
+            "battery" -> openSettingsAction(Intent.ACTION_POWER_USAGE_SUMMARY)
+            "assistant" -> launchAssistant()
+            "all_apps" -> openAllApps()
+            "settings" -> openSettingsAction(Settings.ACTION_SETTINGS)
+        }
+        if (id != "all_apps") resetToHome()
+    }
+
+    private fun openSettingsAction(action: String) {
+        try {
+            startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (e2: Exception) {
+                // no settings app resolvable
+            }
+        }
+    }
+
+    private var torchOn = false
+
+    private fun toggleFlashlight() {
+        val manager = getSystemService(CameraManager::class.java) ?: return
+        try {
+            val cameraId = manager.cameraIdList.firstOrNull { id ->
+                manager.getCameraCharacteristics(id)
+                    .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            } ?: return
+            torchOn = !torchOn
+            manager.setTorchMode(cameraId, torchOn)
+        } catch (e: Exception) {
+            torchOn = false
+        }
+    }
+
+    private fun openUrl(url: String) {
+        try {
+            startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: Exception) {
+            // no browser
         }
     }
 

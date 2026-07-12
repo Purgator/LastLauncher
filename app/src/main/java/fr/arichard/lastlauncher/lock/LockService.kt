@@ -67,6 +67,12 @@ class LockService : AccessibilityService() {
             }
         }
 
+        /** Opens the quick-settings panel; returns false if the service is off. */
+        fun openQuickSettings(): Boolean {
+            if (Build.VERSION.SDK_INT < 28) return false
+            return instance?.performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS) == true
+        }
+
         /** Sends the user to the accessibility settings to enable the service. */
         fun openAccessibilitySettings(context: Context) {
             try {
