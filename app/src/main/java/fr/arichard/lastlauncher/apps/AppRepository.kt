@@ -90,6 +90,8 @@ class AppRepository(private val context: Context) {
 
     fun byPackage(pkg: String): AppEntry? = apps.firstOrNull { it.packageName == pkg }
 
+    fun byComponentKey(key: String): AppEntry? = apps.firstOrNull { it.componentKey == key }
+
     /**
      * Ranks apps against [query]: prefix > word prefix > initials > substring >
      * subsequence; ties broken by how often the user opens the app.

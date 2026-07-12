@@ -92,4 +92,17 @@ class CommandProcessorTest {
         assertFalse(CommandProcessor.isNaturalLanguage("spotify"))
         assertFalse(CommandProcessor.isNaturalLanguage("wifi"))
     }
+
+    @Test
+    fun calcResultUsesDotDecimalRegardlessOfLocale() {
+        val previous = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.FRANCE) // comma decimal locale
+            val calc = parse("10/3").single { it.action is CommandProcessor.Action.Copy }
+            assertEquals("3.333333", calc.title)
+            assertEquals("3.333333", (calc.action as CommandProcessor.Action.Copy).text)
+        } finally {
+            java.util.Locale.setDefault(previous)
+        }
+    }
 }
