@@ -88,7 +88,14 @@
     <string name="pref_animations_summary">Effets discrets d’apparition et d’appui. Désactivez pour une autonomie maximale.</string>
     <string name="pref_show_clock">Afficher l’horloge</string>
     <string name="pref_status_line">Ligne d’état</string>
-    <string name="pref_status_line_summary">Un relevé façon terminal sous la date : batterie, réseau, prochaine alarme, applications lancées aujourd’hui</string>
+    <string name="pref_status_line_summary">Un relevé façon terminal sous la date</string>
+    <string name="pref_status_tokens">Champs de la ligne d’état</string>
+    <string name="pref_status_tokens_summary">Choisissez ce qu’affiche la ligne d’état</string>
+    <string name="token_battery">Batterie</string>
+    <string name="token_network">Réseau</string>
+    <string name="token_alarm">Prochaine alarme</string>
+    <string name="token_launches">Applications lancées aujourd’hui</string>
+    <string name="token_storage">Stockage libre</string>
 
     <string name="cat_apps">Applications</string>
     <string name="pref_hidden_apps">Applications masquées</string>

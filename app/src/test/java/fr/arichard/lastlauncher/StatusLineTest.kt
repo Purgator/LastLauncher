@@ -1,29 +1,50 @@
 package fr.arichard.lastlauncher
 
 import fr.arichard.lastlauncher.ui.StatusLine
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StatusLineTest {
 
+    private fun values(
+        percent: Int = 82,
+        charging: Boolean = true,
+        net: StatusLine.Net = StatusLine.Net.WIFI,
+        alarm: String? = "07:00",
+        launches: Int = 23,
+        storage: Double = 41.2,
+    ) = StatusLine.Values(percent, charging, net, alarm, launches, storage)
+
     @Test
-    fun chargingShowsBoltAndAllTokens() {
-        val line = StatusLine.build(82, true, StatusLine.Net.WIFI, "07:00", 23)
+    fun rendersOnlyEnabledTokensInCanonicalOrder() {
+        val line = StatusLine.build(
+            setOf(StatusLine.NETWORK, StatusLine.BATTERY, StatusLine.STORAGE), values()
+        )
+        // Battery comes before network before storage regardless of set order.
+        assertTrue(line.indexOf("82%⚡") < line.indexOf("wifi"))
+        assertTrue(line.indexOf("wifi") < line.indexOf("41.2G"))
+        assertFalse(line.contains("⏰"))  // alarm not enabled
+        assertFalse(line.contains("↑"))   // launches not enabled
+    }
+
+    @Test
+    fun chargingBoltAndOptionalTokens() {
+        val line = StatusLine.build(StatusLine.ALL_TOKENS.toSet(), values())
         assertTrue(line.contains("82%⚡"))
-        assertTrue(line.contains("wifi"))
         assertTrue(line.contains("⏰07:00"))
         assertTrue(line.contains("↑23"))
     }
 
     @Test
-    fun optionalTokensAreOmittedWhenEmpty() {
-        val line = StatusLine.build(50, false, StatusLine.Net.OFFLINE, null, 0)
+    fun emptyOptionalsAreOmitted() {
+        val line = StatusLine.build(
+            StatusLine.ALL_TOKENS.toSet(),
+            values(charging = false, net = StatusLine.Net.OFFLINE, alarm = null, launches = 0)
+        )
         assertFalse(line.contains("⚡"))
         assertFalse(line.contains("⏰"))
         assertFalse(line.contains("↑"))
         assertTrue(line.contains("off"))
-        assertTrue(line.contains("50%"))
     }
 }
