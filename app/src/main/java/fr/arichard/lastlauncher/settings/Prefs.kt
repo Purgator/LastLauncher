@@ -61,7 +61,7 @@ class Prefs(context: Context) {
     val weatherBesideClock: Boolean get() = sp.getBoolean(KEY_WEATHER_BESIDE_CLOCK, false)
 
     /** Tint the clock's glow by the current weather (static styling, zero battery). */
-    val weatherClockStyle: Boolean get() = sp.getBoolean(KEY_WEATHER_CLOCK_STYLE, false)
+    val weatherClockStyle: Boolean get() = sp.getBoolean(KEY_WEATHER_CLOCK_STYLE, true)
 
     /** Ticker layout: title and message on two lines (else one compact line). */
     val tickerTwoLines: Boolean get() = sp.getBoolean(KEY_TICKER_TWO_LINES, true)

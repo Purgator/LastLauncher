@@ -21,7 +21,6 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
-import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -42,6 +41,7 @@ import fr.arichard.lastlauncher.gesture.GestureBinding
 import fr.arichard.lastlauncher.lock.LockService
 import fr.arichard.lastlauncher.notify.NotifListener
 import fr.arichard.lastlauncher.predict.PredictionEngine
+import fr.arichard.lastlauncher.settings.InsightsActivity
 import fr.arichard.lastlauncher.settings.Prefs
 import fr.arichard.lastlauncher.settings.SettingsActivity
 import fr.arichard.lastlauncher.ui.AppAdapter
@@ -160,6 +160,7 @@ class MainActivity : AppCompatActivity() {
     // ---------------------------------------------------------------- setup
 
     private fun setupInsets() {
+        var imeWasVisible = false
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
@@ -168,6 +169,10 @@ class MainActivity : AppCompatActivity() {
                 binding.content.paddingLeft, bars.top,
                 binding.content.paddingRight, bars.bottom
             )
+            // Whatever summons the keyboard takes over from the drawers.
+            val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+            if (imeVisible && !imeWasVisible && anyDrawerOpen) closeDrawers(animate = true)
+            imeWasVisible = imeVisible
             insets
         }
     }
@@ -865,20 +870,22 @@ class MainActivity : AppCompatActivity() {
             binding.clock.setTextColor(getColor(R.color.text_primary))
             return
         }
+        // Every hue is saturated — a near-white "silver" blended into white digits was
+        // invisible, which is why the effect looked dead in cloudy weather.
         val hue = when (weatherCode) {
-            0, 1 -> 0xFFFFC24D.toInt()          // sun: warm gold
-            2, 3 -> 0xFFB8C4D9.toInt()          // clouds: soft silver
-            in 45..48 -> 0xFF9BA3B7.toInt()     // fog: grey
-            in 51..67, in 80..82 -> 0xFF4DA6FF.toInt() // rain: steel blue
-            in 71..77, in 85..86 -> 0xFFCFE9FF.toInt() // snow: icy white-blue
-            in 95..99 -> 0xFFB388FF.toInt()     // storm: violet
-            else -> 0xFFB8C4D9.toInt()
+            0, 1 -> 0xFFFFB733.toInt()          // sun: golden
+            2, 3 -> 0xFF7E96C8.toInt()          // clouds: slate blue
+            in 45..48 -> 0xFF8A93A6.toInt()     // fog: grey-blue
+            in 51..67, in 80..82 -> 0xFF3D9BFF.toInt() // rain: azure
+            in 71..77, in 85..86 -> 0xFF6FC5FF.toInt() // snow: ice blue
+            in 95..99 -> 0xFF9E6FFF.toInt()     // storm: violet
+            else -> 0xFF7E96C8.toInt()
         }
         // Color blend carries the effect (clearly visible); the glow reinforces it.
         // Radius stays ≤25px: larger text-shadow radii are unreliable when
         // hardware-accelerated on older devices.
         binding.clock.setTextColor(
-            ColorUtils.blendARGB(getColor(R.color.text_primary), hue, 0.45f)
+            ColorUtils.blendARGB(getColor(R.color.text_primary), hue, 0.6f)
         )
         binding.clock.setShadowLayer(
             24f, 0f, 0f, ColorUtils.setAlphaComponent(hue, 0xD0)
@@ -1066,43 +1073,41 @@ class MainActivity : AppCompatActivity() {
 
     private fun showAppMenu(entry: AppEntry, anchor: View) {
         haptic(anchor)
-        val menu = PopupMenu(this, anchor)
         val boosted = entry.packageName in prefs.boostedApps
-        menu.menu.add(if (boosted) R.string.menu_unboost else R.string.menu_boost)
-            .setOnMenuItemClickListener {
-                prefs.boostedApps =
-                    if (boosted) prefs.boostedApps - entry.packageName
-                    else prefs.boostedApps + entry.packageName
-                refreshSuggestions()
-                true
-            }
-        menu.menu.add(R.string.menu_app_info).setOnMenuItemClickListener {
-            startActivity(
-                Intent(
-                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.parse("package:${entry.packageName}")
-                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-            true
-        }
-        menu.menu.add(R.string.menu_hide).setOnMenuItemClickListener {
-            prefs.hideApp(entry.packageName)
-            refreshSuggestions()
-            onQueryChanged(binding.searchInput.text.toString())
-            true
-        }
-        menu.menu.add(R.string.menu_uninstall).setOnMenuItemClickListener {
-            try {
-                startActivity(
-                    Intent(Intent.ACTION_DELETE, Uri.parse("package:${entry.packageName}"))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        fun icon(res: Int) = androidx.core.content.ContextCompat.getDrawable(this, res)
+        val items = listOf(
+            AppPickerDialog.Item(
+                getString(if (boosted) R.string.menu_unboost else R.string.menu_boost),
+                icon(R.drawable.ic_boost)
+            ),
+            AppPickerDialog.Item(getString(R.string.menu_app_info), icon(R.drawable.ic_info)),
+            AppPickerDialog.Item(getString(R.string.menu_hide), icon(R.drawable.ic_eye_off)),
+            AppPickerDialog.Item(getString(R.string.menu_uninstall), icon(R.drawable.ic_delete)),
+        )
+        AppPickerDialog.singleChoice(this, entry.label, items, -1) { which ->
+            when (which) {
+                0 -> {
+                    prefs.boostedApps =
+                        if (boosted) prefs.boostedApps - entry.packageName
+                        else prefs.boostedApps + entry.packageName
+                    refreshSuggestions()
+                }
+                1 -> startActivitySafely(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:${entry.packageName}")
+                    )
                 )
-            } catch (e: Exception) {
-                // system apps can refuse
+                2 -> {
+                    prefs.hideApp(entry.packageName)
+                    refreshSuggestions()
+                    onQueryChanged(binding.searchInput.text.toString())
+                }
+                3 -> startActivitySafely(
+                    Intent(Intent.ACTION_DELETE, Uri.parse("package:${entry.packageName}"))
+                )
             }
-            true
         }
-        menu.show()
     }
 
     // ---------------------------------------------------------- predictions
@@ -1371,14 +1376,55 @@ class MainActivity : AppCompatActivity() {
         } else 0L
 
         fun render(launches: Int) {
-            binding.statusLine.text = StatusLine.build(
-                enabled,
-                StatusLine.Values(percent, charging, net, alarm, launches, storage, dbBytes)
+            binding.statusLine.text = clickableStatusText(
+                StatusLine.segments(
+                    enabled,
+                    StatusLine.Values(percent, charging, net, alarm, launches, storage, dbBytes)
+                ),
+                net
             )
+            binding.statusLine.movementMethod = android.text.method.LinkMovementMethod.getInstance()
             binding.statusLine.visibility = View.VISIBLE
         }
         if (StatusLine.LAUNCHES in enabled) PredictionEngine.launchesToday(this) { render(it) }
         else render(0)
+    }
+
+    /** Each token becomes tappable, opening its related app or settings screen. */
+    private fun clickableStatusText(
+        segments: List<Pair<String, String>>, net: StatusLine.Net,
+    ): CharSequence {
+        val text = android.text.SpannableStringBuilder("› ")
+        for ((i, segment) in segments.withIndex()) {
+            if (i > 0) text.append("  ·  ")
+            val start = text.length
+            text.append(segment.second)
+            val span = object : android.text.style.ClickableSpan() {
+                override fun onClick(widget: View) {
+                    haptic(binding.statusLine)
+                    when (segment.first) {
+                        StatusLine.BATTERY ->
+                            openSettingsAction(Intent.ACTION_POWER_USAGE_SUMMARY)
+                        StatusLine.NETWORK -> openSettingsAction(
+                            if (net == StatusLine.Net.WIFI) Settings.ACTION_WIFI_SETTINGS
+                            else Settings.ACTION_WIRELESS_SETTINGS
+                        )
+                        StatusLine.ALARM ->
+                            startActivitySafely(Intent(AlarmClock.ACTION_SHOW_ALARMS))
+                        StatusLine.STORAGE ->
+                            openSettingsAction(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
+                        // Launch count and DB size both live in the insights screen.
+                        else -> startActivity(Intent(this@MainActivity, InsightsActivity::class.java))
+                    }
+                }
+
+                override fun updateDrawState(ds: android.text.TextPaint) {
+                    // Keep the terminal look: no underline, no link color.
+                }
+            }
+            text.setSpan(span, start, text.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        return text
     }
 
     private fun freeStorageGb(): Double = try {
