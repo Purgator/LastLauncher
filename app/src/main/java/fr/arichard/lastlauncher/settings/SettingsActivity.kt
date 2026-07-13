@@ -46,9 +46,11 @@ class SettingsActivity : AppCompatActivity(),
     override fun onPreferenceStartFragment(
         caller: PreferenceFragmentCompat, pref: Preference,
     ): Boolean {
-        val fragment = supportFragmentManager.fragmentFactory.instantiate(
-            classLoader, pref.fragment ?: return false
-        )
+        // Map keys ("screen_general" → GeneralFragment) to direct constructors instead
+        // of reflectively instantiating pref.fragment: R8 strips classes that are only
+        // referenced by name strings in XML, which crashed release builds here.
+        if (pref.fragment == null) return false
+        val fragment = fragmentForScreen(pref.key.removePrefix("screen_"))
         supportFragmentManager.beginTransaction()
             .replace(android.R.id.content, fragment)
             .addToBackStack(null)
