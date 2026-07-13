@@ -8,19 +8,19 @@ import fr.arichard.lastlauncher.R
  *  `>`  left→right, one finger      `>>` left→right, two fingers
  *  `<`  right→left, one finger      `<<` right→left, two fingers
  */
-enum class GestureAction(val id: String, val labelRes: Int) {
+enum class GestureAction(val id: String, val labelRes: Int, val iconRes: Int = 0) {
     NONE("none", R.string.gesture_none),
-    NOTIFICATIONS("notifications", R.string.cmd_notifications),
-    QUICK_SETTINGS("quick_settings", R.string.cmd_quick_settings),
-    LOCK("lock", R.string.cmd_lock),
-    FLASHLIGHT("flashlight", R.string.cmd_flashlight),
-    ASSISTANT("assistant", R.string.cmd_assistant),
-    ALL_APPS("all_apps", R.string.cmd_all_apps),
-    APP_DRAWER("app_drawer", R.string.gesture_app_drawer),
-    SEARCH("search", R.string.gesture_search),
-    CAMERA("camera", R.string.gesture_camera),
-    DIALER("dialer", R.string.gesture_dialer),
-    OPEN_APP("open_app", R.string.gesture_open_app);
+    NOTIFICATIONS("notifications", R.string.cmd_notifications, R.drawable.ic_bell),
+    QUICK_SETTINGS("quick_settings", R.string.cmd_quick_settings, R.drawable.ic_tiles),
+    LOCK("lock", R.string.cmd_lock, R.drawable.ic_lock),
+    FLASHLIGHT("flashlight", R.string.cmd_flashlight, R.drawable.ic_flashlight),
+    ASSISTANT("assistant", R.string.cmd_assistant, R.drawable.ic_assistant),
+    ALL_APPS("all_apps", R.string.cmd_all_apps, R.drawable.ic_apps),
+    APP_DRAWER("app_drawer", R.string.gesture_app_drawer, R.drawable.ic_apps),
+    SEARCH("search", R.string.gesture_search, R.drawable.ic_search),
+    CAMERA("camera", R.string.gesture_camera, R.drawable.ic_camera),
+    DIALER("dialer", R.string.gesture_dialer, R.drawable.ic_phone),
+    OPEN_APP("open_app", R.string.gesture_open_app, R.drawable.ic_apps);
 
     companion object {
         fun byId(id: String): GestureAction =
