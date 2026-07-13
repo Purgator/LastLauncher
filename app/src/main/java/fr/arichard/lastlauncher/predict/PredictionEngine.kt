@@ -49,6 +49,12 @@ object PredictionEngine {
     private const val W_NOTIFICATION = 0.35
     private const val NOTIFICATION_CAP = 4
 
+    // User-boosted apps ("Boost in suggestions" in the long-press menu): learned score
+    // is amplified and gets a floor, so a boosted app shows even with little history
+    // yet still yields to genuinely stronger habits.
+    private const val BOOST_FACTOR = 1.35
+    private const val BOOST_BASE = 1.0
+
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "predict") }
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -158,6 +164,9 @@ object PredictionEngine {
                 scores.merge(pkg, W_NOTIFICATION * minOf(count, NOTIFICATION_CAP), Double::plus)
             }
         }
+        for (pkg in Prefs(context).boostedApps) {
+            scores[pkg] = (scores[pkg] ?: 0.0) * BOOST_FACTOR + BOOST_BASE
+        }
         return scores
     }
 
@@ -203,6 +212,68 @@ object PredictionEngine {
             mainHandler.post { callback(count) }
         }
     }
+
+    /** Everything the insights screen shows about the engine's state. */
+    data class Snapshot(
+        val totalRows: Int,
+        val daysCovered: Int,
+        val dbBytes: Long,
+        val launchesToday: Int,
+        val hour: Int,
+        val weekend: Boolean,
+        val prevApp: String?,
+        val activeTrigger: String?,
+        val topScores: List<Pair<String, Double>>,
+        val boosted: Set<String>,
+        val notifying: Map<String, Int>,
+    )
+
+    /** Builds a live view of the engine's data and current ranking, off the UI thread. */
+    fun snapshot(context: Context, callback: (Snapshot) -> Unit) {
+        val appContext = context.applicationContext
+        executor.execute {
+            val snapshot = try {
+                val database = db(appContext)
+                val now = System.currentTimeMillis()
+                val cal = Calendar.getInstance()
+                val startOfDay = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                val oldest = database.oldestTs()
+                Snapshot(
+                    totalRows = database.totalCount(),
+                    daysCovered = oldest?.let { ((now - it) / DAY_MS).toInt() + 1 } ?: 0,
+                    dbBytes = appContext.getDatabasePath("usage.db").length(),
+                    launchesToday = database.countSince(startOfDay),
+                    hour = cal.get(Calendar.HOUR_OF_DAY),
+                    weekend = isWeekend(cal.get(Calendar.DAY_OF_WEEK)),
+                    prevApp = Prefs(appContext).lastLaunchedPkg,
+                    activeTrigger = ContextSignals.activeEvent(now),
+                    topScores = score(appContext).entries
+                        .sortedByDescending { it.value }
+                        .take(10)
+                        .map { it.key to it.value },
+                    boosted = Prefs(appContext).boostedApps,
+                    notifying = NotifListener.counts.filterValues { it > 0 },
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Snapshot failed", e)
+                Snapshot(0, 0, 0, 0, 0, false, null, null, emptyList(), emptySet(), emptyMap())
+            }
+            mainHandler.post { callback(snapshot) }
+        }
+    }
+
+    /** The signal weights, exposed for the insights screen. */
+    fun weights(): List<Pair<String, Double>> = listOf(
+        "hour" to W_HOUR,
+        "daytype" to W_DAY_TYPE,
+        "transition" to W_TRANSITION,
+        "trigger" to W_TRIGGER,
+        "notification" to W_NOTIFICATION,
+        "boost_factor" to BOOST_FACTOR,
+    )
 
     /** Deletes the learned history (settings: "forget everything"). */
     fun clearHistory(context: Context, onDone: () -> Unit) {

@@ -1,6 +1,7 @@
 package fr.arichard.lastlauncher
 
 import fr.arichard.lastlauncher.ui.StatusLine
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,7 +15,8 @@ class StatusLineTest {
         alarm: String? = "07:00",
         launches: Int = 23,
         storage: Double = 41.2,
-    ) = StatusLine.Values(percent, charging, net, alarm, launches, storage)
+        dbBytes: Long = 0,
+    ) = StatusLine.Values(percent, charging, net, alarm, launches, storage, dbBytes)
 
     @Test
     fun rendersOnlyEnabledTokensInCanonicalOrder() {
@@ -46,6 +48,15 @@ class StatusLineTest {
         } finally {
             java.util.Locale.setDefault(previous)
         }
+    }
+
+    @Test
+    fun dbTokenFormatsCompactBytes() {
+        assertEquals("87K", StatusLine.formatBytes(87_400))
+        assertEquals("1.2M", StatusLine.formatBytes(1_230_000))
+        assertEquals("1K", StatusLine.formatBytes(400))
+        val line = StatusLine.build(setOf(StatusLine.DB), values(dbBytes = 218_000))
+        assertTrue(line.contains("◇ 218K"))
     }
 
     @Test
