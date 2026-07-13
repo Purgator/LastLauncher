@@ -168,6 +168,15 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                // A tap on the open home area dismisses whatever drawers are out.
+                if (anyDrawerOpen) {
+                    closeDrawers(animate = true)
+                    return true
+                }
+                return false
+            }
+
             override fun onLongPress(e: MotionEvent) {
                 haptic(binding.root)
                 startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
@@ -276,6 +285,17 @@ class MainActivity : AppCompatActivity() {
         val minDist = 90 * density
         val fingers = maxPointers.coerceIn(1, 2)
         if (abs(dx) > abs(dy) && abs(dx) > minDist) {
+            // With a drawer out, horizontal swipes only manage drawers: the swipe whose
+            // direction matches an open drawer's closing motion closes it, nothing else
+            // fires. Prevents "closing" the right drawer from opening the left one.
+            if (anyDrawerOpen) {
+                if (dx > 0 && binding.rightDrawer.isVisibleAtAll) {
+                    binding.rightDrawer.close(animate = true)
+                } else if (dx < 0 && binding.leftDrawer.isVisibleAtAll) {
+                    binding.leftDrawer.close(animate = true)
+                }
+                return
+            }
             // Horizontal: direction picks the edge set, finger count picks the slot.
             val key = when {
                 dx > 0 && fingers == 1 -> Prefs.KEY_GESTURE_LR_1
@@ -1035,8 +1055,17 @@ class MainActivity : AppCompatActivity() {
     private fun badgeFor(pkg: String): Int =
         if (prefs.notifBadges) NotifListener.count(pkg) else 0
 
+    private var lastNotifPkgs: Set<String> = emptySet()
+
     /** Active-notification set changed: refresh every visible badge and the ticker. */
     private fun onNotificationsChanged() {
+        // Which apps notify feeds the prediction ranking; recompute only when that
+        // set changes (not on every count bump) to keep this cheap.
+        val notifying = NotifListener.counts.filterValues { it > 0 }.keys
+        if (notifying != lastNotifPkgs) {
+            lastNotifPkgs = notifying
+            if (prefs.predictions) refreshSuggestions()
+        }
         // Suggestions: re-bind badges only, no re-prediction.
         for ((entry, badge) in listOf(
             suggestions.getOrNull(0) to binding.suggestMainBadge,
