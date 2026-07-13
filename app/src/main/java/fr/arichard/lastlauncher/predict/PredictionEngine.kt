@@ -8,6 +8,7 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.provider.Telephony
 import android.util.Log
+import fr.arichard.lastlauncher.notify.NotifListener
 import fr.arichard.lastlauncher.settings.Prefs
 import java.util.Calendar
 import java.util.concurrent.Executors
@@ -42,6 +43,11 @@ object PredictionEngine {
     // A learned candidate only takes a suggestion slot from the user's go-to apps
     // once its score is at least this (≈ one recent, contextually matching launch).
     private const val MIN_CONFIDENCE = 1.0
+
+    // Per active notification (capped), so an app demanding attention floats up
+    // without drowning real habits: 4+ notifications ≈ one recent matching launch.
+    private const val W_NOTIFICATION = 0.35
+    private const val NOTIFICATION_CAP = 4
 
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "predict") }
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -134,8 +140,6 @@ object PredictionEngine {
         val activeEvent = ContextSignals.activeEvent(now)
 
         val rows = db(context).rowsSince(now - HISTORY_DAYS * DAY_MS)
-        if (rows.isEmpty()) return emptyMap()
-
         val scores = HashMap<String, Double>(64)
         for (r in rows) {
             val ageDays = (now - r.ts).toDouble() / DAY_MS
@@ -146,6 +150,13 @@ object PredictionEngine {
             if (prev != null && r.prevPkg == prev) s += W_TRANSITION * w
             if (activeEvent != null && r.ctxEvent == activeEvent) s += W_TRIGGER * w
             scores.merge(r.pkg, s, Double::plus)
+        }
+        // An app currently showing notifications is more likely to be wanted next.
+        // Empty map without notification access, so this is a no-op until granted.
+        for ((pkg, count) in NotifListener.counts) {
+            if (count > 0) {
+                scores.merge(pkg, W_NOTIFICATION * minOf(count, NOTIFICATION_CAP), Double::plus)
+            }
         }
         return scores
     }
