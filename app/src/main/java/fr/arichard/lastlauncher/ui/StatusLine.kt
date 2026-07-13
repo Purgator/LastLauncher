@@ -37,10 +37,13 @@ object StatusLine {
         val dbBytes: Long = 0,
     )
 
-    fun build(enabled: Set<String>, v: Values): String {
-        val tokens = ALL_TOKENS.filter { it in enabled }.mapNotNull { token(it, v) }
-        return "› " + tokens.joinToString("  ·  ")
-    }
+    fun build(enabled: Set<String>, v: Values): String =
+        "› " + segments(enabled, v).joinToString("  ·  ") { it.second }
+
+    /** Rendered (tokenId, text) pairs, so hosts can attach per-token tap actions. */
+    fun segments(enabled: Set<String>, v: Values): List<Pair<String, String>> =
+        ALL_TOKENS.filter { it in enabled }
+            .mapNotNull { id -> token(id, v)?.let { id to it } }
 
     private fun token(id: String, v: Values): String? = when (id) {
         BATTERY -> "${v.batteryPercent}%" + if (v.charging) "⚡" else ""
