@@ -49,6 +49,22 @@
             android:textSize="15sp"
             tools:text="Friday 11 July" />
 
+        <!-- Optional weather chip; tap opens the configured weather app. -->
+        <TextView
+            android:id="@+id/weather"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:visibility="gone"
+            tools:text="☀ 24°"
+            tools:visibility="visible" />
+
         <TextView
             android:id="@+id/statusLine"
             android:layout_width="wrap_content"
@@ -364,24 +380,23 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Slide-out app drawer: dim scrim + a panel that tracks the finger. -->
-    <View
-        android:id="@+id/drawerScrim"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#000000"
-        android:alpha="0"
-        android:visibility="gone" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/drawerList"
-        android:layout_width="300dp"
+    <!-- Two independent, background-less wheel drawers pinned to each edge. Non-modal:
+         the narrow band leaves the center and command bar usable, and both can be open. -->
+    <fr.arichard.lastlauncher.ui.WheelDrawer
+        android:id="@+id/leftDrawer"
+        android:layout_width="152dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:layout_margin="10dp"
-        android:background="@drawable/bg_drawer_panel"
-        android:paddingVertical="16dp"
-        android:clipToPadding="false"
-        android:overScrollMode="never"
+        android:layout_marginTop="70dp"
+        android:layout_marginBottom="80dp"
+        android:visibility="gone" />
+
+    <fr.arichard.lastlauncher.ui.WheelDrawer
+        android:id="@+id/rightDrawer"
+        android:layout_width="152dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:layout_marginTop="70dp"
+        android:layout_marginBottom="80dp"
         android:visibility="gone" />
 </FrameLayout>
