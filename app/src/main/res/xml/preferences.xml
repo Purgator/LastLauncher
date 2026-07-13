@@ -1,188 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Root settings: one entry per domain, each opening its own subscreen. -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory android:title="@string/cat_general">
-        <Preference
-            android:key="default_launcher"
-            android:title="@string/pref_default_launcher"
-            android:summary="@string/pref_default_launcher_summary" />
-        <SwitchPreferenceCompat
-            android:key="keyboard_always"
-            android:title="@string/pref_keyboard_always"
-            android:summary="@string/pref_keyboard_always_summary"
-            android:defaultValue="true" />
-        <SwitchPreferenceCompat
-            android:key="haptics"
-            android:title="@string/pref_haptics"
-            android:summary="@string/pref_haptics_summary"
-            android:defaultValue="true" />
-        <Preference
-            android:key="clock_tap"
-            android:title="@string/pref_clock_tap" />
-    </PreferenceCategory>
+    <Preference
+        android:key="screen_general"
+        android:title="@string/cat_general"
+        android:summary="@string/screen_general_summary"
+        app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$GeneralFragment" />
 
-    <PreferenceCategory android:title="@string/cat_weather">
-        <SwitchPreferenceCompat
-            android:key="weather_enabled"
-            android:title="@string/pref_weather_enabled"
-            android:summary="@string/pref_weather_enabled_summary"
-            android:defaultValue="false" />
-        <ListPreference
-            android:key="weather_units"
-            android:title="@string/pref_weather_units"
-            android:entries="@array/weather_units_entries"
-            android:entryValues="@array/weather_units_values"
-            android:defaultValue="c"
-            android:dependency="weather_enabled"
-            app:useSimpleSummaryProvider="true" />
-        <ListPreference
-            android:key="weather_style"
-            android:title="@string/pref_weather_style"
-            android:entries="@array/weather_style_entries"
-            android:entryValues="@array/weather_style_values"
-            android:defaultValue="icon_temp"
-            android:dependency="weather_enabled"
-            app:useSimpleSummaryProvider="true" />
-        <Preference
-            android:key="weather_tap"
-            android:title="@string/pref_weather_tap"
-            android:dependency="weather_enabled" />
-    </PreferenceCategory>
+    <Preference
+        android:key="screen_clock_weather"
+        android:title="@string/cat_clock_weather"
+        android:summary="@string/screen_clock_weather_summary"
+        app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$ClockWeatherFragment" />
 
-    <PreferenceCategory android:title="@string/cat_suggestions">
-        <SwitchPreferenceCompat
-            android:key="predictions"
-            android:title="@string/pref_predictions"
-            android:summary="@string/pref_predictions_summary"
-            android:defaultValue="true" />
-        <SwitchPreferenceCompat
-            android:key="bt_signal"
-            android:title="@string/pref_bt_signal"
-            android:summary="@string/pref_bt_signal_summary"
-            android:defaultValue="true"
-            android:dependency="predictions" />
-        <Preference
-            android:key="favorites"
-            android:title="@string/pref_favorites"
-            android:summary="@string/pref_favorites_summary" />
-        <Preference
-            android:key="reset_learning"
-            android:title="@string/pref_reset_learning"
-            android:summary="@string/pref_reset_learning_summary" />
-    </PreferenceCategory>
+    <Preference
+        android:key="screen_suggestions"
+        android:title="@string/cat_suggestions"
+        android:summary="@string/screen_suggestions_summary"
+        app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$SuggestionsFragment" />
 
-    <PreferenceCategory android:title="@string/cat_gestures">
-        <SwitchPreferenceCompat
-            android:key="double_tap_lock"
-            android:title="@string/pref_double_tap_lock"
-            android:summary="@string/pref_double_tap_lock_summary"
-            android:defaultValue="true" />
-        <SwitchPreferenceCompat
-            android:key="swipe_down_notifications"
-            android:title="@string/pref_swipe_down"
-            android:summary="@string/pref_swipe_down_summary"
-            android:defaultValue="true" />
-        <Preference
-            android:key="gesture_lr_1"
-            android:title="@string/pref_gesture_lr_1" />
-        <Preference
-            android:key="gesture_lr_2"
-            android:title="@string/pref_gesture_lr_2" />
-        <Preference
-            android:key="gesture_rl_1"
-            android:title="@string/pref_gesture_rl_1" />
-        <Preference
-            android:key="gesture_rl_2"
-            android:title="@string/pref_gesture_rl_2" />
-        <SwitchPreferenceCompat
-            android:key="show_gesture_hints"
-            android:title="@string/pref_gesture_hints"
-            android:summary="@string/pref_gesture_hints_summary"
-            android:defaultValue="true" />
-    </PreferenceCategory>
+    <Preference
+        android:key="screen_gestures"
+        android:title="@string/cat_gestures"
+        android:summary="@string/screen_gestures_summary"
+        app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$GesturesFragment" />
 
-    <PreferenceCategory android:title="@string/cat_appearance">
-        <ListPreference
-            android:key="accent"
-            android:title="@string/pref_accent"
-            android:entries="@array/accent_entries"
-            android:entryValues="@array/accent_values"
-            android:defaultValue="cyan"
-            app:useSimpleSummaryProvider="true" />
-        <SeekBarPreference
-            android:key="dim"
-            android:title="@string/pref_dim"
-            android:defaultValue="25"
-            android:max="80"
-            app:showSeekBarValue="true" />
-        <SwitchPreferenceCompat
-            android:key="show_clock"
-            android:title="@string/pref_show_clock"
-            android:defaultValue="true" />
-        <SwitchPreferenceCompat
-            android:key="show_status_line"
-            android:title="@string/pref_status_line"
-            android:summary="@string/pref_status_line_summary"
-            android:defaultValue="true" />
-        <MultiSelectListPreference
-            android:key="status_tokens"
-            android:title="@string/pref_status_tokens"
-            android:summary="@string/pref_status_tokens_summary"
-            android:entries="@array/status_token_entries"
-            android:entryValues="@array/status_token_values"
-            android:defaultValue="@array/status_token_defaults"
-            android:dependency="show_status_line" />
-        <SwitchPreferenceCompat
-            android:key="animations"
-            android:title="@string/pref_animations"
-            android:summary="@string/pref_animations_summary"
-            android:defaultValue="true" />
-    </PreferenceCategory>
+    <Preference
+        android:key="screen_appearance"
+        android:title="@string/cat_appearance"
+        android:summary="@string/screen_appearance_summary"
+        app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$AppearanceFragment" />
 
-    <PreferenceCategory android:title="@string/cat_apps">
-        <Preference
-            android:key="hidden_apps"
-            android:title="@string/pref_hidden_apps"
-            android:summary="@string/pref_hidden_apps_summary" />
-        <Preference
-            android:key="drawers"
-            android:title="@string/pref_drawers"
-            android:summary="@string/pref_drawers_summary" />
-    </PreferenceCategory>
+    <Preference
+        android:key="screen_apps"
+        android:title="@string/cat_apps"
+        android:summary="@string/screen_apps_summary"
+        app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$AppsFragment" />
 
-    <PreferenceCategory android:title="@string/cat_notifications">
-        <Preference
-            android:key="notif_access"
-            android:title="@string/pref_notif_access"
-            android:summary="@string/pref_notif_access_summary" />
-        <SwitchPreferenceCompat
-            android:key="notif_badges"
-            android:title="@string/pref_notif_badges"
-            android:summary="@string/pref_notif_badges_summary"
-            android:defaultValue="true" />
-        <SwitchPreferenceCompat
-            android:key="message_ticker"
-            android:title="@string/pref_message_ticker"
-            android:summary="@string/pref_message_ticker_summary"
-            android:defaultValue="false" />
-    </PreferenceCategory>
+    <Preference
+        android:key="screen_notifications"
+        android:title="@string/cat_notifications"
+        android:summary="@string/screen_notifications_summary"
+        app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$NotificationsFragment" />
 
-    <PreferenceCategory android:title="@string/cat_updates">
-        <SwitchPreferenceCompat
-            android:key="auto_update"
-            android:title="@string/pref_auto_update"
-            android:summary="@string/pref_auto_update_summary"
-            android:defaultValue="true" />
-        <Preference
-            android:key="check_now"
-            android:title="@string/pref_check_now" />
-    </PreferenceCategory>
+    <Preference
+        android:key="insights"
+        android:title="@string/pref_insights"
+        android:summary="@string/pref_insights_summary" />
 
-    <PreferenceCategory android:title="@string/cat_about">
-        <Preference
-            android:key="version"
-            android:title="@string/pref_version"
-            android:selectable="false" />
-    </PreferenceCategory>
+    <Preference
+        android:key="screen_updates"
+        android:title="@string/cat_updates"
+        android:summary="@string/screen_updates_summary"
+        app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$UpdatesFragment" />
 </PreferenceScreen>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <Preference
+        android:key="hidden_apps"
+        android:title="@string/pref_hidden_apps"
+        android:summary="@string/pref_hidden_apps_summary" />
+    <Preference
+        android:key="drawers"
+        android:title="@string/pref_drawers"
+        android:summary="@string/pref_drawers_summary" />
+</PreferenceScreen>

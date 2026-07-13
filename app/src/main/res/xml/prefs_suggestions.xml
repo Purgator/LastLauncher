@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <SwitchPreferenceCompat
+        android:key="predictions"
+        android:title="@string/pref_predictions"
+        android:summary="@string/pref_predictions_summary"
+        android:defaultValue="true" />
+    <SwitchPreferenceCompat
+        android:key="bt_signal"
+        android:title="@string/pref_bt_signal"
+        android:summary="@string/pref_bt_signal_summary"
+        android:defaultValue="true"
+        android:dependency="predictions" />
+    <Preference
+        android:key="favorites"
+        android:title="@string/pref_favorites"
+        android:summary="@string/pref_favorites_summary" />
+    <Preference
+        android:key="boosted_apps"
+        android:title="@string/pref_boosted"
+        android:summary="@string/pref_boosted_summary" />
+    <Preference
+        android:key="insights"
+        android:title="@string/pref_insights"
+        android:summary="@string/pref_insights_summary" />
+    <Preference
+        android:key="reset_learning"
+        android:title="@string/pref_reset_learning"
+        android:summary="@string/pref_reset_learning_summary" />
+</PreferenceScreen>
