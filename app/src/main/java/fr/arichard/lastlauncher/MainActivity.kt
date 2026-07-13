@@ -379,6 +379,14 @@ class MainActivity : AppCompatActivity() {
                     // The gesture hint on a drawer's side yields to the drawer.
                     val hint = if (drawer.second < 0) binding.hintLeft else binding.hintRight
                     if (visible) hint.visibility = View.INVISIBLE else startHints()
+                    // Drop the keyboard while a drawer is out so the command bar sits
+                    // at the bottom instead of riding up into the wheel; bring it back
+                    // once every drawer is gone.
+                    if (visible) {
+                        hideKeyboard()
+                    } else if (!anyDrawerOpen && prefs.keyboardAlways && !allAppsOpen) {
+                        focusSearch(show = true)
+                    }
                 },
             )
         }
@@ -454,6 +462,8 @@ class MainActivity : AppCompatActivity() {
                 false
             }
         }
+        // Touching the command bar takes over from any open drawer.
+        binding.searchInput.setOnClickListener { closeDrawers(animate = true) }
         // Left button is the mode wheel: tap to cycle, long-press for the assistant.
         binding.modeBtn.setOnClickListener { cycleMode() }
         binding.modeBtn.setOnLongClickListener { launchAssistant(); true }
@@ -509,6 +519,8 @@ class MainActivity : AppCompatActivity() {
     private fun onQueryChanged(raw: String) {
         val query = raw.trim()
         val mode = searchMode
+        // Typing means the user moved on from the drawers.
+        if (query.isNotEmpty() && anyDrawerOpen) closeDrawers(animate = true)
         // Empty with no active view is the home screen — suggestions + hints, mode-independent.
         if (query.isEmpty() && !allAppsOpen) {
             binding.results.visibility = View.GONE
@@ -565,6 +577,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun openAllApps() {
         allAppsOpen = true
+        closeDrawers(animate = true)
         onQueryChanged(binding.searchInput.text.toString())
         focusSearch(show = true)
     }
@@ -808,51 +821,67 @@ class MainActivity : AppCompatActivity() {
         styleClockForWeather(if (prefs.weatherClockStyle) weather.code else null)
     }
 
-    /** Moves the weather chip beside the clock or back under the date, per setting. */
+    /**
+     * Moves the weather chip beside the clock or back under the date, per setting.
+     * On the clock line it grows into a real companion of the clock — big, thin
+     * digits-style type — instead of a tiny footnote.
+     */
     private fun placeWeatherChip() {
         val wantRow = prefs.weatherBesideClock
         val inRow = binding.weather.parent === binding.clockRow
-        if (wantRow == inRow) return
-        (binding.weather.parent as? android.view.ViewGroup)?.removeView(binding.weather)
-        if (wantRow) {
-            binding.clockRow.addView(binding.weather)
-            (binding.weather.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
-                marginStart = (14 * resources.displayMetrics.density).toInt()
-                topMargin = 0
-            }
-        } else {
-            // Back to its original slot: right after the date line.
-            val index = binding.content.indexOfChild(binding.date) + 1
-            binding.content.addView(binding.weather, index)
-            (binding.weather.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
-                gravity = android.view.Gravity.CENTER_HORIZONTAL
-                topMargin = (8 * resources.displayMetrics.density).toInt()
-                marginStart = 0
+        if (wantRow != inRow) {
+            (binding.weather.parent as? android.view.ViewGroup)?.removeView(binding.weather)
+            if (wantRow) {
+                binding.clockRow.addView(binding.weather)
+                (binding.weather.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
+                    marginStart = (16 * resources.displayMetrics.density).toInt()
+                    topMargin = 0
+                }
+            } else {
+                // Back to its original slot: right after the date line.
+                val index = binding.content.indexOfChild(binding.date) + 1
+                binding.content.addView(binding.weather, index)
+                (binding.weather.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
+                    gravity = android.view.Gravity.CENTER_HORIZONTAL
+                    topMargin = (8 * resources.displayMetrics.density).toInt()
+                    marginStart = 0
+                }
             }
         }
+        binding.weather.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, if (wantRow) 30f else 16f)
+        binding.weather.typeface = android.graphics.Typeface.create(
+            if (wantRow) "sans-serif-light" else "sans-serif", android.graphics.Typeface.NORMAL
+        )
     }
 
     /**
-     * "Living clock": a static glow tinted by the sky — warm gold in sunshine, steel
-     * blue in rain, icy white in snow, violet in storms. One setShadowLayer call, no
-     * animation, so the battery cost is zero.
+     * "Living clock": the digits take on the sky's hue — warm gold in sunshine, steel
+     * blue in rain, icy white in snow, violet in storms — backed by a matching glow.
+     * Static styling set once per weather refresh, so the battery cost is zero.
      */
     private fun styleClockForWeather(weatherCode: Int?) {
         if (weatherCode == null) {
             binding.clock.setShadowLayer(0f, 0f, 0f, 0)
+            binding.clock.setTextColor(getColor(R.color.text_primary))
             return
         }
-        val glow = when (weatherCode) {
+        val hue = when (weatherCode) {
             0, 1 -> 0xFFFFC24D.toInt()          // sun: warm gold
             2, 3 -> 0xFFB8C4D9.toInt()          // clouds: soft silver
             in 45..48 -> 0xFF9BA3B7.toInt()     // fog: grey
             in 51..67, in 80..82 -> 0xFF4DA6FF.toInt() // rain: steel blue
-            in 71..77, in 85..86 -> 0xFFCfE9FF.toInt() // snow: icy white-blue
+            in 71..77, in 85..86 -> 0xFFCFE9FF.toInt() // snow: icy white-blue
             in 95..99 -> 0xFFB388FF.toInt()     // storm: violet
             else -> 0xFFB8C4D9.toInt()
         }
+        // Color blend carries the effect (clearly visible); the glow reinforces it.
+        // Radius stays ≤25px: larger text-shadow radii are unreliable when
+        // hardware-accelerated on older devices.
+        binding.clock.setTextColor(
+            ColorUtils.blendARGB(getColor(R.color.text_primary), hue, 0.45f)
+        )
         binding.clock.setShadowLayer(
-            18f, 0f, 0f, ColorUtils.setAlphaComponent(glow, 0xA0)
+            24f, 0f, 0f, ColorUtils.setAlphaComponent(hue, 0xD0)
         )
     }
 
