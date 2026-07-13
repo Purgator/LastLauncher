@@ -84,6 +84,7 @@ class WheelDrawer @JvmOverloads constructor(
     }
 
     fun bind(apps: List<AppEntry>) {
+        flingAnimator?.cancel()
         this.apps = apps
         scrollAngle = 0f.coerceIn(minScroll(), maxScroll())
         rebuildViews()
@@ -231,12 +232,34 @@ class WheelDrawer @JvmOverloads constructor(
     private var downScroll = 0f
     private var mode = Mode.NONE
     private var tracker: VelocityTracker? = null
+    private var flingAnimator: ValueAnimator? = null
+
+    /** Rolls on with the release velocity, decaying — a hard flick sweeps the whole list. */
+    private fun startFling(velocityDegPerSec: Float) {
+        flingAnimator?.cancel()
+        if (abs(velocityDegPerSec) < 40f) return
+        // Total travel ≈ v·τ with τ=0.5s of exponential-ish decay, clamped to the ends.
+        val target = (scrollAngle + velocityDegPerSec * 0.5f)
+            .coerceIn(minScroll(), maxScroll())
+        if (target == scrollAngle) return
+        val duration = (250 + 2.5f * abs(target - scrollAngle)).toLong().coerceAtMost(1400)
+        flingAnimator = ValueAnimator.ofFloat(scrollAngle, target).apply {
+            this.duration = duration
+            interpolator = android.view.animation.DecelerateInterpolator(1.6f)
+            addUpdateListener {
+                scrollAngle = it.animatedValue as Float
+                layoutIcons()
+            }
+            start()
+        }
+    }
 
     private enum class Mode { NONE, SCROLL, CLOSE }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                flingAnimator?.cancel() // catch the rolling wheel
                 downX = ev.rawX
                 downY = ev.rawY
                 downScroll = scrollAngle
@@ -284,6 +307,10 @@ class WheelDrawer @JvmOverloads constructor(
                 if (mode == Mode.CLOSE) {
                     val vx = tracker?.let { it.computeCurrentVelocity(1000); it.xVelocity } ?: 0f
                     settle(vx)
+                } else if (mode == Mode.SCROLL && ev.actionMasked == MotionEvent.ACTION_UP) {
+                    val vy = tracker?.let { it.computeCurrentVelocity(1000); it.yVelocity } ?: 0f
+                    // Drag up (negative vy) rolls the wheel forward.
+                    startFling(-vy * ARC_SPAN / (height.coerceAtLeast(1)).toFloat())
                 } else if (wasTap && ev.actionMasked == MotionEvent.ACTION_UP) {
                     // Tap on the band's empty space: dismiss, matching the home tap.
                     performClick()
