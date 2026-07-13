@@ -46,8 +46,10 @@ import fr.arichard.lastlauncher.settings.Prefs
 import fr.arichard.lastlauncher.settings.SettingsActivity
 import fr.arichard.lastlauncher.ui.AppAdapter
 import fr.arichard.lastlauncher.ui.AppPickerDialog
+import fr.arichard.lastlauncher.ui.WheelDrawer
 import fr.arichard.lastlauncher.ui.StatusLine
 import fr.arichard.lastlauncher.update.UpdateManager
+import fr.arichard.lastlauncher.weather.WeatherProvider
 import java.util.concurrent.Executors
 import kotlin.math.abs
 
@@ -87,6 +89,7 @@ class MainActivity : AppCompatActivity() {
             pendingUpdateVersion?.let { v -> UpdateManager.install(this, v) }
         }
         binding.clock.setOnClickListener { launchClockTarget() }
+        binding.weather.setOnClickListener { launchWeatherTarget() }
         binding.starterPill.setOnClickListener { showStarterPicker() }
         repo.addListener(repoListener)
         NotifListener.addListener(notifListener)
@@ -110,6 +113,7 @@ class MainActivity : AppCompatActivity() {
         setupStatusLine()
         NotifListener.ensureBound(this)
         startTicker()
+        refreshWeather()
     }
 
     override fun onPause() {
@@ -130,7 +134,7 @@ class MainActivity : AppCompatActivity() {
     @android.annotation.SuppressLint("MissingSuperCall")
     override fun onBackPressed() {
         // A launcher never finishes; back just closes overlays.
-        if (drawerOpen) closeDrawer(animate = true)
+        if (anyDrawerOpen) closeDrawers(animate = true)
         else if (allAppsOpen || binding.searchInput.text.isNotEmpty()) resetToHome()
     }
 
@@ -207,7 +211,7 @@ class MainActivity : AppCompatActivity() {
                             it.computeCurrentVelocity(1000)
                             it.xVelocity
                         } ?: 0f
-                        settleDrawer(vx)
+                        drawerForSide(drawerCandidateSide).settle(vx)
                         drawerDragging = false
                     } else if (event.actionMasked == MotionEvent.ACTION_UP) {
                         handleSwipe(event.x - downX, event.y - downY, event.eventTime - downTime)
@@ -227,14 +231,15 @@ class MainActivity : AppCompatActivity() {
      * that edge's direction — the finger count only matters for the fling path.
      */
     private fun drawerEdgeCandidate(x: Float, width: Int, edgeZone: Float): Int {
-        if (drawerOpen) return 0
-        if (x < edgeZone) {
+        // Only that edge's own drawer being open blocks a fresh pull; the other side
+        // stays independently pullable (both drawers can be open at once).
+        if (x < edgeZone && !binding.leftDrawer.isVisibleAtAll) {
             edgeDrawerIndex(Prefs.KEY_GESTURE_LR_1, Prefs.KEY_GESTURE_LR_2)?.let {
                 drawerCandidateIndex = it
                 return -1
             }
         }
-        if (x > width - edgeZone) {
+        if (x > width - edgeZone && !binding.rightDrawer.isVisibleAtAll) {
             edgeDrawerIndex(Prefs.KEY_GESTURE_RL_1, Prefs.KEY_GESTURE_RL_2)?.let {
                 drawerCandidateIndex = it
                 return 1
@@ -258,10 +263,11 @@ class MainActivity : AppCompatActivity() {
             val inward = (drawerCandidateSide < 0 && dx > 0) || (drawerCandidateSide > 0 && dx < 0)
             if (!inward) { drawerCandidateSide = 0; return }
             drawerDragging = true
-            beginDrawerDrag(drawerCandidateSide, drawerCandidateIndex)
+            drawerForSide(drawerCandidateSide).bind(drawerContents(drawerCandidateIndex))
         }
-        val progress = if (drawerSide < 0) dx / drawerOffset() else -dx / drawerOffset()
-        setDrawerProgress(progress)
+        val drawer = drawerForSide(drawerCandidateSide)
+        // Inward finger travel maps straight to the open amount.
+        drawer.dragBy(if (drawerCandidateSide < 0) dx else -dx)
     }
 
     private fun handleSwipe(dx: Float, dy: Float, dtMs: Long) {
@@ -311,135 +317,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ------------------------------------------------------------- drawer
+    // ------------------------------------------------------------- drawers
 
-    private lateinit var drawerAdapter: AppAdapter
-    private var drawerOpen = false
-    private var drawerSide = -1          // -1 anchored left, +1 anchored right
-    private var drawerIndex = 0          // which configured drawer is showing
-    private var drawerCandidateSide = 0  // edge the current touch could pull the drawer from
-    private var drawerCandidateIndex = 0 // drawer bound to that edge
+    // Two independent, non-modal wheel drawers. During an edge pull-in, these track the
+    // finger for the side being dragged and which configured drawer it opens.
+    private var drawerCandidateSide = 0  // edge the current touch could pull a drawer from
+    private var drawerCandidateIndex = 0 // configured drawer bound to that edge
     private var drawerDragging = false
     private var velocityTracker: android.view.VelocityTracker? = null
 
     private fun setupDrawer() {
-        drawerAdapter = AppAdapter(
-            repo,
-            onAppClick = { entry, view -> closeDrawer(animate = false); launchApp(entry, view) },
-            onAppLongClick = { entry, view -> showAppMenu(entry, view) },
-            onCommand = {},
-            badgeCount = { pkg -> badgeFor(pkg) },
-        )
-        binding.drawerList.layoutManager = LinearLayoutManager(this)
-        binding.drawerList.adapter = drawerAdapter
-        binding.drawerList.itemAnimator = null
-        binding.drawerScrim.setOnClickListener { closeDrawer(animate = true) }
-        setupDrawerWheel()
-        setupDrawerSwipeBack()
-    }
-
-    /**
-     * The "wheel": rows bulge toward the screen center at the panel's vertical middle
-     * and tuck back near the edges, with a matching alpha/scale falloff — scrolling
-     * feels like rotating a cylinder. Pure per-child transforms, recomputed on scroll
-     * and layout; no allocation, no extra invalidation.
-     */
-    private fun setupDrawerWheel() {
-        val list = binding.drawerList
-        list.clipChildren = false
-        list.clipToPadding = false
-        list.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
-            override fun onScrolled(rv: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) =
-                applyWheelTransform()
-        })
-        list.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyWheelTransform() }
-    }
-
-    private fun applyWheelTransform() {
-        val list = binding.drawerList
-        val height = list.height
-        if (height == 0) return
-        val center = height / 2f
-        val bulge = 16 * resources.displayMetrics.density
-        // Positive bulge pushes rows inward (right for a left drawer, left for a right one).
-        val direction = if (drawerSide < 0) 1f else -1f
-        for (i in 0 until list.childCount) {
-            val child = list.getChildAt(i)
-            val childCenter = (child.top + child.bottom) / 2f
-            // t: 0 at the vertical middle, 1 at the panel edges.
-            val t = ((childCenter - center) / center).coerceIn(-1f, 1f)
-            val curve = kotlin.math.cos(t * (Math.PI.toFloat() / 2f)) // 1 center → 0 edge
-            child.translationX = direction * bulge * curve
-            child.alpha = 0.45f + 0.55f * curve
-            val scale = 0.92f + 0.08f * curve
-            child.scaleX = scale
-            child.scaleY = scale
+        for (drawer in listOf(binding.leftDrawer to -1, binding.rightDrawer to 1)) {
+            drawer.first.init(
+                side = drawer.second,
+                iconOf = { entry -> repo.icon(entry) },
+                badgeOf = { pkg -> badgeFor(pkg) },
+                onClick = { entry, view -> drawer.first.close(animate = false); launchApp(entry, view) },
+                onLongClick = { entry, view -> showAppMenu(entry, view) },
+                onClosed = {},
+            )
         }
     }
 
-    /** Horizontal drag on the open drawer toward its edge closes it, tracking the finger. */
-    private fun setupDrawerSwipeBack() {
-        val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop
-        binding.drawerList.addOnItemTouchListener(
-            object : androidx.recyclerview.widget.RecyclerView.SimpleOnItemTouchListener() {
-                private var startX = 0f
-                private var startY = 0f
-                private var stealing = false
-                private var tracker: android.view.VelocityTracker? = null
+    private fun drawerForSide(side: Int): WheelDrawer =
+        if (side < 0) binding.leftDrawer else binding.rightDrawer
 
-                override fun onInterceptTouchEvent(
-                    rv: androidx.recyclerview.widget.RecyclerView, e: MotionEvent,
-                ): Boolean {
-                    when (e.actionMasked) {
-                        MotionEvent.ACTION_DOWN -> {
-                            // Raw coords: the panel itself moves during the drag.
-                            startX = e.rawX
-                            startY = e.rawY
-                            stealing = false
-                            tracker?.recycle()
-                            tracker = android.view.VelocityTracker.obtain()
-                            tracker?.addMovement(e)
-                        }
-                        MotionEvent.ACTION_MOVE -> {
-                            tracker?.addMovement(e)
-                            val dx = e.rawX - startX
-                            val dy = e.rawY - startY
-                            val outward = if (drawerSide < 0) dx < 0 else dx > 0
-                            if (!stealing && outward && abs(dx) > slop && abs(dx) > abs(dy)) {
-                                stealing = true
-                            }
-                        }
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                            tracker?.recycle()
-                            tracker = null
-                        }
-                    }
-                    return stealing
-                }
+    private val anyDrawerOpen: Boolean
+        get() = binding.leftDrawer.isVisibleAtAll || binding.rightDrawer.isVisibleAtAll
 
-                override fun onTouchEvent(
-                    rv: androidx.recyclerview.widget.RecyclerView, e: MotionEvent,
-                ) {
-                    tracker?.addMovement(e)
-                    when (e.actionMasked) {
-                        MotionEvent.ACTION_MOVE -> {
-                            val outwardDist = if (drawerSide < 0) startX - e.rawX else e.rawX - startX
-                            setDrawerProgress(1f - outwardDist / drawerOffset())
-                        }
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                            val vx = tracker?.let {
-                                it.computeCurrentVelocity(1000)
-                                it.xVelocity
-                            } ?: 0f
-                            tracker?.recycle()
-                            tracker = null
-                            stealing = false
-                            settleDrawer(vx)
-                        }
-                    }
-                }
-            }
-        )
+    private fun closeDrawers(animate: Boolean) {
+        if (binding.leftDrawer.isVisibleAtAll) binding.leftDrawer.close(animate)
+        if (binding.rightDrawer.isVisibleAtAll) binding.rightDrawer.close(animate)
     }
 
     private fun drawerContents(index: Int): List<AppEntry> {
@@ -448,91 +356,10 @@ class MainActivity : AppCompatActivity() {
         else keys.mapNotNull { repo.byComponentKey(it) }
     }
 
-    /** Anchors the panel to the given [side] (-1 left, +1 right) via its layout gravity. */
-    private fun placeDrawer(side: Int) {
-        drawerSide = side
-        val lp = binding.drawerList.layoutParams as android.widget.FrameLayout.LayoutParams
-        lp.gravity = if (side < 0) android.view.Gravity.START else android.view.Gravity.END
-        binding.drawerList.layoutParams = lp
-    }
-
-    /** Off-screen distance for the closed panel: measured width + its outer margin. */
-    private fun drawerOffset(): Float {
-        val lp = binding.drawerList.layoutParams as android.view.ViewGroup.MarginLayoutParams
-        val margin = if (drawerSide < 0) lp.leftMargin else lp.rightMargin
-        val w = binding.drawerList.width
-        return if (w > 0) (w + margin).toFloat() else 320 * resources.displayMetrics.density
-    }
-
-    private fun closedTranslation(): Float =
-        if (drawerSide < 0) -drawerOffset() else drawerOffset()
-
-    private fun setDrawerProgress(progress: Float) {
-        val p = progress.coerceIn(0f, 1f)
-        binding.drawerList.visibility = View.VISIBLE
-        binding.drawerScrim.visibility = View.VISIBLE
-        binding.drawerList.translationX = closedTranslation() * (1f - p)
-        binding.drawerScrim.alpha = 0.55f * p
-    }
-
-    private fun beginDrawerDrag(side: Int, index: Int) {
-        placeDrawer(side)
-        drawerIndex = index
-        drawerAdapter.submit(drawerContents(index))
-        setDrawerProgress(0f)
-        binding.drawerList.post { applyWheelTransform() }
-    }
-
     private fun openDrawer(side: Int, index: Int, animate: Boolean) {
-        if (!::drawerAdapter.isInitialized) return
-        // Already visible (settling from a drag) → animate on from the finger position,
-        // don't snap back to fully closed first.
-        val wasVisible = binding.drawerList.visibility == View.VISIBLE
-        placeDrawer(side)
-        drawerIndex = index
-        drawerAdapter.submit(drawerContents(index))
-        binding.drawerList.visibility = View.VISIBLE
-        binding.drawerScrim.visibility = View.VISIBLE
-        drawerOpen = true
-        if (animate && prefs.animations) {
-            if (!wasVisible) binding.drawerList.translationX = closedTranslation()
-            binding.drawerList.animate().translationX(0f).setDuration(220).start()
-            binding.drawerScrim.animate().alpha(0.55f).setDuration(220).start()
-        } else {
-            setDrawerProgress(1f)
-        }
-        binding.drawerList.post { applyWheelTransform() }
-    }
-
-    private fun closeDrawer(animate: Boolean) {
-        if (!::drawerAdapter.isInitialized) return
-        drawerOpen = false
-        drawerDragging = false
-        val hide = {
-            binding.drawerList.visibility = View.GONE
-            binding.drawerScrim.visibility = View.GONE
-        }
-        if (animate && prefs.animations && binding.drawerList.visibility == View.VISIBLE) {
-            binding.drawerList.animate().translationX(closedTranslation()).setDuration(200)
-                .withEndAction(hide).start()
-            binding.drawerScrim.animate().alpha(0f).setDuration(200).start()
-        } else {
-            hide()
-        }
-    }
-
-    /**
-     * On release, settle open or closed. A decisive flick wins by its direction (so a
-     * fast short pull still opens); otherwise fall back to how far it was dragged.
-     */
-    private fun settleDrawer(velocityX: Float) {
-        val fast = abs(velocityX) > 800 * resources.displayMetrics.density
-        val opening = if (drawerSide < 0) velocityX > 0 else velocityX < 0
-        val closed = closedTranslation()
-        val progress = 1f - (binding.drawerList.translationX / closed).coerceIn(0f, 1f)
-        val open = if (fast) opening else progress > 0.4f
-        if (open) openDrawer(drawerSide, drawerIndex, animate = true)
-        else closeDrawer(animate = true)
+        val drawer = drawerForSide(side)
+        drawer.bind(drawerContents(index))
+        drawer.open(animate && prefs.animations)
     }
 
     private fun setupSearch() {
@@ -687,7 +514,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun resetToHome() {
         allAppsOpen = false
-        closeDrawer(animate = false)
+        closeDrawers(animate = false)
         if (binding.searchInput.text.isNotEmpty()) {
             binding.searchInput.setText("")
         }
@@ -884,6 +711,53 @@ class MainActivity : AppCompatActivity() {
             }
         }
         startActivitySafely(Intent(AlarmClock.ACTION_SHOW_ALARMS))
+    }
+
+    // -------------------------------------------------------------- weather
+
+    private fun refreshWeather() {
+        if (!prefs.weatherEnabled) {
+            binding.weather.visibility = View.GONE
+            return
+        }
+        // Ask once; the user grants location from the Weather settings screen.
+        WeatherProvider.request(this) { weather -> renderWeather(weather) }
+        if (!WeatherProvider.hasLocationPermission(this) &&
+            binding.weather.visibility != View.VISIBLE
+        ) {
+            binding.weather.visibility = View.GONE
+        }
+    }
+
+    private fun renderWeather(weather: WeatherProvider.Weather?) {
+        if (!prefs.weatherEnabled || weather == null) {
+            binding.weather.visibility = View.GONE
+            return
+        }
+        val fahrenheit = prefs.weatherUnits == "f"
+        val temp = if (fahrenheit) weather.tempC * 9 / 5 + 32 else weather.tempC
+        val degrees = "${Math.round(temp)}°"
+        val glyph = WeatherProvider.glyph(weather.code)
+        binding.weather.text = when (prefs.weatherStyle) {
+            "temp" -> degrees
+            "icon" -> glyph
+            else -> "$glyph $degrees"
+        }
+        binding.weather.setTextColor(accentColor())
+        binding.weather.visibility = View.VISIBLE
+    }
+
+    /** Tapping the weather chip opens the chosen app, else a weather web search. */
+    private fun launchWeatherTarget() {
+        haptic(binding.weather)
+        val target = prefs.weatherTapTarget
+        if (target.isNotEmpty()) {
+            repo.byComponentKey(target)?.let {
+                launchApp(it, binding.weather)
+                return
+            }
+        }
+        openUrl("https://www.google.com/search?q=" + Uri.encode(getString(R.string.weather_query)))
     }
 
     /**
@@ -1175,7 +1049,8 @@ class MainActivity : AppCompatActivity() {
             if (count > 0) badge.text = if (count > 99) "99+" else count.toString()
         }
         if (binding.results.visibility == View.VISIBLE) adapter.notifyDataSetChanged()
-        if (drawerOpen) drawerAdapter.notifyDataSetChanged()
+        binding.leftDrawer.refreshBadges()
+        binding.rightDrawer.refreshBadges()
         if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
             startTicker()
         }
