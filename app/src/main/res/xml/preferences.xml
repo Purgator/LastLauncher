@@ -5,53 +5,62 @@
 
     <Preference
         android:key="screen_general"
+        android:icon="@drawable/ic_settings"
         android:title="@string/cat_general"
         android:summary="@string/screen_general_summary"
         app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$GeneralFragment" />
 
     <Preference
         android:key="screen_clock_weather"
+        android:icon="@drawable/ic_clock"
         android:title="@string/cat_clock_weather"
         android:summary="@string/screen_clock_weather_summary"
         app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$ClockWeatherFragment" />
 
     <Preference
         android:key="screen_suggestions"
+        android:icon="@drawable/ic_boost"
         android:title="@string/cat_suggestions"
         android:summary="@string/screen_suggestions_summary"
         app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$SuggestionsFragment" />
 
     <Preference
         android:key="screen_gestures"
+        android:icon="@drawable/ic_gesture"
         android:title="@string/cat_gestures"
         android:summary="@string/screen_gestures_summary"
         app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$GesturesFragment" />
 
     <Preference
         android:key="screen_appearance"
+        android:icon="@drawable/ic_palette"
         android:title="@string/cat_appearance"
         android:summary="@string/screen_appearance_summary"
         app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$AppearanceFragment" />
 
     <Preference
         android:key="screen_apps"
+        android:icon="@drawable/ic_apps"
         android:title="@string/cat_apps"
         android:summary="@string/screen_apps_summary"
         app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$AppsFragment" />
 
     <Preference
         android:key="screen_notifications"
+        android:icon="@drawable/ic_bell"
         android:title="@string/cat_notifications"
         android:summary="@string/screen_notifications_summary"
         app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$NotificationsFragment" />
 
     <Preference
         android:key="insights"
+        android:icon="@drawable/ic_info"
         android:title="@string/pref_insights"
         android:summary="@string/pref_insights_summary" />
 
     <Preference
         android:key="screen_updates"
+        android:icon="@drawable/ic_update"
         android:title="@string/cat_updates"
         android:summary="@string/screen_updates_summary"
         app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$UpdatesFragment" />

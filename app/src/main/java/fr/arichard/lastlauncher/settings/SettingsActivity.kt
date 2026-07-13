@@ -116,6 +116,9 @@ class SettingsActivity : AppCompatActivity(),
             }
         }
 
+        protected fun icon(res: Int) =
+            androidx.core.content.ContextCompat.getDrawable(requireContext(), res)
+
         /** Single-choice picker of an app component with a "default" first row. */
         protected fun pickComponentWithDefault(
             title: CharSequence, defaultLabel: String, currentKey: String,
@@ -316,7 +319,12 @@ class SettingsActivity : AppCompatActivity(),
         private fun showGestureDialog(pref: Preference, key: String) {
             val actions = GestureAction.entries
             val current = GestureBinding.decode(prefs.gestureBinding(key)).action
-            val items = actions.map { AppPickerDialog.Item(getString(it.labelRes), null) }
+            val items = actions.map {
+                AppPickerDialog.Item(
+                    getString(it.labelRes),
+                    if (it.iconRes != 0) icon(it.iconRes) else null
+                )
+            }
             AppPickerDialog.singleChoice(
                 requireContext(), pref.title ?: "", items,
                 actions.indexOf(current).coerceAtLeast(0)
@@ -405,8 +413,8 @@ class SettingsActivity : AppCompatActivity(),
         private fun showDrawersDialog() {
             val drawers = prefs.drawers()
             val labels = drawers.map {
-                AppPickerDialog.Item(it.name, null)
-            } + AppPickerDialog.Item("＋ " + getString(R.string.drawer_add), null)
+                AppPickerDialog.Item(it.name, icon(R.drawable.ic_apps))
+            } + AppPickerDialog.Item("＋ " + getString(R.string.drawer_add), icon(R.drawable.ic_edit))
             AppPickerDialog.singleChoice(
                 requireContext(), getString(R.string.pref_drawers), labels, -1
             ) { which ->
@@ -421,11 +429,13 @@ class SettingsActivity : AppCompatActivity(),
         private fun editDrawer(index: Int) {
             val drawer = prefs.drawer(index)
             val actions = mutableListOf(
-                AppPickerDialog.Item(getString(R.string.drawer_edit_apps), null),
-                AppPickerDialog.Item(getString(R.string.drawer_rename), null),
+                AppPickerDialog.Item(getString(R.string.drawer_edit_apps), icon(R.drawable.ic_apps)),
+                AppPickerDialog.Item(getString(R.string.drawer_rename), icon(R.drawable.ic_edit)),
             )
             if (prefs.drawers().size > 1) {
-                actions.add(AppPickerDialog.Item(getString(R.string.drawer_delete), null))
+                actions.add(
+                    AppPickerDialog.Item(getString(R.string.drawer_delete), icon(R.drawable.ic_delete))
+                )
             }
             AppPickerDialog.singleChoice(requireContext(), drawer.name, actions, -1) { which ->
                 when (which) {
