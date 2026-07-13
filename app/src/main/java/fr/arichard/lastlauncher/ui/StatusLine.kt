@@ -20,9 +20,10 @@ object StatusLine {
     const val ALARM = "alarm"
     const val LAUNCHES = "launches"
     const val STORAGE = "storage"
+    const val DB = "db"
 
     /** Canonical order tokens are rendered in, regardless of selection order. */
-    val ALL_TOKENS = listOf(BATTERY, NETWORK, ALARM, LAUNCHES, STORAGE)
+    val ALL_TOKENS = listOf(BATTERY, NETWORK, ALARM, LAUNCHES, STORAGE, DB)
 
     val DEFAULT_TOKENS = setOf(NETWORK, ALARM, LAUNCHES)
 
@@ -33,6 +34,7 @@ object StatusLine {
         val nextAlarm: String?,
         val launchesToday: Int,
         val freeStorageGb: Double,
+        val dbBytes: Long = 0,
     )
 
     fun build(enabled: Set<String>, v: Values): String {
@@ -46,6 +48,13 @@ object StatusLine {
         ALARM -> v.nextAlarm?.let { "⏰$it" }
         LAUNCHES -> if (v.launchesToday > 0) "↑${v.launchesToday}" else null
         STORAGE -> "▤ ${"%.1f".format(java.util.Locale.US, v.freeStorageGb)}G"
+        DB -> if (v.dbBytes > 0) "◇ ${formatBytes(v.dbBytes)}" else null
         else -> null
+    }
+
+    /** Compact byte count: 87K, 1.2M. */
+    internal fun formatBytes(bytes: Long): String = when {
+        bytes >= 1_000_000 -> "%.1fM".format(java.util.Locale.US, bytes / 1_000_000.0)
+        else -> "${(bytes / 1000).coerceAtLeast(1)}K"
     }
 }

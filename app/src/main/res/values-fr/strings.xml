@@ -42,6 +42,8 @@
 
     <!-- App long-press menu -->
     <string name="menu_app_info">Infos de l’application</string>
+    <string name="menu_boost">Booster dans les suggestions</string>
+    <string name="menu_unboost">Retirer le boost</string>
     <string name="menu_uninstall">Désinstaller</string>
     <string name="menu_hide">Masquer de la liste</string>
 
@@ -66,7 +68,6 @@
     <string name="clock_tap_default">Horloge (application système)</string>
 
     <!-- Météo -->
-    <string name="cat_weather">Météo</string>
     <string name="pref_weather_enabled">Afficher la météo</string>
     <string name="pref_weather_enabled_summary">Une puce météo sous l’horloge. Utilise votre localisation approximative et un service sans clé (Open-Meteo) ; actualisée toutes les heures.</string>
     <string name="pref_weather_units">Unités</string>
@@ -83,6 +84,8 @@
     <string name="pref_bt_signal_summary">Suggère les applications que vous ouvrez habituellement après une connexion Bluetooth (voiture, écouteurs…)</string>
     <string name="pref_favorites">Applications favorites</string>
     <string name="pref_favorites_summary">Occupent les suggestions tant que le lanceur n’a pas appris vos habitudes — et quand les prédictions sont désactivées</string>
+    <string name="pref_boosted">Applications boostées</string>
+    <string name="pref_boosted_summary">Applications épinglées pour apparaître plus souvent dans le trio suggéré</string>
     <string name="pref_reset_learning">Tout oublier</string>
     <string name="pref_reset_learning_summary">Supprime l’historique de lancements utilisé pour les prédictions</string>
     <string name="reset_learning_confirm">Supprimer tout l’historique appris ? Les suggestions repartiront de zéro.</string>
@@ -124,6 +127,7 @@
     <string name="token_alarm">Prochaine alarme</string>
     <string name="token_launches">Applications lancées aujourd’hui</string>
     <string name="token_storage">Stockage libre</string>
+    <string name="token_db">Taille de la mémoire du lanceur</string>
 
     <string name="cat_apps">Applications</string>
     <string name="pref_hidden_apps">Applications masquées</string>
@@ -150,6 +154,55 @@
     <string name="pref_notif_badges_summary">Affiche une bulle avec le nombre de non-lus sur les applications</string>
     <string name="pref_message_ticker">Bandeau de messages</string>
     <string name="pref_message_ticker_summary">Fait défiler les messages non lus sous l’horloge, un à un. Affiche le contenu des messages sur l’écran d’accueil.</string>
+    <string name="pref_ticker_two_lines">Messages sur deux lignes</string>
+    <string name="pref_ticker_two_lines_summary">Expéditeur sur la première ligne, message sur la seconde</string>
+    <string name="pref_ticker_seconds">Secondes par message</string>
+
+    <!-- Écrans de réglages -->
+    <string name="cat_clock_weather">Horloge &amp; météo</string>
+    <string name="screen_general_summary">Lanceur par défaut, clavier, vibrations</string>
+    <string name="screen_clock_weather_summary">Appui sur l’horloge, puce météo, horloge vivante</string>
+    <string name="screen_suggestions_summary">Prédictions, favoris et boosts, données d’apprentissage</string>
+    <string name="screen_gestures_summary">Balayages de bord, double appui, indices</string>
+    <string name="screen_appearance_summary">Accent, assombrissement, ligne d’état, animations</string>
+    <string name="screen_apps_summary">Applications masquées, tiroirs en molette</string>
+    <string name="screen_notifications_summary">Bulles de compteur, bandeau de messages</string>
+    <string name="screen_updates_summary">Mises à jour automatiques, version</string>
+
+    <!-- Horloge & météo -->
+    <string name="pref_weather_beside_clock">Météo à côté de l’horloge</string>
+    <string name="pref_weather_beside_clock_summary">Affiche la puce sur la ligne de l’horloge plutôt que sous la date</string>
+    <string name="pref_weather_clock_style">Horloge vivante</string>
+    <string name="pref_weather_clock_style_summary">Teinte le halo de l’horloge selon le ciel — soleil doré, pluie bleu acier, orages violets. Effet statique, zéro coût batterie.</string>
+
+    <!-- Fonctionnement -->
+    <string name="pref_insights">Comment marchent les suggestions</string>
+    <string name="pref_insights_summary">Vue en direct de la mémoire du lanceur, des signaux et du classement</string>
+    <string name="insights_loading">calcul…</string>
+    <string name="insights_how_title">Comment les applications sont choisies</string>
+    <string name="insights_how_body">Chaque lancement est consigné sur l’appareil avec son contexte : heure, jour, application précédente et déclencheur éventuel (Bluetooth, écouteurs, chargeur). Le score d’une application additionne ces lancements, les récents comptant davantage (décroissance sur ~20 jours). Les signaux ci-dessous augmentent le poids d’un lancement quand ils correspondent à l’instant présent ; notifications et boosts s’ajoutent par-dessus. Les trois meilleurs scores forment le trio suggéré.</string>
+    <string name="insights_weights_title">Poids des signaux</string>
+    <string name="insights_w_hour">même heure de la journée (±1 h)</string>
+    <string name="insights_w_daytype">même type de jour (semaine / week-end)</string>
+    <string name="insights_w_transition">suit l’application précédente</string>
+    <string name="insights_w_trigger">même déclencheur actif (BT, jack, chargeur)</string>
+    <string name="insights_w_notification">par notification active (plafonné ×4)</string>
+    <string name="insights_w_boost">boost utilisateur (facteur + plancher)</string>
+    <string name="insights_data_title">Vos données</string>
+    <string name="insights_rows">%1$d lancements mémorisés</string>
+    <string name="insights_days">sur %1$d jours</string>
+    <string name="insights_db">base de données sur disque : %1$s</string>
+    <string name="insights_today">%1$d lancements aujourd’hui</string>
+    <string name="insights_context_title">Contexte actuel</string>
+    <string name="insights_context_now">heure %1$d, %2$s</string>
+    <string name="insights_weekday">semaine</string>
+    <string name="insights_weekend">week-end</string>
+    <string name="insights_prev_app">application précédente : %1$s</string>
+    <string name="insights_trigger">déclencheur actif : %1$s</string>
+    <string name="insights_notifying">%1$d applications avec notifications</string>
+    <string name="insights_ranking_title">Classement actuel (top 10)</string>
+    <string name="insights_no_data">pas encore de données — lancez des applications !</string>
+    <string name="insights_footer">◈ = trio actuel · ↑boost = boosté par vous · ✉ = notifications actives\nTout ce qui précède ne quitte jamais ce téléphone.</string>
 
     <string name="cat_updates">Mises à jour</string>
     <string name="pref_auto_update">Mises à jour automatiques</string>
@@ -161,7 +214,6 @@
     <string name="update_error">Échec de la mise à jour : %1$s</string>
     <string name="update_checking">Vérification…</string>
 
-    <string name="cat_about">À propos</string>
     <string name="pref_version">Version</string>
 
     <!-- Accents -->

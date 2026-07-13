@@ -56,6 +56,7 @@ class WheelDrawer @JvmOverloads constructor(
     private var onClick: (AppEntry, View) -> Unit = { _, _ -> }
     private var onLongClick: (AppEntry, View) -> Unit = { _, _ -> }
     private var onClosed: () -> Unit = {}
+    private var onVisibleChanged: (Boolean) -> Unit = {}
 
     init {
         clipChildren = false
@@ -71,6 +72,7 @@ class WheelDrawer @JvmOverloads constructor(
         onClick: (AppEntry, View) -> Unit,
         onLongClick: (AppEntry, View) -> Unit,
         onClosed: () -> Unit,
+        onVisibleChanged: (Boolean) -> Unit = {},
     ) {
         this.side = side
         this.iconOf = iconOf
@@ -78,11 +80,12 @@ class WheelDrawer @JvmOverloads constructor(
         this.onClick = onClick
         this.onLongClick = onLongClick
         this.onClosed = onClosed
+        this.onVisibleChanged = onVisibleChanged
     }
 
     fun bind(apps: List<AppEntry>) {
         this.apps = apps
-        scrollAngle = 0f
+        scrollAngle = 0f.coerceIn(minScroll(), maxScroll())
         rebuildViews()
         layoutIcons()
     }
@@ -101,9 +104,12 @@ class WheelDrawer @JvmOverloads constructor(
     private fun spacing(): Float =
         if (apps.size <= 1) 0f else ARC_SPAN / (minOf(apps.size, MAX_VISIBLE) - 1)
 
-    /** How far the wheel can roll when there are more apps than the arc holds. */
+    // The wheel rolls freely enough that ANY app — including the first and last —
+    // can be brought to the middle (the max-bulge sweet spot).
+    private fun minScroll(): Float = -HALF_SPAN
+
     private fun maxScroll(): Float =
-        maxOf(0f, (apps.size - 1) * spacing() - ARC_SPAN)
+        maxOf(-HALF_SPAN, (apps.size - 1) * spacing() - HALF_SPAN)
 
     /**
      * Places every icon on the arc. An icon's angle combines its slot, the current
@@ -176,8 +182,10 @@ class WheelDrawer @JvmOverloads constructor(
     }
 
     private fun applyProgress(p: Float) {
+        val wasVisible = progress > 0f
         progress = p.coerceIn(0f, 1f)
         visibility = if (progress <= 0f) GONE else VISIBLE
+        if (wasVisible != progress > 0f) onVisibleChanged(progress > 0f)
         layoutIcons()
     }
 
@@ -260,7 +268,7 @@ class WheelDrawer @JvmOverloads constructor(
                         // finger travel and icon travel visually matched.
                         val degPerPx = ARC_SPAN / (height.coerceAtLeast(1)).toFloat()
                         scrollAngle = (downScroll + (downY - ev.rawY) * degPerPx)
-                            .coerceIn(0f, maxScroll())
+                            .coerceIn(minScroll(), maxScroll())
                         layoutIcons()
                     }
                     Mode.CLOSE -> {
@@ -307,6 +315,6 @@ class WheelDrawer @JvmOverloads constructor(
         const val FADE_LIMIT = 100f   // icons fade out between 90° and here
         const val ROLL_IN_DEG = 150f  // open/close rolls the wheel in from the bottom
         const val ROLL_MS = 260L
-        const val MAX_VISIBLE = 9     // fixed spacing once the arc is this full
+        const val MAX_VISIBLE = 13    // fixed spacing once the arc is this full
     }
 }
