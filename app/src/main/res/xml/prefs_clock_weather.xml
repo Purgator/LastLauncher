@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <SwitchPreferenceCompat
+        android:key="show_clock"
+        android:title="@string/pref_show_clock"
+        android:defaultValue="true" />
+    <Preference
+        android:key="clock_tap"
+        android:title="@string/pref_clock_tap"
+        android:dependency="show_clock" />
+    <SwitchPreferenceCompat
+        android:key="weather_enabled"
+        android:title="@string/pref_weather_enabled"
+        android:summary="@string/pref_weather_enabled_summary"
+        android:defaultValue="false" />
+    <SwitchPreferenceCompat
+        android:key="weather_beside_clock"
+        android:title="@string/pref_weather_beside_clock"
+        android:summary="@string/pref_weather_beside_clock_summary"
+        android:defaultValue="false"
+        android:dependency="weather_enabled" />
+    <SwitchPreferenceCompat
+        android:key="weather_clock_style"
+        android:title="@string/pref_weather_clock_style"
+        android:summary="@string/pref_weather_clock_style_summary"
+        android:defaultValue="false"
+        android:dependency="weather_enabled" />
+    <ListPreference
+        android:key="weather_units"
+        android:title="@string/pref_weather_units"
+        android:entries="@array/weather_units_entries"
+        android:entryValues="@array/weather_units_values"
+        android:defaultValue="c"
+        android:dependency="weather_enabled"
+        app:useSimpleSummaryProvider="true" />
+    <ListPreference
+        android:key="weather_style"
+        android:title="@string/pref_weather_style"
+        android:entries="@array/weather_style_entries"
+        android:entryValues="@array/weather_style_values"
+        android:defaultValue="icon_temp"
+        android:dependency="weather_enabled"
+        app:useSimpleSummaryProvider="true" />
+    <Preference
+        android:key="weather_tap"
+        android:title="@string/pref_weather_tap"
+        android:dependency="weather_enabled" />
+</PreferenceScreen>

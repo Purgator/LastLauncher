@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <Preference
+        android:key="default_launcher"
+        android:title="@string/pref_default_launcher"
+        android:summary="@string/pref_default_launcher_summary" />
+    <SwitchPreferenceCompat
+        android:key="keyboard_always"
+        android:title="@string/pref_keyboard_always"
+        android:summary="@string/pref_keyboard_always_summary"
+        android:defaultValue="true" />
+    <SwitchPreferenceCompat
+        android:key="haptics"
+        android:title="@string/pref_haptics"
+        android:summary="@string/pref_haptics_summary"
+        android:defaultValue="true" />
+</PreferenceScreen>

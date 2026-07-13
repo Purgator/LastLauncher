@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <Preference
+        android:key="notif_access"
+        android:title="@string/pref_notif_access"
+        android:summary="@string/pref_notif_access_summary" />
+    <SwitchPreferenceCompat
+        android:key="notif_badges"
+        android:title="@string/pref_notif_badges"
+        android:summary="@string/pref_notif_badges_summary"
+        android:defaultValue="true" />
+    <SwitchPreferenceCompat
+        android:key="message_ticker"
+        android:title="@string/pref_message_ticker"
+        android:summary="@string/pref_message_ticker_summary"
+        android:defaultValue="false" />
+    <SwitchPreferenceCompat
+        android:key="ticker_two_lines"
+        android:title="@string/pref_ticker_two_lines"
+        android:summary="@string/pref_ticker_two_lines_summary"
+        android:defaultValue="true"
+        android:dependency="message_ticker" />
+    <SeekBarPreference
+        android:key="ticker_seconds"
+        android:title="@string/pref_ticker_seconds"
+        android:defaultValue="4"
+        android:max="12"
+        app:min="2"
+        app:showSeekBarValue="true"
+        android:dependency="message_ticker" />
+</PreferenceScreen>

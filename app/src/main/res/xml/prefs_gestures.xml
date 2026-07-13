@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <SwitchPreferenceCompat
+        android:key="double_tap_lock"
+        android:title="@string/pref_double_tap_lock"
+        android:summary="@string/pref_double_tap_lock_summary"
+        android:defaultValue="true" />
+    <SwitchPreferenceCompat
+        android:key="swipe_down_notifications"
+        android:title="@string/pref_swipe_down"
+        android:summary="@string/pref_swipe_down_summary"
+        android:defaultValue="true" />
+    <Preference
+        android:key="gesture_lr_1"
+        android:title="@string/pref_gesture_lr_1" />
+    <Preference
+        android:key="gesture_lr_2"
+        android:title="@string/pref_gesture_lr_2" />
+    <Preference
+        android:key="gesture_rl_1"
+        android:title="@string/pref_gesture_rl_1" />
+    <Preference
+        android:key="gesture_rl_2"
+        android:title="@string/pref_gesture_rl_2" />
+    <SwitchPreferenceCompat
+        android:key="show_gesture_hints"
+        android:title="@string/pref_gesture_hints"
+        android:summary="@string/pref_gesture_hints_summary"
+        android:defaultValue="true" />
+</PreferenceScreen>
