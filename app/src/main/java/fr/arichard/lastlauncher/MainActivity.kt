@@ -91,8 +91,27 @@ class MainActivity : AppCompatActivity() {
         binding.clock.setOnClickListener { launchClockTarget() }
         binding.weather.setOnClickListener { launchWeatherTarget() }
         binding.starterPill.setOnClickListener { showStarterPicker() }
+        setupContextualLongPress()
         repo.addListener(repoListener)
         NotifListener.addListener(notifListener)
+    }
+
+    /** Long-pressing a home-screen element jumps straight to its settings domain. */
+    private fun setupContextualLongPress() {
+        fun View.opensSettings(screen: String) {
+            setOnLongClickListener {
+                haptic(this)
+                SettingsActivity.open(this@MainActivity, screen)
+                true
+            }
+        }
+        binding.clock.opensSettings(SettingsActivity.SCREEN_CLOCK_WEATHER)
+        binding.date.opensSettings(SettingsActivity.SCREEN_CLOCK_WEATHER)
+        binding.weather.opensSettings(SettingsActivity.SCREEN_CLOCK_WEATHER)
+        binding.statusLine.opensSettings(SettingsActivity.SCREEN_APPEARANCE)
+        binding.ticker.opensSettings(SettingsActivity.SCREEN_NOTIFICATIONS)
+        binding.searchBar.opensSettings(SettingsActivity.SCREEN_GENERAL)
+        binding.suggestionsBlock.opensSettings(SettingsActivity.SCREEN_SUGGESTIONS)
     }
 
     override fun onDestroy() {
@@ -179,7 +198,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onLongPress(e: MotionEvent) {
                 haptic(binding.root)
-                startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                SettingsActivity.open(this@MainActivity)
             }
         })
         binding.root.isClickable = true
@@ -348,14 +367,32 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupDrawer() {
         for (drawer in listOf(binding.leftDrawer to -1, binding.rightDrawer to 1)) {
-            drawer.first.init(
+            val view = drawer.first
+            view.init(
                 side = drawer.second,
                 iconOf = { entry -> repo.icon(entry) },
                 badgeOf = { pkg -> badgeFor(pkg) },
-                onClick = { entry, view -> drawer.first.close(animate = false); launchApp(entry, view) },
-                onLongClick = { entry, view -> showAppMenu(entry, view) },
+                onClick = { entry, v -> view.close(animate = false); launchApp(entry, v) },
+                onLongClick = { entry, v -> showAppMenu(entry, v) },
                 onClosed = {},
+                onVisibleChanged = { visible ->
+                    // The gesture hint on a drawer's side yields to the drawer.
+                    val hint = if (drawer.second < 0) binding.hintLeft else binding.hintRight
+                    if (visible) hint.visibility = View.INVISIBLE else startHints()
+                },
             )
+        }
+        // The wheel occupies half the screen height, vertically centered.
+        binding.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            val half = binding.root.height / 2
+            if (half <= 0) return@addOnLayoutChangeListener
+            for (drawer in listOf(binding.leftDrawer, binding.rightDrawer)) {
+                val lp = drawer.layoutParams as android.widget.FrameLayout.LayoutParams
+                if (lp.height != half) {
+                    lp.height = half
+                    drawer.layoutParams = lp
+                }
+            }
         }
     }
 
@@ -738,6 +775,7 @@ class MainActivity : AppCompatActivity() {
     private fun refreshWeather() {
         if (!prefs.weatherEnabled) {
             binding.weather.visibility = View.GONE
+            styleClockForWeather(null)
             return
         }
         // Ask once; the user grants location from the Weather settings screen.
@@ -752,8 +790,10 @@ class MainActivity : AppCompatActivity() {
     private fun renderWeather(weather: WeatherProvider.Weather?) {
         if (!prefs.weatherEnabled || weather == null) {
             binding.weather.visibility = View.GONE
+            styleClockForWeather(null)
             return
         }
+        placeWeatherChip()
         val fahrenheit = prefs.weatherUnits == "f"
         val temp = if (fahrenheit) weather.tempC * 9 / 5 + 32 else weather.tempC
         val degrees = "${Math.round(temp)}°"
@@ -765,6 +805,55 @@ class MainActivity : AppCompatActivity() {
         }
         binding.weather.setTextColor(accentColor())
         binding.weather.visibility = View.VISIBLE
+        styleClockForWeather(if (prefs.weatherClockStyle) weather.code else null)
+    }
+
+    /** Moves the weather chip beside the clock or back under the date, per setting. */
+    private fun placeWeatherChip() {
+        val wantRow = prefs.weatherBesideClock
+        val inRow = binding.weather.parent === binding.clockRow
+        if (wantRow == inRow) return
+        (binding.weather.parent as? android.view.ViewGroup)?.removeView(binding.weather)
+        if (wantRow) {
+            binding.clockRow.addView(binding.weather)
+            (binding.weather.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
+                marginStart = (14 * resources.displayMetrics.density).toInt()
+                topMargin = 0
+            }
+        } else {
+            // Back to its original slot: right after the date line.
+            val index = binding.content.indexOfChild(binding.date) + 1
+            binding.content.addView(binding.weather, index)
+            (binding.weather.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                topMargin = (8 * resources.displayMetrics.density).toInt()
+                marginStart = 0
+            }
+        }
+    }
+
+    /**
+     * "Living clock": a static glow tinted by the sky — warm gold in sunshine, steel
+     * blue in rain, icy white in snow, violet in storms. One setShadowLayer call, no
+     * animation, so the battery cost is zero.
+     */
+    private fun styleClockForWeather(weatherCode: Int?) {
+        if (weatherCode == null) {
+            binding.clock.setShadowLayer(0f, 0f, 0f, 0)
+            return
+        }
+        val glow = when (weatherCode) {
+            0, 1 -> 0xFFFFC24D.toInt()          // sun: warm gold
+            2, 3 -> 0xFFB8C4D9.toInt()          // clouds: soft silver
+            in 45..48 -> 0xFF9BA3B7.toInt()     // fog: grey
+            in 51..67, in 80..82 -> 0xFF4DA6FF.toInt() // rain: steel blue
+            in 71..77, in 85..86 -> 0xFFCfE9FF.toInt() // snow: icy white-blue
+            in 95..99 -> 0xFFB388FF.toInt()     // storm: violet
+            else -> 0xFFB8C4D9.toInt()
+        }
+        binding.clock.setShadowLayer(
+            18f, 0f, 0f, ColorUtils.setAlphaComponent(glow, 0xA0)
+        )
     }
 
     /** Tapping the weather chip opens the chosen app, else a weather web search. */
@@ -949,6 +1038,15 @@ class MainActivity : AppCompatActivity() {
     private fun showAppMenu(entry: AppEntry, anchor: View) {
         haptic(anchor)
         val menu = PopupMenu(this, anchor)
+        val boosted = entry.packageName in prefs.boostedApps
+        menu.menu.add(if (boosted) R.string.menu_unboost else R.string.menu_boost)
+            .setOnMenuItemClickListener {
+                prefs.boostedApps =
+                    if (boosted) prefs.boostedApps - entry.packageName
+                    else prefs.boostedApps + entry.packageName
+                refreshSuggestions()
+                true
+            }
         menu.menu.add(R.string.menu_app_info).setOnMenuItemClickListener {
             startActivity(
                 Intent(
@@ -1091,7 +1189,7 @@ class MainActivity : AppCompatActivity() {
     private val tickerRunnable = object : Runnable {
         override fun run() {
             showNextTickerMessage()
-            tickerHandler.postDelayed(this, TICKER_PERIOD_MS)
+            tickerHandler.postDelayed(this, prefs.tickerSeconds * 1000L)
         }
     }
 
@@ -1119,22 +1217,31 @@ class MainActivity : AppCompatActivity() {
         }
         val msg = messages[tickerIndex % messages.size]
         tickerIndex++
-        val appLabel = repo.byPackage(msg.pkg)?.label ?: msg.pkg
-        val text = "$appLabel · ${msg.title} — ${msg.text}"
         binding.ticker.setOnClickListener {
             repo.byPackage(msg.pkg)?.let { entry -> launchApp(entry, binding.ticker) }
         }
+        val bind = {
+            val appLabel = repo.byPackage(msg.pkg)?.label ?: msg.pkg
+            if (prefs.tickerTwoLines) {
+                binding.tickerTitle.text = "$appLabel · ${msg.title}"
+                binding.tickerText.text = msg.text
+                binding.tickerText.visibility = View.VISIBLE
+            } else {
+                binding.tickerTitle.text = "$appLabel · ${msg.title} — ${msg.text}"
+                binding.tickerText.visibility = View.GONE
+            }
+        }
         if (!prefs.animations) {
-            binding.ticker.text = text
-            binding.ticker.alpha = 0.9f
+            bind()
+            binding.ticker.alpha = 0.92f
             binding.ticker.visibility = View.VISIBLE
             return
         }
         binding.ticker.animate().alpha(0f).setDuration(250).withEndAction {
-            binding.ticker.text = text
+            bind()
             binding.ticker.translationY = 6 * resources.displayMetrics.density
             binding.ticker.visibility = View.VISIBLE
-            binding.ticker.animate().alpha(0.9f).translationY(0f).setDuration(350).start()
+            binding.ticker.animate().alpha(0.92f).translationY(0f).setDuration(350).start()
         }.start()
     }
 
@@ -1226,11 +1333,18 @@ class MainActivity : AppCompatActivity() {
         val net = if (StatusLine.NETWORK in enabled) currentNet() else StatusLine.Net.OFFLINE
         val alarm = if (StatusLine.ALARM in enabled) nextAlarmText() else null
         val storage = if (StatusLine.STORAGE in enabled) freeStorageGb() else 0.0
+        val dbBytes = if (StatusLine.DB in enabled) {
+            try {
+                getDatabasePath("usage.db").length()
+            } catch (e: Exception) {
+                0L
+            }
+        } else 0L
 
         fun render(launches: Int) {
             binding.statusLine.text = StatusLine.build(
                 enabled,
-                StatusLine.Values(percent, charging, net, alarm, launches, storage)
+                StatusLine.Values(percent, charging, net, alarm, launches, storage, dbBytes)
             )
             binding.statusLine.visibility = View.VISIBLE
         }
@@ -1329,7 +1443,4 @@ class MainActivity : AppCompatActivity() {
         requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1)
     }
 
-    private companion object {
-        const val TICKER_PERIOD_MS = 4200L
-    }
 }

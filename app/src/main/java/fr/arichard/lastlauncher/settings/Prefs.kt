@@ -57,6 +57,23 @@ class Prefs(context: Context) {
     /** App opened when the weather chip is tapped; empty = a weather web search. */
     val weatherTapTarget: String get() = sp.getString(KEY_WEATHER_TAP, "") ?: ""
 
+    /** Show the weather beside the clock instead of under the date. */
+    val weatherBesideClock: Boolean get() = sp.getBoolean(KEY_WEATHER_BESIDE_CLOCK, false)
+
+    /** Tint the clock's glow by the current weather (static styling, zero battery). */
+    val weatherClockStyle: Boolean get() = sp.getBoolean(KEY_WEATHER_CLOCK_STYLE, false)
+
+    /** Ticker layout: title and message on two lines (else one compact line). */
+    val tickerTwoLines: Boolean get() = sp.getBoolean(KEY_TICKER_TWO_LINES, true)
+
+    /** Seconds each ticker message stays before fading to the next. */
+    val tickerSeconds: Int get() = sp.getInt(KEY_TICKER_SECONDS, 4).coerceIn(2, 12)
+
+    /** Apps the user pinned to appear more often in the guessed trio. */
+    var boostedApps: Set<String>
+        get() = sp.getStringSet(KEY_BOOSTED_APPS, emptySet()) ?: emptySet()
+        set(value) = sp.edit().putStringSet(KEY_BOOSTED_APPS, value).apply()
+
     val weatherHasCache: Boolean get() = sp.contains(KEY_WEATHER_TEMP)
     val weatherTempC: Double
         get() = java.lang.Double.longBitsToDouble(sp.getLong(KEY_WEATHER_TEMP, 0))
@@ -215,6 +232,11 @@ class Prefs(context: Context) {
         const val KEY_WEATHER_UNITS = "weather_units"
         const val KEY_WEATHER_STYLE = "weather_style"
         const val KEY_WEATHER_TAP = "weather_tap_app"
+        const val KEY_WEATHER_BESIDE_CLOCK = "weather_beside_clock"
+        const val KEY_WEATHER_CLOCK_STYLE = "weather_clock_style"
+        const val KEY_TICKER_TWO_LINES = "ticker_two_lines"
+        const val KEY_TICKER_SECONDS = "ticker_seconds"
+        const val KEY_BOOSTED_APPS = "boosted_apps"
         const val KEY_WEATHER_TEMP = "weather_temp_c"
         const val KEY_WEATHER_CODE = "weather_code"
         const val KEY_WEATHER_FETCH = "weather_last_fetch"

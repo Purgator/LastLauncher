@@ -71,6 +71,18 @@ class UsageDb(context: Context) :
         return rows
     }
 
+    fun totalCount(): Int {
+        readableDatabase.rawQuery("SELECT COUNT(*) FROM launches", null).use { c ->
+            return if (c.moveToFirst()) c.getInt(0) else 0
+        }
+    }
+
+    fun oldestTs(): Long? {
+        readableDatabase.rawQuery("SELECT MIN(ts) FROM launches", null).use { c ->
+            return if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
+        }
+    }
+
     /** Number of launches logged since [sinceTs]. */
     fun countSince(sinceTs: Long): Int {
         readableDatabase.rawQuery(

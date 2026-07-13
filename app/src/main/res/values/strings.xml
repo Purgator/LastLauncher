@@ -42,6 +42,8 @@
 
     <!-- App long-press menu -->
     <string name="menu_app_info">App info</string>
+    <string name="menu_boost">Boost in suggestions</string>
+    <string name="menu_unboost">Remove boost</string>
     <string name="menu_uninstall">Uninstall</string>
     <string name="menu_hide">Hide from list</string>
 
@@ -66,7 +68,6 @@
     <string name="clock_tap_default">Clock (system default)</string>
 
     <!-- Weather -->
-    <string name="cat_weather">Weather</string>
     <string name="pref_weather_enabled">Show weather</string>
     <string name="pref_weather_enabled_summary">A weather chip under the clock. Uses your approximate location and a key-less service (Open-Meteo); refreshed hourly.</string>
     <string name="pref_weather_units">Units</string>
@@ -83,6 +84,8 @@
     <string name="pref_bt_signal_summary">Suggest apps you usually open after connecting to a Bluetooth device (car, headphones…)</string>
     <string name="pref_favorites">Go-to apps</string>
     <string name="pref_favorites_summary">Fill the suggestion slots until the launcher has learned your habits — and whenever predictions are off</string>
+    <string name="pref_boosted">Boosted apps</string>
+    <string name="pref_boosted_summary">Apps you pinned to appear more often in the guessed trio</string>
     <string name="pref_reset_learning">Forget everything learned</string>
     <string name="pref_reset_learning_summary">Delete all launch history used for predictions</string>
     <string name="reset_learning_confirm">Delete all learned launch history? Suggestions will start from scratch.</string>
@@ -124,6 +127,7 @@
     <string name="token_alarm">Next alarm</string>
     <string name="token_launches">Apps launched today</string>
     <string name="token_storage">Free storage</string>
+    <string name="token_db">Launcher memory size</string>
 
     <string name="cat_apps">Apps</string>
     <string name="pref_hidden_apps">Hidden apps</string>
@@ -150,6 +154,55 @@
     <string name="pref_notif_badges_summary">Show a bubble with the unread count on apps</string>
     <string name="pref_message_ticker">Message ticker</string>
     <string name="pref_message_ticker_summary">Cycle unread messages under the clock, one at a time. Shows message contents on the home screen.</string>
+    <string name="pref_ticker_two_lines">Two-line messages</string>
+    <string name="pref_ticker_two_lines_summary">Sender on the first line, message on the second</string>
+    <string name="pref_ticker_seconds">Seconds per message</string>
+
+    <!-- Root settings screens -->
+    <string name="cat_clock_weather">Clock &amp; weather</string>
+    <string name="screen_general_summary">Default launcher, keyboard, haptics</string>
+    <string name="screen_clock_weather_summary">Clock tap, weather chip, living clock</string>
+    <string name="screen_suggestions_summary">Predictions, go-to and boosted apps, learning data</string>
+    <string name="screen_gestures_summary">Edge swipes, double-tap lock, hints</string>
+    <string name="screen_appearance_summary">Accent, dimming, status line, animations</string>
+    <string name="screen_apps_summary">Hidden apps, wheel drawers</string>
+    <string name="screen_notifications_summary">Count bubbles, message ticker</string>
+    <string name="screen_updates_summary">Automatic updates, version</string>
+
+    <!-- Clock & weather extras -->
+    <string name="pref_weather_beside_clock">Weather beside the clock</string>
+    <string name="pref_weather_beside_clock_summary">Show the chip on the clock line instead of under the date</string>
+    <string name="pref_weather_clock_style">Living clock</string>
+    <string name="pref_weather_clock_style_summary">Tint the clock’s glow with the sky — golden sun, steel-blue rain, violet storms. Static effect, zero battery cost.</string>
+
+    <!-- Insights -->
+    <string name="pref_insights">How suggestions work</string>
+    <string name="pref_insights_summary">Live view of the launcher’s memory, signals and current ranking</string>
+    <string name="insights_loading">computing…</string>
+    <string name="insights_how_title">How apps are chosen</string>
+    <string name="insights_how_body">Every launch is logged on-device with its context: hour, weekday, the app you came from, and any trigger (Bluetooth, headphones, charger). Each app’s score sums those launches, recent ones counting more (20-day half-life-style decay). The signals below multiply a launch’s weight when they match the present moment; notifications and your boosts add on top. The three highest scores become the suggestion trio.</string>
+    <string name="insights_weights_title">Signal weights</string>
+    <string name="insights_w_hour">same hour of day (±1h)</string>
+    <string name="insights_w_daytype">same day type (week / weekend)</string>
+    <string name="insights_w_transition">follows the previous app</string>
+    <string name="insights_w_trigger">same trigger active (BT, jack, charger)</string>
+    <string name="insights_w_notification">per active notification (capped ×4)</string>
+    <string name="insights_w_boost">user boost (factor + floor)</string>
+    <string name="insights_data_title">Your data</string>
+    <string name="insights_rows">%1$d launches remembered</string>
+    <string name="insights_days">covering %1$d days</string>
+    <string name="insights_db">database on disk: %1$s</string>
+    <string name="insights_today">%1$d launches today</string>
+    <string name="insights_context_title">Context right now</string>
+    <string name="insights_context_now">hour %1$d, %2$s</string>
+    <string name="insights_weekday">weekday</string>
+    <string name="insights_weekend">weekend</string>
+    <string name="insights_prev_app">previous app: %1$s</string>
+    <string name="insights_trigger">active trigger: %1$s</string>
+    <string name="insights_notifying">%1$d apps with notifications</string>
+    <string name="insights_ranking_title">Current ranking (top 10)</string>
+    <string name="insights_no_data">no data yet — launch some apps!</string>
+    <string name="insights_footer">◈ = current trio · ↑boost = boosted by you · ✉ = active notifications\nEverything above lives only on this phone.</string>
 
     <string name="cat_updates">Updates</string>
     <string name="pref_auto_update">Automatic updates</string>
@@ -161,7 +214,6 @@
     <string name="update_error">Update failed: %1$s</string>
     <string name="update_checking">Checking…</string>
 
-    <string name="cat_about">About</string>
     <string name="pref_version">Version</string>
 
     <!-- Accents -->
