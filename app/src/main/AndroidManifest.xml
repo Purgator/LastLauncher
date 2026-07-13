@@ -12,6 +12,8 @@
         tools:ignore="QueryAllPackagesPermission" />
     <!-- Swipe-down gesture opens the notification shade. -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+    <!-- Optional weather chip: coarse last-known location only, never continuous. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Bluetooth connection events feed the prediction engine (optional signal). -->
     <uses-permission
         android:name="android.permission.BLUETOOTH"

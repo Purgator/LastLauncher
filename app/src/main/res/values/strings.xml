@@ -65,6 +65,17 @@
     <string name="pref_clock_tap">Clock tap opens</string>
     <string name="clock_tap_default">Clock (system default)</string>
 
+    <!-- Weather -->
+    <string name="cat_weather">Weather</string>
+    <string name="pref_weather_enabled">Show weather</string>
+    <string name="pref_weather_enabled_summary">A weather chip under the clock. Uses your approximate location and a key-less service (Open-Meteo); refreshed hourly.</string>
+    <string name="pref_weather_units">Units</string>
+    <string name="pref_weather_style">What to show</string>
+    <string name="pref_weather_tap">Weather tap opens</string>
+    <string name="weather_tap_default">Weather search</string>
+    <string name="weather_query">weather</string>
+    <string name="weather_needs_location">Weather needs approximate location permission</string>
+
     <string name="cat_suggestions">Smart suggestions</string>
     <string name="pref_predictions">Predict my next app</string>
     <string name="pref_predictions_summary">Learn from your habits (time, app sequences, Bluetooth, headphones, charging) and suggest the apps you are most likely to open. Everything stays on this device.</string>
@@ -121,7 +132,6 @@
     <!-- App drawers -->
     <string name="pref_drawers">App drawers</string>
     <string name="pref_drawers_summary">Create wheel-style drawers and bind them to edge swipes</string>
-    <string name="drawer_choose">Choose a drawer</string>
     <string name="drawer_add">Add a drawer</string>
     <string name="drawer_add_title">New drawer</string>
     <string name="drawer_name_hint">Drawer name</string>
@@ -130,7 +140,6 @@
     <string name="drawer_delete">Delete drawer</string>
     <string name="drawer_action_named">Drawer: %1$s</string>
     <string name="drawer_pick_for_gesture">Which drawer?</string>
-    <string name="drawer_count_summary">%1$d apps</string>
 
     <!-- Notifications -->
     <string name="cat_notifications">Notifications</string>
