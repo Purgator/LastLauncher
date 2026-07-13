@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <ListPreference
+        android:key="accent"
+        android:title="@string/pref_accent"
+        android:entries="@array/accent_entries"
+        android:entryValues="@array/accent_values"
+        android:defaultValue="cyan"
+        app:useSimpleSummaryProvider="true" />
+    <SeekBarPreference
+        android:key="dim"
+        android:title="@string/pref_dim"
+        android:defaultValue="25"
+        android:max="80"
+        app:showSeekBarValue="true" />
+    <SwitchPreferenceCompat
+        android:key="show_status_line"
+        android:title="@string/pref_status_line"
+        android:summary="@string/pref_status_line_summary"
+        android:defaultValue="true" />
+    <MultiSelectListPreference
+        android:key="status_tokens"
+        android:title="@string/pref_status_tokens"
+        android:summary="@string/pref_status_tokens_summary"
+        android:entries="@array/status_token_entries"
+        android:entryValues="@array/status_token_values"
+        android:defaultValue="@array/status_token_defaults"
+        android:dependency="show_status_line" />
+    <SwitchPreferenceCompat
+        android:key="animations"
+        android:title="@string/pref_animations"
+        android:summary="@string/pref_animations_summary"
+        android:defaultValue="true" />
+</PreferenceScreen>

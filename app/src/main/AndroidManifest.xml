@@ -53,6 +53,11 @@
             android:exported="false"
             android:label="@string/settings_title" />
 
+        <activity
+            android:name=".settings.InsightsActivity"
+            android:exported="false"
+            android:label="@string/pref_insights" />
+
         <!-- Performs the screen-lock / notification-shade global actions. Enabled by the
              user from the system accessibility settings; does not read screen content. -->
         <service

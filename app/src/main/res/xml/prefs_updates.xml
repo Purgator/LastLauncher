@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <SwitchPreferenceCompat
+        android:key="auto_update"
+        android:title="@string/pref_auto_update"
+        android:summary="@string/pref_auto_update_summary"
+        android:defaultValue="true" />
+    <Preference
+        android:key="check_now"
+        android:title="@string/pref_check_now" />
+    <Preference
+        android:key="version"
+        android:title="@string/pref_version"
+        android:selectable="false" />
+</PreferenceScreen>
