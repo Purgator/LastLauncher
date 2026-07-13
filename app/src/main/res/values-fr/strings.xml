@@ -65,6 +65,17 @@
     <string name="pref_clock_tap">Un appui sur l’horloge ouvre</string>
     <string name="clock_tap_default">Horloge (application système)</string>
 
+    <!-- Météo -->
+    <string name="cat_weather">Météo</string>
+    <string name="pref_weather_enabled">Afficher la météo</string>
+    <string name="pref_weather_enabled_summary">Une puce météo sous l’horloge. Utilise votre localisation approximative et un service sans clé (Open-Meteo) ; actualisée toutes les heures.</string>
+    <string name="pref_weather_units">Unités</string>
+    <string name="pref_weather_style">Contenu affiché</string>
+    <string name="pref_weather_tap">Un appui sur la météo ouvre</string>
+    <string name="weather_tap_default">Recherche météo</string>
+    <string name="weather_query">météo</string>
+    <string name="weather_needs_location">La météo nécessite l’autorisation de localisation approximative</string>
+
     <string name="cat_suggestions">Suggestions intelligentes</string>
     <string name="pref_predictions">Prédire ma prochaine application</string>
     <string name="pref_predictions_summary">Apprend de vos habitudes (heure, enchaînements d’applications, Bluetooth, écouteurs, charge) et suggère les applications que vous allez probablement ouvrir. Tout reste sur cet appareil.</string>
@@ -121,7 +132,6 @@
     <!-- Tiroirs d’applications -->
     <string name="pref_drawers">Tiroirs d’applications</string>
     <string name="pref_drawers_summary">Créez des tiroirs en molette et associez-les aux balayages de bord</string>
-    <string name="drawer_choose">Choisir un tiroir</string>
     <string name="drawer_add">Ajouter un tiroir</string>
     <string name="drawer_add_title">Nouveau tiroir</string>
     <string name="drawer_name_hint">Nom du tiroir</string>
@@ -130,7 +140,6 @@
     <string name="drawer_delete">Supprimer le tiroir</string>
     <string name="drawer_action_named">Tiroir : %1$s</string>
     <string name="drawer_pick_for_gesture">Quel tiroir ?</string>
-    <string name="drawer_count_summary">%1$d applications</string>
 
     <!-- Notifications -->
     <string name="cat_notifications">Notifications</string>

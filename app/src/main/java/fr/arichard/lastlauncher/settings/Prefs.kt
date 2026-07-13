@@ -43,6 +43,34 @@ class Prefs(context: Context) {
     /** App opened by tapping the clock; empty = the system clock app. */
     val clockTapTarget: String get() = sp.getString(KEY_CLOCK_TAP, "") ?: ""
 
+    // ------------------------------------------------------------------ weather
+
+    /** Show a weather chip by the clock (needs location + network). Off by default. */
+    val weatherEnabled: Boolean get() = sp.getBoolean(KEY_WEATHER_ENABLED, false)
+
+    /** "c" or "f" — display units for the weather temperature. */
+    val weatherUnits: String get() = sp.getString(KEY_WEATHER_UNITS, "c") ?: "c"
+
+    /** What the chip shows: "icon_temp", "temp", or "icon". */
+    val weatherStyle: String get() = sp.getString(KEY_WEATHER_STYLE, "icon_temp") ?: "icon_temp"
+
+    /** App opened when the weather chip is tapped; empty = a weather web search. */
+    val weatherTapTarget: String get() = sp.getString(KEY_WEATHER_TAP, "") ?: ""
+
+    val weatherHasCache: Boolean get() = sp.contains(KEY_WEATHER_TEMP)
+    val weatherTempC: Double
+        get() = java.lang.Double.longBitsToDouble(sp.getLong(KEY_WEATHER_TEMP, 0))
+    val weatherCode: Int get() = sp.getInt(KEY_WEATHER_CODE, 0)
+    val weatherLastFetch: Long get() = sp.getLong(KEY_WEATHER_FETCH, 0)
+
+    fun saveWeather(tempC: Double, code: Int) {
+        sp.edit()
+            .putLong(KEY_WEATHER_TEMP, java.lang.Double.doubleToRawLongBits(tempC))
+            .putInt(KEY_WEATHER_CODE, code)
+            .putLong(KEY_WEATHER_FETCH, System.currentTimeMillis())
+            .apply()
+    }
+
     // ------------------------------------------------------------ app drawers
 
     /** One configurable slide-out drawer: a name plus its apps (empty = every app). */
@@ -183,6 +211,13 @@ class Prefs(context: Context) {
         const val KEY_UPDATE_DEFERRED = "update_deferred"
         const val KEY_HIDDEN_APPS = "hidden_apps"
         const val KEY_CLOCK_TAP = "clock_tap_app"
+        const val KEY_WEATHER_ENABLED = "weather_enabled"
+        const val KEY_WEATHER_UNITS = "weather_units"
+        const val KEY_WEATHER_STYLE = "weather_style"
+        const val KEY_WEATHER_TAP = "weather_tap_app"
+        const val KEY_WEATHER_TEMP = "weather_temp_c"
+        const val KEY_WEATHER_CODE = "weather_code"
+        const val KEY_WEATHER_FETCH = "weather_last_fetch"
         const val KEY_FAVORITES = "favorite_apps"
         const val KEY_DRAWER_APPS = "drawer_apps" // legacy single drawer, migrated
         const val KEY_DRAWER_COUNT = "drawer_count"

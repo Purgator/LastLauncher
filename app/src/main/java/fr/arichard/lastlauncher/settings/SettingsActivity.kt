@@ -20,6 +20,7 @@ import fr.arichard.lastlauncher.lock.LockService
 import fr.arichard.lastlauncher.notify.NotifListener
 import fr.arichard.lastlauncher.predict.PredictionEngine
 import fr.arichard.lastlauncher.ui.AppPickerDialog
+import fr.arichard.lastlauncher.weather.WeatherProvider
 import fr.arichard.lastlauncher.update.UpdateManager
 import java.util.concurrent.Executors
 
@@ -67,6 +68,20 @@ class SettingsActivity : AppCompatActivity() {
                 updateClockTapSummary(pref)
                 pref.setOnPreferenceClickListener {
                     showClockTapDialog(pref)
+                    true
+                }
+            }
+
+            findPreference<SwitchPreferenceCompat>("weather_enabled")
+                ?.setOnPreferenceChangeListener { _, newValue ->
+                    if (newValue == true) requestLocationForWeather()
+                    true
+                }
+
+            findPreference<Preference>("weather_tap")?.let { pref ->
+                updateWeatherTapSummary(pref)
+                pref.setOnPreferenceClickListener {
+                    showWeatherTapDialog(pref)
                     true
                 }
             }
@@ -287,6 +302,40 @@ class SettingsActivity : AppCompatActivity() {
                 preferenceManager.sharedPreferences?.edit()
                     ?.putString(Prefs.KEY_CLOCK_TAP, value)?.apply()
                 updateClockTapSummary(pref)
+            }
+        }
+
+        private fun requestLocationForWeather() {
+            val context = requireContext()
+            if (WeatherProvider.hasLocationPermission(context)) return
+            requestPermissions(
+                arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION), 42
+            )
+            Toast.makeText(context, R.string.weather_needs_location, Toast.LENGTH_SHORT).show()
+        }
+
+        private fun updateWeatherTapSummary(pref: Preference) {
+            val context = requireContext()
+            val repo = (context.applicationContext as LauncherApp).repo
+            pref.summary = repo.byComponentKey(Prefs(context).weatherTapTarget)?.label
+                ?: getString(R.string.weather_tap_default)
+        }
+
+        private fun showWeatherTapDialog(pref: Preference) {
+            val context = requireContext()
+            val repo = (context.applicationContext as LauncherApp).repo
+            val apps = repo.apps
+            val items = listOf(AppPickerDialog.Item(getString(R.string.weather_tap_default), null)) +
+                apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
+            val current = Prefs(context).weatherTapTarget
+            val checkedIndex = apps.indexOfFirst { it.componentKey == current } + 1
+            AppPickerDialog.singleChoice(
+                context, getString(R.string.pref_weather_tap), items, checkedIndex
+            ) { which ->
+                val value = if (which == 0) "" else apps[which - 1].componentKey
+                preferenceManager.sharedPreferences?.edit()
+                    ?.putString(Prefs.KEY_WEATHER_TAP, value)?.apply()
+                updateWeatherTapSummary(pref)
             }
         }
 

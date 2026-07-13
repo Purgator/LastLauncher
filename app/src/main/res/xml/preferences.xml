@@ -22,6 +22,34 @@
             android:title="@string/pref_clock_tap" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/cat_weather">
+        <SwitchPreferenceCompat
+            android:key="weather_enabled"
+            android:title="@string/pref_weather_enabled"
+            android:summary="@string/pref_weather_enabled_summary"
+            android:defaultValue="false" />
+        <ListPreference
+            android:key="weather_units"
+            android:title="@string/pref_weather_units"
+            android:entries="@array/weather_units_entries"
+            android:entryValues="@array/weather_units_values"
+            android:defaultValue="c"
+            android:dependency="weather_enabled"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            android:key="weather_style"
+            android:title="@string/pref_weather_style"
+            android:entries="@array/weather_style_entries"
+            android:entryValues="@array/weather_style_values"
+            android:defaultValue="icon_temp"
+            android:dependency="weather_enabled"
+            app:useSimpleSummaryProvider="true" />
+        <Preference
+            android:key="weather_tap"
+            android:title="@string/pref_weather_tap"
+            android:dependency="weather_enabled" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/cat_suggestions">
         <SwitchPreferenceCompat
             android:key="predictions"
