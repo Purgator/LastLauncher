@@ -70,4 +70,60 @@ class StatusLineTest {
         assertFalse(line.contains("↑"))
         assertTrue(line.contains("off"))
     }
+
+    // ------------------------------------------------- next-alarm reconciliation
+
+    private fun min(h: Int, m: Int) = h * 60 + m
+
+    @Test
+    fun parsesOemNextAlarmFormats() {
+        assertEquals(min(7, 30), StatusLine.parseTimeOfDay("ven. 07:30"))
+        assertEquals(min(7, 5), StatusLine.parseTimeOfDay("7h05"))
+        assertEquals(min(8, 0), StatusLine.parseTimeOfDay("Tue 8:00"))
+        assertEquals(min(20, 0), StatusLine.parseTimeOfDay("8:00 PM"))
+        assertEquals(min(20, 0), StatusLine.parseTimeOfDay("Tue 8:00 p.m."))
+        assertEquals(min(0, 15), StatusLine.parseTimeOfDay("12:15 AM"))
+        assertEquals(min(12, 15), StatusLine.parseTimeOfDay("12:15 PM"))
+        assertEquals(null, StatusLine.parseTimeOfDay(null))
+        assertEquals(null, StatusLine.parseTimeOfDay(""))
+        assertEquals(null, StatusLine.parseTimeOfDay("no alarm"))
+        assertEquals(null, StatusLine.parseTimeOfDay("99:99"))
+    }
+
+    @Test
+    fun formattedTimeWinsInsideThePrewakeWindow() {
+        // MIUI: trigger reports 07:50 for an alarm the Clock app shows at 08:00.
+        assertEquals(
+            min(8, 0), StatusLine.reconcileAlarmMinutes(min(8, 0), min(7, 50))
+        )
+        // Identical values are trivially consistent.
+        assertEquals(
+            min(8, 0), StatusLine.reconcileAlarmMinutes(min(8, 0), min(8, 0))
+        )
+        // Pre-wake window wraps midnight: trigger 23:55 for a 00:05 alarm.
+        assertEquals(
+            min(0, 5), StatusLine.reconcileAlarmMinutes(min(0, 5), min(23, 55))
+        )
+    }
+
+    @Test
+    fun staleOrTimezoneShiftedFormattedStringIsDiscarded() {
+        // A two-hour shift (UTC-formatted string on a UTC+2 device) must lose to
+        // the framework trigger time.
+        assertEquals(
+            min(8, 0), StatusLine.reconcileAlarmMinutes(min(6, 0), min(8, 0))
+        )
+        // A stale string pointing at some old alarm loses too.
+        assertEquals(
+            min(8, 0), StatusLine.reconcileAlarmMinutes(min(14, 30), min(8, 0))
+        )
+        // Formatted BEFORE the trigger is never a pre-wake shift — discard.
+        assertEquals(
+            min(8, 0), StatusLine.reconcileAlarmMinutes(min(7, 50), min(8, 0))
+        )
+        // No parseable string: trigger time as-is.
+        assertEquals(
+            min(8, 0), StatusLine.reconcileAlarmMinutes(null, min(8, 0))
+        )
+    }
 }
