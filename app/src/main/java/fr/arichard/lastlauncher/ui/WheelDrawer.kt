@@ -63,6 +63,7 @@ class WheelDrawer @JvmOverloads constructor(
     val isVisibleAtAll: Boolean get() = progress > 0f
 
     private var progress = 0f          // 0 closed .. 1 open; drives the roll-in
+    private var announcedOpen = false  // onOpened fired for the current fully-open state
     private var scrollAngle = 0f       // 0 .. maxScroll(), rolls the wheel
     private var apps: List<AppEntry> = emptyList()
     private val items = ArrayList<ItemWheelBinding>()
@@ -90,6 +91,14 @@ class WheelDrawer @JvmOverloads constructor(
 
     /** Screen-space drag position updates while the finger is over this drawer. */
     var onDragMoved: (Float, Float) -> Unit = { _, _ -> }
+
+    /**
+     * A swipe over the band that isn't the drawer's own (close drag, wheel roll):
+     * inward horizontals and multi-finger swipes land here so the host can run the
+     * matching gesture action — the open drawer must not eat its side's gestures.
+     * (dx, dy, durationMs, maxFingers).
+     */
+    var onSwipe: (Float, Float, Long, Int) -> Unit = { _, _, _, _ -> }
 
     init {
         clipChildren = false
@@ -279,6 +288,7 @@ class WheelDrawer @JvmOverloads constructor(
     private fun applyProgress(p: Float) {
         val wasVisible = progress > 0f
         progress = p.coerceIn(0f, 1f)
+        if (progress < 1f) announcedOpen = false
         visibility = if (progress <= 0f) GONE else VISIBLE
         if (wasVisible != progress > 0f) onVisibleChanged(progress > 0f)
         layoutIcons()
@@ -301,10 +311,16 @@ class WheelDrawer @JvmOverloads constructor(
 
     private fun animateTo(target: Float, animate: Boolean) {
         settleAnimator?.cancel()
-        val wasOpen = isOpen
+        flingAnimator?.cancel()
+        // onOpened must fire whenever the wheel clicks into place, including a drag
+        // that already crossed the half-open mark before release — announcedOpen
+        // (reset while below 1) dedupes instead of the pre-settle isOpen state.
         fun settled() {
             if (target <= 0f) onClosed()
-            else if (target >= 1f && !wasOpen) onOpened()
+            else if (target >= 1f && !announcedOpen) {
+                announcedOpen = true
+                onOpened()
+            }
         }
         if (!animate) {
             applyProgress(target)
@@ -328,7 +344,9 @@ class WheelDrawer @JvmOverloads constructor(
 
     private var downX = 0f
     private var downY = 0f
+    private var downTime = 0L
     private var downScroll = 0f
+    private var maxPointers = 1
     private var mode = Mode.NONE
     private var tracker: VelocityTracker? = null
     private var flingAnimator: ValueAnimator? = null
@@ -353,7 +371,7 @@ class WheelDrawer @JvmOverloads constructor(
         }
     }
 
-    private enum class Mode { NONE, SCROLL, CLOSE }
+    private enum class Mode { NONE, SCROLL, CLOSE, FORWARD }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
@@ -361,12 +379,16 @@ class WheelDrawer @JvmOverloads constructor(
                 flingAnimator?.cancel() // catch the rolling wheel
                 downX = ev.rawX
                 downY = ev.rawY
+                downTime = ev.eventTime
                 downScroll = scrollAngle
+                maxPointers = 1
                 mode = Mode.NONE
                 tracker?.recycle()
                 tracker = VelocityTracker.obtain()
                 tracker?.addMovement(ev)
             }
+            MotionEvent.ACTION_POINTER_DOWN ->
+                maxPointers = maxOf(maxPointers, ev.pointerCount)
             MotionEvent.ACTION_MOVE -> {
                 tracker?.addMovement(ev)
                 decideMode(ev)
@@ -382,6 +404,8 @@ class WheelDrawer @JvmOverloads constructor(
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         tracker?.addMovement(ev)
         when (ev.actionMasked) {
+            MotionEvent.ACTION_POINTER_DOWN ->
+                maxPointers = maxOf(maxPointers, ev.pointerCount)
             MotionEvent.ACTION_MOVE -> {
                 if (mode == Mode.NONE) decideMode(ev)
                 when (mode) {
@@ -397,7 +421,7 @@ class WheelDrawer @JvmOverloads constructor(
                         val outward = if (side < 0) downX - ev.rawX else ev.rawX - downX
                         applyProgress(1f - outward / band())
                     }
-                    Mode.NONE -> {}
+                    Mode.FORWARD, Mode.NONE -> {}
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -410,6 +434,11 @@ class WheelDrawer @JvmOverloads constructor(
                     val vy = tracker?.let { it.computeCurrentVelocity(1000); it.yVelocity } ?: 0f
                     // Drag up (negative vy) rolls the wheel forward.
                     startFling(-vy * ARC_SPAN / (height.coerceAtLeast(1)).toFloat())
+                } else if (mode == Mode.FORWARD && ev.actionMasked == MotionEvent.ACTION_UP) {
+                    onSwipe(
+                        ev.rawX - downX, ev.rawY - downY,
+                        ev.eventTime - downTime, maxPointers,
+                    )
                 } else if (wasTap && ev.actionMasked == MotionEvent.ACTION_UP) {
                     // Tap on the band's empty space: dismiss, matching the home tap.
                     performClick()
@@ -429,10 +458,23 @@ class WheelDrawer @JvmOverloads constructor(
             mode = Mode.SCROLL
             downY = ev.rawY // avoid the initial slop jump
             downScroll = scrollAngle
-        } else {
+        } else if (abs(dx) > slop && abs(dx) > abs(dy)) {
             val outward = if (side < 0) dx < 0 else dx > 0
-            if (outward && abs(dx) > slop && abs(dx) > abs(dy)) mode = Mode.CLOSE
+            // Outward is the drawer's own close drag; inward belongs to the host
+            // (same-side gesture bindings must keep working over an open drawer).
+            // Inward asks for double the slop: it steals the touch from an icon
+            // tap, so a slightly sloppy tap must not be mistaken for a swipe.
+            if (outward) mode = Mode.CLOSE
+            else if (abs(dx) > slop * 2) mode = Mode.FORWARD
         }
+    }
+
+    override fun onDetachedFromWindow() {
+        settleAnimator?.cancel()
+        flingAnimator?.cancel()
+        tracker?.recycle()
+        tracker = null
+        super.onDetachedFromWindow()
     }
 
     private companion object {

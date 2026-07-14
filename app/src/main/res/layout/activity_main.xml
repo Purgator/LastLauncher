@@ -425,9 +425,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
-        android:text="✦ ✧ ✦"
+        android:text="✧ ✦ ✧ ✦ ✧"
         android:textColor="@color/accent_cyan"
-        android:textSize="16sp"
+        android:textSize="20sp"
         android:importantForAccessibility="no"
         android:visibility="gone" />
 
