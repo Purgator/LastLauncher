@@ -6,12 +6,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
+import android.view.HapticFeedbackConstants
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import fr.arichard.lastlauncher.R
 import fr.arichard.lastlauncher.databinding.DialogAppListBinding
 import fr.arichard.lastlauncher.databinding.ItemAppChoiceBinding
+import fr.arichard.lastlauncher.settings.Prefs
 
 /**
  * App-selection dialogs that show each app's real icon — used everywhere the launcher
@@ -91,9 +93,13 @@ object AppPickerDialog {
             holder.binding.choiceLabel.text = item.label
             holder.binding.choiceIcon.setImageDrawable(item.icon)
             holder.binding.choiceCheck.isChecked = checked[position]
-            holder.binding.root.setOnClickListener {
+            holder.binding.root.setOnClickListener { view ->
                 val p = holder.bindingAdapterPosition
                 if (p == RecyclerView.NO_POSITION) return@setOnClickListener
+                // Picking is a deliberate action: same tick as the rest of the app.
+                if (Prefs(view.context).haptics) {
+                    view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                }
                 if (onClick(p)) holder.binding.choiceCheck.isChecked = checked[p]
             }
         }
