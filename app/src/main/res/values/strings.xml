@@ -214,6 +214,7 @@
     <string name="insights_ranking_title">Current ranking (top 10)</string>
     <string name="insights_no_data">no data yet — launch some apps!</string>
     <string name="insights_footer">◈ = current trio · ↑boost = boosted by you · ✉ = active notifications\nEverything above lives only on this phone.</string>
+    <string name="insights_alarm_title">Next alarm — raw system sources</string>
 
     <string name="cat_updates">Updates</string>
     <string name="pref_auto_update">Automatic updates</string>
