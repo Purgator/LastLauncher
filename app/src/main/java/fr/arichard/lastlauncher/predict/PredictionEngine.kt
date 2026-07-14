@@ -55,6 +55,13 @@ object PredictionEngine {
     private const val BOOST_FACTOR = 1.35
     private const val BOOST_BASE = 1.0
 
+    // The app just opened is almost never wanted again right away — crush its score
+    // for a while. Exception: within the first seconds (an accidental exit) it keeps
+    // its full rank so reopening is one tap.
+    private const val JUST_USED_FACTOR = 0.05
+    private const val MISTAKE_WINDOW_MS = 15_000L
+    private const val JUST_USED_WINDOW_MS = 45L * 60_000
+
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "predict") }
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -71,6 +78,7 @@ object PredictionEngine {
         val prev = prefs.lastLaunchedPkg
         prefs.lastLaunchedPkg = pkg
         val now = System.currentTimeMillis()
+        prefs.lastLaunchedTs = now
         val cal = Calendar.getInstance()
         val event = ContextSignals.activeEvent(now)
         executor.execute {
@@ -108,15 +116,22 @@ object PredictionEngine {
         val appContext = context.applicationContext
         executor.execute {
             val result = try {
-                score(appContext)
+                score(appContext).toMutableMap()
             } catch (e: Exception) {
                 Log.w(TAG, "Prediction failed", e)
-                emptyMap()
+                mutableMapOf()
             }
             val prefs = Prefs(appContext)
             val hidden = prefs.hiddenApps
+            fun eligible(pkg: String) = pkg !in hidden
+
+            // The just-opened app is crushed (it's one tap away in recents anyway) —
+            // unless it was exited within seconds, i.e. probably by mistake.
             val prev = prefs.lastLaunchedPkg
-            fun eligible(pkg: String) = pkg !in hidden && pkg != prev
+            val sincePrev = System.currentTimeMillis() - prefs.lastLaunchedTs
+            if (prev != null && sincePrev in MISTAKE_WINDOW_MS..JUST_USED_WINDOW_MS) {
+                result[prev] = (result[prev] ?: 0.0) * JUST_USED_FACTOR
+            }
 
             // Confident learned predictions first…
             val ranked = result.entries.asSequence()

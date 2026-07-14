@@ -24,6 +24,14 @@ class LauncherApp : Application() {
     private fun registerPackageChanges() {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                // A genuinely new install (not an update) enters the spotlight.
+                if (intent.action == Intent.ACTION_PACKAGE_ADDED &&
+                    !intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+                ) {
+                    intent.data?.schemeSpecificPart?.let {
+                        fr.arichard.lastlauncher.settings.Prefs(context).addNewApp(it)
+                    }
+                }
                 repo.load()
             }
         }
