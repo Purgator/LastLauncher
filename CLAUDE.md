@@ -103,12 +103,14 @@ the two `WheelDrawer`s (last = on top).
 - Both drawers can be open at once; they are non-modal (home stays usable). A tap on
   empty home closes them; the keyboard appearing closes them; opening one drops the
   keyboard. A swipe matching a drawer's closing direction closes it; other swipes run
-  their bound action even over an open drawer.
+  their bound action even over an open drawer (the drawer forwards inward and
+  multi-finger swipes to the host instead of eating them).
 - Edge pulls (40 dp zones) track the finger when that edge's gesture slot is bound to
   a drawer; flings elsewhere fire `GestureBinding` actions (1- vs 2-finger slots).
-- Suggestions: trio = top of a 12-deep ranking; horizontal swipe on the row pages it
-  (live glow + sparkle feedback, coin-flip switch). Long-press = menu, or drag into
-  an open drawer. The just-launched app is excluded-ish for 45 min (15 s grace).
+- Suggestions: trio = top of a 12-deep ranking; a one-finger horizontal swipe
+  starting anywhere from mid-screen down to the row pages it (live glow + sparkle
+  feedback, coin-flip switch). Long-press = menu, or drag into an open drawer. The
+  just-launched app is excluded-ish for 45 min (15 s grace).
 - Haptics on every deliberate action, gated by `prefs.haptics` via `haptic(view)`.
 - Hints, spotlight and ticker all yield to drawers/search and stop on pause.
 
