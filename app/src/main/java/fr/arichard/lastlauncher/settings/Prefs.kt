@@ -188,6 +188,54 @@ class Prefs(context: Context) {
         get() = sp.getString(KEY_LAST_LAUNCHED, null)
         set(value) = sp.edit().putString(KEY_LAST_LAUNCHED, value).apply()
 
+    /** When the last launch happened; drives the "just used" suggestion penalty. */
+    var lastLaunchedTs: Long
+        get() = sp.getLong(KEY_LAST_LAUNCHED_TS, 0)
+        set(value) = sp.edit().putLong(KEY_LAST_LAUNCHED_TS, value).apply()
+
+    // ---------------------------------------------------------- new-app spotlight
+
+    val newAppSpotEnabled: Boolean get() = sp.getBoolean(KEY_NEW_APP_ENABLED, true)
+
+    /** Which edge the spotlight sits on: "left" or "right". */
+    val newAppSide: String get() = sp.getString(KEY_NEW_APP_SIDE, "right") ?: "right"
+
+    /** How long a fresh install keeps shining, in hours. */
+    val newAppHours: Int get() = sp.getInt(KEY_NEW_APP_HOURS, 24).coerceIn(1, 72)
+
+    /** Freshly installed apps still within the spotlight window, newest first. */
+    fun newApps(now: Long = System.currentTimeMillis()): List<String> {
+        val cutoff = now - newAppHours * 3_600_000L
+        val entries = readNewApps()
+        val live = entries.filter { it.second >= cutoff }
+        if (live.size != entries.size) writeNewApps(live)
+        return live.sortedByDescending { it.second }.map { it.first }
+    }
+
+    fun addNewApp(pkg: String, now: Long = System.currentTimeMillis()) {
+        val kept = readNewApps().filter { it.first != pkg }
+        writeNewApps((kept + (pkg to now)).takeLast(MAX_NEW_APPS))
+    }
+
+    fun removeNewApp(pkg: String) {
+        writeNewApps(readNewApps().filter { it.first != pkg })
+    }
+
+    private fun readNewApps(): List<Pair<String, Long>> =
+        (sp.getString(KEY_NEW_APPS, "") ?: "")
+            .split(',')
+            .mapNotNull {
+                val sep = it.lastIndexOf('|')
+                if (sep <= 0) null
+                else it.substring(0, sep) to (it.substring(sep + 1).toLongOrNull() ?: 0L)
+            }
+
+    private fun writeNewApps(entries: List<Pair<String, Long>>) {
+        sp.edit().putString(
+            KEY_NEW_APPS, entries.joinToString(",") { "${it.first}|${it.second}" }
+        ).apply()
+    }
+
     fun hideApp(pkg: String) {
         hiddenApps = hiddenApps + pkg
     }
@@ -251,6 +299,12 @@ class Prefs(context: Context) {
         const val KEY_ONBOARDING_DONE = "onboarding_done"
         const val KEY_BT_PERM_ASKED = "bt_permission_asked"
         const val KEY_LAST_LAUNCHED = "last_launched_pkg"
+        const val KEY_LAST_LAUNCHED_TS = "last_launched_ts"
+        const val KEY_NEW_APP_ENABLED = "new_app_spot_enabled"
+        const val KEY_NEW_APP_SIDE = "new_app_side"
+        const val KEY_NEW_APP_HOURS = "new_app_hours"
+        const val KEY_NEW_APPS = "new_apps"
+        const val MAX_NEW_APPS = 10
         const val KEY_SEARCH_MODE = "search_mode"
     }
 }

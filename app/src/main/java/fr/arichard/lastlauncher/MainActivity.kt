@@ -133,12 +133,14 @@ class MainActivity : AppCompatActivity() {
         NotifListener.ensureBound(this)
         startTicker()
         refreshWeather()
+        updateNewAppSpot()
     }
 
     override fun onPause() {
         super.onPause()
         stopHints()
         stopTicker()
+        stopNewAppSpot()
         unregisterStatusReceiver()
     }
 
@@ -296,7 +298,8 @@ class MainActivity : AppCompatActivity() {
             val inward = (drawerCandidateSide < 0 && dx > 0) || (drawerCandidateSide > 0 && dx < 0)
             if (!inward) { drawerCandidateSide = 0; return }
             drawerDragging = true
-            drawerForSide(drawerCandidateSide).bind(drawerContents(drawerCandidateIndex))
+            drawerForSide(drawerCandidateSide)
+                .bind(drawerContents(drawerCandidateIndex), drawerCandidateIndex)
         }
         val drawer = drawerForSide(drawerCandidateSide)
         // Inward finger travel maps straight to the open amount.
@@ -309,18 +312,22 @@ class MainActivity : AppCompatActivity() {
         val minDist = 90 * density
         val fingers = maxPointers.coerceIn(1, 2)
         if (abs(dx) > abs(dy) && abs(dx) > minDist) {
-            // With a drawer out, horizontal swipes only manage drawers: the swipe whose
-            // direction matches an open drawer's closing motion closes it, nothing else
-            // fires. Prevents "closing" the right drawer from opening the left one.
-            if (anyDrawerOpen) {
-                if (dx > 0 && binding.rightDrawer.isVisibleAtAll) {
-                    binding.rightDrawer.close(animate = true)
-                } else if (dx < 0 && binding.leftDrawer.isVisibleAtAll) {
-                    binding.leftDrawer.close(animate = true)
-                }
+            // Across the suggestions row, a horizontal swipe pages the proposed trio.
+            if (binding.suggestionsBlock.visibility == View.VISIBLE && downInSuggestions()) {
+                cycleSuggestions(if (dx < 0) 1 else -1)
                 return
             }
-            // Horizontal: direction picks the edge set, finger count picks the slot.
+            // A swipe matching an open drawer's closing motion closes it and stops there.
+            if (dx > 0 && binding.rightDrawer.isVisibleAtAll) {
+                binding.rightDrawer.close(animate = true)
+                return
+            }
+            if (dx < 0 && binding.leftDrawer.isVisibleAtAll) {
+                binding.leftDrawer.close(animate = true)
+                return
+            }
+            // Otherwise the bound action runs even while that side's drawer is open: a
+            // drawer action swaps the wheel in place, a system action leaves it open.
             val key = when {
                 dx > 0 && fingers == 1 -> Prefs.KEY_GESTURE_LR_1
                 dx > 0 -> Prefs.KEY_GESTURE_LR_2
@@ -334,6 +341,16 @@ class MainActivity : AppCompatActivity() {
             if (dy < 0) openAllApps()
             else if (prefs.swipeDownNotifications) LockService.openNotificationShade(this)
         }
+    }
+
+    /** True when the gesture started within the suggestions row's vertical band. */
+    private fun downInSuggestions(): Boolean {
+        val loc = IntArray(2)
+        binding.suggestionsBlock.getLocationInWindow(loc)
+        val rootLoc = IntArray(2)
+        binding.root.getLocationInWindow(rootLoc)
+        val top = (loc[1] - rootLoc[1]).toFloat()
+        return downY >= top && downY <= top + binding.suggestionsBlock.height
     }
 
     private fun runGesture(bindingSpec: GestureBinding, drawerSide: Int = -1) {
@@ -373,17 +390,19 @@ class MainActivity : AppCompatActivity() {
     private fun setupDrawer() {
         for (drawer in listOf(binding.leftDrawer to -1, binding.rightDrawer to 1)) {
             val view = drawer.first
+            view.onAppDropped = { key, from, to, position -> handleAppDrop(key, from, to, position) }
             view.init(
                 side = drawer.second,
                 iconOf = { entry -> repo.icon(entry) },
                 badgeOf = { pkg -> badgeFor(pkg) },
                 onClick = { entry, v -> view.close(animate = false); launchApp(entry, v) },
-                onLongClick = { entry, v -> showAppMenu(entry, v) },
+                onLongClick = { _, v -> haptic(v) }, // drag pickup feedback
                 onClosed = {},
                 onVisibleChanged = { visible ->
                     // The gesture hint on a drawer's side yields to the drawer.
                     val hint = if (drawer.second < 0) binding.hintLeft else binding.hintRight
                     if (visible) hint.visibility = View.INVISIBLE else startHints()
+                    updateNewAppSpot()
                     // Drop the keyboard while a drawer is out so the command bar sits
                     // at the bottom instead of riding up into the wheel; bring it back
                     // once every drawer is gone.
@@ -428,8 +447,43 @@ class MainActivity : AppCompatActivity() {
 
     private fun openDrawer(side: Int, index: Int, animate: Boolean) {
         val drawer = drawerForSide(side)
-        drawer.bind(drawerContents(index))
+        drawer.bind(drawerContents(index), index)
         drawer.open(animate && prefs.animations)
+    }
+
+    /** Applies a drag & drop: reorder within a drawer, or move/copy into another. */
+    private fun handleAppDrop(componentKey: String, from: Int, to: Int, position: Int) {
+        val target = prefs.drawer(to)
+        if (target.apps.isEmpty()) {
+            // "All apps" drawers have no explicit order to edit.
+            Toast.makeText(this, R.string.drawer_drop_needs_list, Toast.LENGTH_LONG).show()
+            return
+        }
+        val list = target.apps.toMutableList()
+        val oldIndex = list.indexOf(componentKey)
+        list.remove(componentKey)
+        // Removing an earlier occurrence shifts the insertion point left by one.
+        val insertAt = (if (oldIndex in 0 until position) position - 1 else position)
+            .coerceIn(0, list.size)
+        list.add(insertAt, componentKey)
+        prefs.saveDrawer(to, target.name, list)
+        if (from >= 0 && from != to) {
+            val source = prefs.drawer(from)
+            if (source.apps.isNotEmpty()) {
+                prefs.saveDrawer(from, source.name, source.apps - componentKey)
+            }
+        }
+        haptic(binding.root)
+        refreshOpenDrawers()
+    }
+
+    /** Re-reads the visible drawers' contents after a drag & drop mutation. */
+    private fun refreshOpenDrawers() {
+        for (drawer in listOf(binding.leftDrawer, binding.rightDrawer)) {
+            if (drawer.isVisibleAtAll) {
+                drawer.bind(drawerContents(drawer.boundIndex), drawer.boundIndex)
+            }
+        }
     }
 
     private fun setupSearch() {
@@ -504,15 +558,26 @@ class MainActivity : AppCompatActivity() {
         binding.suggestMain.setOnClickListener { v -> suggestionAt(0)?.let { launchApp(it, v) } }
         binding.suggestLeft.setOnClickListener { v -> suggestionAt(1)?.let { launchApp(it, v) } }
         binding.suggestRight.setOnClickListener { v -> suggestionAt(2)?.let { launchApp(it, v) } }
-        binding.suggestMain.setOnLongClickListener { v ->
-            suggestionAt(0)?.let { showAppMenu(it, v) }; true
+        // Long-press: menu normally; with a drawer open, start a drag into it instead.
+        fun longPress(rank: Int, v: View): Boolean {
+            val entry = suggestionAt(rank) ?: return true
+            if (anyDrawerOpen) startAppDrag(entry, v, fromDrawer = -1)
+            else showAppMenu(entry, v)
+            return true
         }
-        binding.suggestLeft.setOnLongClickListener { v ->
-            suggestionAt(1)?.let { showAppMenu(it, v) }; true
-        }
-        binding.suggestRight.setOnLongClickListener { v ->
-            suggestionAt(2)?.let { showAppMenu(it, v) }; true
-        }
+        binding.suggestMain.setOnLongClickListener { v -> longPress(0, v) }
+        binding.suggestLeft.setOnLongClickListener { v -> longPress(1, v) }
+        binding.suggestRight.setOnLongClickListener { v -> longPress(2, v) }
+    }
+
+    /** Starts a system drag carrying the app; open drawers accept the drop. */
+    private fun startAppDrag(entry: AppEntry, sourceView: View, fromDrawer: Int) {
+        haptic(sourceView)
+        val data = android.content.ClipData.newPlainText("app", entry.componentKey)
+        sourceView.startDragAndDrop(
+            data, View.DragShadowBuilder(sourceView),
+            WheelDrawer.DragPayload(entry.componentKey, fromDrawer), 0
+        )
     }
 
     private var suggestions: List<AppEntry?> = listOf(null, null, null)
@@ -551,6 +616,7 @@ class MainActivity : AppCompatActivity() {
         stopHints()
         binding.hintLeft.visibility = View.GONE
         binding.hintRight.visibility = View.GONE
+        updateNewAppSpot()
     }
 
     /** Command rows for the current mode, including the "ask the assistant" row. */
@@ -596,6 +662,7 @@ class MainActivity : AppCompatActivity() {
         binding.results.visibility = View.GONE
         binding.suggestionsBlock.visibility = View.VISIBLE
         startHints()
+        updateNewAppSpot()
         if (prefs.keyboardAlways) {
             focusSearch(show = true)
         } else {
@@ -978,8 +1045,20 @@ class MainActivity : AppCompatActivity() {
         val arrows = if (hintStep == 0) 1 else 2
         val leftKey = if (hintStep == 0) Prefs.KEY_GESTURE_LR_1 else Prefs.KEY_GESTURE_LR_2
         val rightKey = if (hintStep == 0) Prefs.KEY_GESTURE_RL_1 else Prefs.KEY_GESTURE_RL_2
-        val hasLeft = setHintText(binding.hintLeft, leftEdgeText(leftKey, arrows), 0f)
-        val hasRight = setHintText(binding.hintRight, rightEdgeText(rightKey, arrows), 0f)
+        // An open drawer owns its edge: no hint runs behind it. (The cycle keeps
+        // running so the hint returns as soon as the drawer closes.)
+        val hasLeft = if (binding.leftDrawer.isVisibleAtAll) {
+            binding.hintLeft.visibility = View.GONE
+            false
+        } else {
+            setHintText(binding.hintLeft, leftEdgeText(leftKey, arrows), 0f)
+        }
+        val hasRight = if (binding.rightDrawer.isVisibleAtAll) {
+            binding.hintRight.visibility = View.GONE
+            false
+        } else {
+            setHintText(binding.hintRight, rightEdgeText(rightKey, arrows), 0f)
+        }
         if (!hasLeft && !hasRight) {
             // This step is unbound on both edges; show the other one next pass.
             hintStep = hintStep xor 1
@@ -1080,6 +1159,7 @@ class MainActivity : AppCompatActivity() {
                 getString(if (boosted) R.string.menu_unboost else R.string.menu_boost),
                 icon(R.drawable.ic_boost)
             ),
+            AppPickerDialog.Item(getString(R.string.menu_add_to_drawer), icon(R.drawable.ic_apps)),
             AppPickerDialog.Item(getString(R.string.menu_app_info), icon(R.drawable.ic_info)),
             AppPickerDialog.Item(getString(R.string.menu_hide), icon(R.drawable.ic_eye_off)),
             AppPickerDialog.Item(getString(R.string.menu_uninstall), icon(R.drawable.ic_delete)),
@@ -1092,25 +1172,51 @@ class MainActivity : AppCompatActivity() {
                         else prefs.boostedApps + entry.packageName
                     refreshSuggestions()
                 }
-                1 -> startActivitySafely(
+                1 -> pickDrawerFor(entry)
+                2 -> startActivitySafely(
                     Intent(
                         Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         Uri.parse("package:${entry.packageName}")
                     )
                 )
-                2 -> {
+                3 -> {
                     prefs.hideApp(entry.packageName)
                     refreshSuggestions()
                     onQueryChanged(binding.searchInput.text.toString())
                 }
-                3 -> startActivitySafely(
+                4 -> startActivitySafely(
                     Intent(Intent.ACTION_DELETE, Uri.parse("package:${entry.packageName}"))
                 )
             }
         }
     }
 
+    /** "Add to a drawer…": appends the app to the chosen drawer's list. */
+    private fun pickDrawerFor(entry: AppEntry) {
+        val drawers = prefs.drawers()
+        val items = drawers.map {
+            AppPickerDialog.Item(
+                it.name, androidx.core.content.ContextCompat.getDrawable(this, R.drawable.ic_apps)
+            )
+        }
+        AppPickerDialog.singleChoice(this, getString(R.string.menu_add_to_drawer), items, -1) { which ->
+            val drawer = drawers[which]
+            if (drawer.apps.isEmpty()) {
+                Toast.makeText(this, R.string.drawer_drop_needs_list, Toast.LENGTH_LONG).show()
+            } else {
+                prefs.saveDrawer(
+                    drawer.index, drawer.name, (drawer.apps - entry.componentKey) + entry.componentKey
+                )
+                refreshOpenDrawers()
+            }
+        }
+    }
+
     // ---------------------------------------------------------- predictions
+
+    // A deeper ranking than the visible trio: swiping the row pages through it.
+    private var suggestionPool: List<AppEntry> = emptyList()
+    private var suggestionPage = 0
 
     private fun refreshSuggestions() {
         if (!prefs.predictions) {
@@ -1119,13 +1225,29 @@ class MainActivity : AppCompatActivity() {
             val favs = prefs.favorites
                 .filter { it !in hidden }
                 .mapNotNull { repo.byPackage(it) }
-            applySuggestions(favs, animate = false)
+            suggestionPool = favs
+            suggestionPage = 0
+            applySuggestions(favs.take(3), animate = false)
             return
         }
-        PredictionEngine.computeSuggestions(this, 3) { ranked, scores ->
+        PredictionEngine.computeSuggestions(this, SUGGESTION_POOL_SIZE) { ranked, scores ->
             repo.usageBoost = scores
-            applySuggestions(ranked.mapNotNull { repo.byPackage(it) }, animate = true)
+            suggestionPool = ranked.mapNotNull { repo.byPackage(it) }
+            suggestionPage = 0
+            applySuggestions(suggestionPool.take(3), animate = true)
         }
+    }
+
+    /** Pages the visible trio through the deeper ranking (wraps around). */
+    private fun cycleSuggestions(direction: Int) {
+        val pages = (suggestionPool.size + 2) / 3
+        if (pages <= 1) return
+        haptic(binding.suggestionsBlock)
+        suggestionPage = (suggestionPage + direction + pages) % pages
+        applySuggestions(
+            suggestionPool.drop(suggestionPage * 3).take(3),
+            animate = true
+        )
     }
 
     private fun applySuggestions(entries: List<AppEntry>, animate: Boolean) {
@@ -1176,6 +1298,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onAppsChanged() {
         refreshSuggestions()
+        updateNewAppSpot()
         if (binding.results.visibility == View.VISIBLE) {
             onQueryChanged(binding.searchInput.text.toString())
         }
@@ -1446,9 +1569,118 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun nextAlarmText(): String? {
+        // Prefer the system's own formatted next-alarm string: some OEM clocks (MIUI…)
+        // report AlarmClockInfo with a pre-wake offset, showing e.g. 07:50 for an
+        // 08:00 alarm, while this setting matches what the Clock app displays.
+        try {
+            @Suppress("DEPRECATION")
+            val formatted = Settings.System.getString(
+                contentResolver, Settings.System.NEXT_ALARM_FORMATTED
+            )
+            if (!formatted.isNullOrBlank()) return formatted.trim()
+        } catch (e: Exception) {
+            // fall through to AlarmClockInfo
+        }
         val am = getSystemService(android.app.AlarmManager::class.java) ?: return null
         val info = am.nextAlarmClock ?: return null
         return android.text.format.DateFormat.getTimeFormat(this).format(info.triggerTime)
+    }
+
+    // ------------------------------------------------------ new-app spotlight
+
+    // A freshly installed app shines on one edge for a configurable while; several
+    // new apps rotate through the same spot.
+    private val spotHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var spotIndex = 0
+    private var spotPulse: android.animation.ObjectAnimator? = null
+    private val spotRunnable = object : Runnable {
+        override fun run() {
+            showNextSpotApp()
+            spotHandler.postDelayed(this, SPOT_ROTATE_MS)
+        }
+    }
+
+    private fun updateNewAppSpot() {
+        spotHandler.removeCallbacks(spotRunnable)
+        stopSpotPulse()
+        val left = prefs.newAppSide == "left"
+        val drawerOnSide =
+            if (left) binding.leftDrawer.isVisibleAtAll else binding.rightDrawer.isVisibleAtAll
+        val apps = if (prefs.newAppSpotEnabled) {
+            prefs.newApps().mapNotNull { repo.byPackage(it) }
+        } else {
+            emptyList()
+        }
+        if (apps.isEmpty() || drawerOnSide || binding.results.visibility == View.VISIBLE) {
+            binding.newAppSpot.visibility = View.GONE
+            return
+        }
+        val lp = binding.newAppSpot.layoutParams as android.widget.FrameLayout.LayoutParams
+        lp.gravity = android.view.Gravity.TOP or
+            (if (left) android.view.Gravity.START else android.view.Gravity.END)
+        lp.topMargin = (binding.root.height * 0.17f).toInt()
+            .coerceAtLeast((110 * resources.displayMetrics.density).toInt())
+        binding.newAppSpot.layoutParams = lp
+        binding.newAppGlow.setImageDrawable(glowDrawable(accentColor(), 42f))
+        binding.newAppStar.setTextColor(accentColor())
+        binding.newAppSpot.visibility = View.VISIBLE
+        spotIndex = 0
+        spotHandler.post(spotRunnable)
+        startSpotPulse()
+    }
+
+    private fun showNextSpotApp() {
+        val apps = prefs.newApps().mapNotNull { repo.byPackage(it) }
+        if (apps.isEmpty()) {
+            binding.newAppSpot.visibility = View.GONE
+            spotHandler.removeCallbacks(spotRunnable)
+            stopSpotPulse()
+            return
+        }
+        val entry = apps[spotIndex % apps.size]
+        spotIndex++
+        val bindIcon = { binding.newAppIcon.setImageDrawable(repo.icon(entry)) }
+        if (prefs.animations && apps.size > 1) {
+            binding.newAppIcon.animate().alpha(0f).setDuration(220).withEndAction {
+                bindIcon()
+                binding.newAppIcon.animate().alpha(1f).setDuration(220).start()
+            }.start()
+        } else {
+            bindIcon()
+        }
+        binding.newAppSpot.setOnClickListener {
+            prefs.removeNewApp(entry.packageName)
+            launchApp(entry, binding.newAppIcon)
+            updateNewAppSpot()
+        }
+        binding.newAppSpot.setOnLongClickListener {
+            showAppMenu(entry, binding.newAppIcon)
+            true
+        }
+    }
+
+    /** The "shine": a slow glow breath. Runs only while the spot is on screen. */
+    private fun startSpotPulse() {
+        if (!prefs.animations) return
+        spotPulse = android.animation.ObjectAnimator.ofFloat(
+            binding.newAppGlow, View.ALPHA, 0.55f, 1f
+        ).apply {
+            duration = 1600
+            repeatCount = android.animation.ObjectAnimator.INFINITE
+            repeatMode = android.animation.ObjectAnimator.REVERSE
+            start()
+        }
+    }
+
+    private fun stopSpotPulse() {
+        spotPulse?.cancel()
+        spotPulse = null
+        binding.newAppGlow.alpha = 1f
+    }
+
+    private fun stopNewAppSpot() {
+        spotHandler.removeCallbacks(spotRunnable)
+        stopSpotPulse()
     }
 
     // ----------------------------------------------------------- appearance
@@ -1460,21 +1692,25 @@ class MainActivity : AppCompatActivity() {
         binding.date.visibility = visible
 
         val accent = accentColor()
-        binding.mainGlow.setImageDrawable(GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            gradientType = GradientDrawable.RADIAL_GRADIENT
-            gradientRadius = TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, 60f, resources.displayMetrics
-            )
-            colors = intArrayOf(
-                ColorUtils.setAlphaComponent(accent, 0x5E),
-                ColorUtils.setAlphaComponent(accent, 0x00),
-            )
-        })
+        binding.mainGlow.setImageDrawable(glowDrawable(accent, 60f))
         binding.updatePill.setTextColor(accent)
         binding.starterPill.setTextColor(accent)
         updateModeUi()
     }
+
+    /** Accent radial glow used behind the main suggestion and the new-app spotlight. */
+    private fun glowDrawable(color: Int, radiusDp: Float): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            gradientType = GradientDrawable.RADIAL_GRADIENT
+            gradientRadius = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, radiusDp, resources.displayMetrics
+            )
+            colors = intArrayOf(
+                ColorUtils.setAlphaComponent(color, 0x5E),
+                ColorUtils.setAlphaComponent(color, 0x00),
+            )
+        }
 
     private fun accentColor(): Int = when (prefs.accent) {
         "purple" -> getColor(R.color.accent_purple)
@@ -1518,4 +1754,8 @@ class MainActivity : AppCompatActivity() {
         requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1)
     }
 
+    private companion object {
+        const val SUGGESTION_POOL_SIZE = 12
+        const val SPOT_ROTATE_MS = 4500L
+    }
 }

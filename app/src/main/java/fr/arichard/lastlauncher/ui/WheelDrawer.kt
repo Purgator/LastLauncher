@@ -32,8 +32,15 @@ class WheelDrawer @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null,
 ) : FrameLayout(context, attrs) {
 
+    /** Carried by an app drag; [fromDrawer] is the source drawer index, -1 = external. */
+    data class DragPayload(val componentKey: String, val fromDrawer: Int)
+
     /** -1 pinned to the left edge, +1 to the right. */
     var side: Int = -1
+        private set
+
+    /** Which configured drawer is currently bound (for reorder/move drops). */
+    var boundIndex: Int = 0
         private set
 
     val isOpen: Boolean get() = progress > 0.5f
@@ -58,11 +65,41 @@ class WheelDrawer @JvmOverloads constructor(
     private var onClosed: () -> Unit = {}
     private var onVisibleChanged: (Boolean) -> Unit = {}
 
+    /** (componentKey, fromDrawer, toDrawer, position): the host mutates the lists. */
+    var onAppDropped: (String, Int, Int, Int) -> Unit = { _, _, _, _ -> }
+
     init {
         clipChildren = false
         clipToPadding = false
         isClickable = true // receive the full touch stream for band drags
         visibility = GONE
+        // Accept app drags: dropping inserts at the nearest slot on the arc.
+        setOnDragListener { _, event ->
+            when (event.action) {
+                android.view.DragEvent.ACTION_DRAG_STARTED -> isVisibleAtAll
+                android.view.DragEvent.ACTION_DROP -> {
+                    val payload = event.localState as? DragPayload
+                        ?: return@setOnDragListener false
+                    onAppDropped(
+                        payload.componentKey, payload.fromDrawer, boundIndex, dropSlot(event.y)
+                    )
+                    true
+                }
+                else -> true
+            }
+        }
+    }
+
+    /** Nearest list position for a drop at [y], derived from the arc geometry. */
+    private fun dropSlot(y: Float): Int {
+        val h = height
+        if (h == 0 || apps.isEmpty()) return 0
+        val bAxis = h / 2f - iconHalf - 8f * density
+        val sine = ((y - h / 2f) / bAxis).coerceIn(-1f, 1f)
+        val theta = Math.toDegrees(kotlin.math.asin(sine.toDouble())).toFloat()
+        val gap = spacing()
+        if (gap == 0f) return 0
+        return Math.round((theta + HALF_SPAN + scrollAngle) / gap).coerceIn(0, apps.size)
     }
 
     fun init(
@@ -83,9 +120,10 @@ class WheelDrawer @JvmOverloads constructor(
         this.onVisibleChanged = onVisibleChanged
     }
 
-    fun bind(apps: List<AppEntry>) {
+    fun bind(apps: List<AppEntry>, drawerIndex: Int = boundIndex) {
         flingAnimator?.cancel()
         this.apps = apps
+        boundIndex = drawerIndex
         scrollAngle = 0f.coerceIn(minScroll(), maxScroll())
         rebuildViews()
         layoutIcons()
@@ -160,7 +198,17 @@ class WheelDrawer @JvmOverloads constructor(
             item.wheelIcon.setImageDrawable(iconOf(entry))
             bindBadge(item, entry.packageName)
             item.root.setOnClickListener { onClick(entry, item.wheelIcon) }
-            item.root.setOnLongClickListener { onLongClick(entry, item.wheelIcon); true }
+            // Long-press picks the app up for drag & drop (reorder, or move to the
+            // other drawer); the app menu stays available from search and suggestions.
+            item.root.setOnLongClickListener { view ->
+                onLongClick(entry, item.wheelIcon)
+                val data = android.content.ClipData.newPlainText("app", entry.componentKey)
+                view.startDragAndDrop(
+                    data, View.DragShadowBuilder(item.wheelIcon),
+                    DragPayload(entry.componentKey, boundIndex), 0
+                )
+                true
+            }
             addView(item.root)
             items.add(item)
         }

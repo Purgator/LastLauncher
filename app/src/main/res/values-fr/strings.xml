@@ -46,6 +46,17 @@
     <string name="menu_unboost">Retirer le boost</string>
     <string name="menu_uninstall">Désinstaller</string>
     <string name="menu_hide">Masquer de la liste</string>
+    <string name="menu_add_to_drawer">Ajouter à un tiroir…</string>
+    <string name="drawer_drop_needs_list">Ce tiroir affiche toutes les applications — choisissez d’abord ses applications (Réglages → Applications) pour lui donner un ordre</string>
+
+    <!-- Projecteur nouvelle application -->
+    <string name="cat_new_app_spot">Projecteur nouveautés</string>
+    <string name="pref_new_app_spot">Faire briller les nouvelles applications</string>
+    <string name="pref_new_app_spot_summary">Une application fraîchement installée brille au bord de l’écran pendant un moment, pour ne pas l’oublier. Plusieurs nouveautés se relaient.</string>
+    <string name="pref_new_app_side">Côté du projecteur</string>
+    <string name="pref_new_app_hours">Durée (heures)</string>
+    <string name="side_left">Gauche</string>
+    <string name="side_right">Droite</string>
 
     <!-- Lock / gestures -->
     <string name="lock_service_label">Actions LastLauncher</string>

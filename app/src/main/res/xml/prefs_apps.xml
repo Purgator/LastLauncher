@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
     <Preference
         android:key="hidden_apps"
         android:title="@string/pref_hidden_apps"
@@ -8,4 +9,28 @@
         android:key="drawers"
         android:title="@string/pref_drawers"
         android:summary="@string/pref_drawers_summary" />
+
+    <PreferenceCategory android:title="@string/cat_new_app_spot">
+        <SwitchPreferenceCompat
+            android:key="new_app_spot_enabled"
+            android:title="@string/pref_new_app_spot"
+            android:summary="@string/pref_new_app_spot_summary"
+            android:defaultValue="true" />
+        <ListPreference
+            android:key="new_app_side"
+            android:title="@string/pref_new_app_side"
+            android:entries="@array/side_entries"
+            android:entryValues="@array/side_values"
+            android:defaultValue="right"
+            android:dependency="new_app_spot_enabled"
+            app:useSimpleSummaryProvider="true" />
+        <SeekBarPreference
+            android:key="new_app_hours"
+            android:title="@string/pref_new_app_hours"
+            android:defaultValue="24"
+            android:max="72"
+            app:min="1"
+            app:showSeekBarValue="true"
+            android:dependency="new_app_spot_enabled" />
+    </PreferenceCategory>
 </PreferenceScreen>
