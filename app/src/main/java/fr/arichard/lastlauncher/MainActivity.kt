@@ -86,11 +86,15 @@ class MainActivity : AppCompatActivity() {
         setupSuggestionClicks()
         setupDrawer()
         binding.updatePill.setOnClickListener {
+            haptic(binding.updatePill)
             pendingUpdateVersion?.let { v -> UpdateManager.install(this, v) }
         }
         binding.clock.setOnClickListener { launchClockTarget() }
         binding.weather.setOnClickListener { launchWeatherTarget() }
-        binding.starterPill.setOnClickListener { showStarterPicker() }
+        binding.starterPill.setOnClickListener {
+            haptic(binding.starterPill)
+            showStarterPicker()
+        }
         setupContextualLongPress()
         setupDragWatcher()
         repo.addListener(repoListener)
@@ -198,6 +202,7 @@ class MainActivity : AppCompatActivity() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 // A tap on the open home area dismisses whatever drawers are out.
                 if (anyDrawerOpen) {
+                    haptic(binding.root)
                     closeDrawers(animate = true)
                     return true
                 }
@@ -411,7 +416,8 @@ class MainActivity : AppCompatActivity() {
                 badgeOf = { pkg -> badgeFor(pkg) },
                 onClick = { entry, v -> view.close(animate = false); launchApp(entry, v) },
                 onLongClick = { _, v -> haptic(v) }, // drag pickup feedback
-                onClosed = {},
+                onClosed = { haptic(binding.root) },
+                onOpened = { haptic(binding.root) }, // the wheel clicks into place
                 onVisibleChanged = { visible ->
                     // The gesture hint on a drawer's side yields to the drawer.
                     val hint = if (drawer.second < 0) binding.hintLeft else binding.hintRight
@@ -547,7 +553,10 @@ class MainActivity : AppCompatActivity() {
         // Left button is the mode wheel: tap to cycle, long-press for the assistant.
         binding.modeBtn.setOnClickListener { cycleMode() }
         binding.modeBtn.setOnLongClickListener { launchAssistant(); true }
-        binding.allAppsBtn.setOnClickListener { if (allAppsOpen) resetToHome() else openAllApps() }
+        binding.allAppsBtn.setOnClickListener {
+            haptic(binding.allAppsBtn)
+            if (allAppsOpen) resetToHome() else openAllApps()
+        }
     }
 
     private fun cycleMode() {
