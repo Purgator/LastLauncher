@@ -92,6 +92,7 @@ class MainActivity : AppCompatActivity() {
         binding.weather.setOnClickListener { launchWeatherTarget() }
         binding.starterPill.setOnClickListener { showStarterPicker() }
         setupContextualLongPress()
+        setupDragWatcher()
         repo.addListener(repoListener)
         NotifListener.addListener(notifListener)
     }
@@ -221,6 +222,10 @@ class MainActivity : AppCompatActivity() {
                 maxPointers = 1
                 drawerDragging = false
                 drawerCandidateSide = drawerEdgeCandidate(event.x, v.width, edgeZone)
+                suggSwipeActive = false
+                suggSwipeCandidate = drawerCandidateSide == 0 &&
+                    binding.suggestionsBlock.visibility == View.VISIBLE &&
+                    downInSuggestions()
                 detector.setIsLongpressEnabled(drawerCandidateSide == 0)
                 if (drawerCandidateSide != 0) {
                     velocityTracker = android.view.VelocityTracker.obtain()
@@ -233,10 +238,12 @@ class MainActivity : AppCompatActivity() {
                     maxPointers = maxOf(maxPointers, event.pointerCount)
                     // The drawer is a one-finger edge pull; a second finger cancels it.
                     drawerCandidateSide = 0
+                    suggSwipeCandidate = false
                 }
                 MotionEvent.ACTION_MOVE -> {
                     velocityTracker?.addMovement(event)
                     updateDrawerDrag(event, touchSlop)
+                    if (suggSwipeCandidate && !drawerDragging) updateSuggestionSwipe(event)
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     v.performClick()
@@ -248,6 +255,11 @@ class MainActivity : AppCompatActivity() {
                         } ?: 0f
                         drawerForSide(drawerCandidateSide).settle(vx)
                         drawerDragging = false
+                    } else if (suggSwipeActive) {
+                        finishSuggestionSwipe(
+                            event.x - downX,
+                            confirmed = event.actionMasked == MotionEvent.ACTION_UP
+                        )
                     } else if (event.actionMasked == MotionEvent.ACTION_UP) {
                         handleSwipe(event.x - downX, event.y - downY, event.eventTime - downTime)
                     }
@@ -391,6 +403,8 @@ class MainActivity : AppCompatActivity() {
         for (drawer in listOf(binding.leftDrawer to -1, binding.rightDrawer to 1)) {
             val view = drawer.first
             view.onAppDropped = { key, from, to, position -> handleAppDrop(key, from, to, position) }
+            view.onItemDragStarted = { entry, v -> onAppDragStarted(entry, v) }
+            view.onDragMoved = { x, y -> dragLastX = x; dragLastY = y }
             view.init(
                 side = drawer.second,
                 iconOf = { entry -> repo.icon(entry) },
@@ -452,12 +466,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Applies a drag & drop: reorder within a drawer, or move/copy into another. */
-    private fun handleAppDrop(componentKey: String, from: Int, to: Int, position: Int) {
+    private fun handleAppDrop(componentKey: String, from: Int, to: Int, position: Int): Boolean {
         val target = prefs.drawer(to)
         if (target.apps.isEmpty()) {
             // "All apps" drawers have no explicit order to edit.
             Toast.makeText(this, R.string.drawer_drop_needs_list, Toast.LENGTH_LONG).show()
-            return
+            return false
         }
         val list = target.apps.toMutableList()
         val oldIndex = list.indexOf(componentKey)
@@ -475,6 +489,13 @@ class MainActivity : AppCompatActivity() {
         }
         haptic(binding.root)
         refreshOpenDrawers()
+        // Landing pop on the freshly inserted item.
+        if (prefs.animations) {
+            for (drawer in listOf(binding.leftDrawer, binding.rightDrawer)) {
+                if (drawer.isVisibleAtAll && drawer.boundIndex == to) drawer.popItem(insertAt)
+            }
+        }
+        return true
     }
 
     /** Re-reads the visible drawers' contents after a drag & drop mutation. */
@@ -573,11 +594,76 @@ class MainActivity : AppCompatActivity() {
     /** Starts a system drag carrying the app; open drawers accept the drop. */
     private fun startAppDrag(entry: AppEntry, sourceView: View, fromDrawer: Int) {
         haptic(sourceView)
+        onAppDragStarted(entry, sourceView)
         val data = android.content.ClipData.newPlainText("app", entry.componentKey)
         sourceView.startDragAndDrop(
-            data, View.DragShadowBuilder(sourceView),
+            data, WheelDrawer.IconShadow(sourceView, 1.4f),
             WheelDrawer.DragPayload(entry.componentKey, fromDrawer), 0
         )
+    }
+
+    // ------------------------------------------------------- drag lifecycle
+
+    // The lifted app dims at its origin; a rejected drop flies the icon back home.
+    private var dragSourceView: View? = null
+    private var dragIcon: android.graphics.drawable.Drawable? = null
+    private var dragLastX = 0f
+    private var dragLastY = 0f
+
+    private fun onAppDragStarted(entry: AppEntry, sourceView: View) {
+        dragSourceView = sourceView
+        dragIcon = repo.icon(entry)
+        sourceView.animate().alpha(0.25f).setDuration(150).start()
+    }
+
+    /** Root-level drag watcher: tracks the finger and settles the ending. */
+    private fun setupDragWatcher() {
+        binding.root.setOnDragListener { _, event ->
+            when (event.action) {
+                android.view.DragEvent.ACTION_DRAG_STARTED -> true
+                android.view.DragEvent.ACTION_DRAG_LOCATION -> {
+                    dragLastX = event.x
+                    dragLastY = event.y
+                    true
+                }
+                android.view.DragEvent.ACTION_DRAG_ENDED -> {
+                    onDragEnded(event.result)
+                    true
+                }
+                else -> true
+            }
+        }
+    }
+
+    private fun onDragEnded(success: Boolean) {
+        val source = dragSourceView ?: return
+        dragSourceView = null
+        if (success || !prefs.animations || dragIcon == null) {
+            source.animate().alpha(1f).setDuration(150).start()
+            return
+        }
+        // Rejected: fly a ghost of the icon from the drop point back to its origin.
+        val ghost = binding.dragGhost
+        val half = ghost.layoutParams.width / 2f
+        val loc = IntArray(2)
+        source.getLocationInWindow(loc)
+        val rootLoc = IntArray(2)
+        binding.root.getLocationInWindow(rootLoc)
+        ghost.setImageDrawable(dragIcon)
+        ghost.x = dragLastX - half
+        ghost.y = dragLastY - half
+        ghost.alpha = 1f
+        ghost.visibility = View.VISIBLE
+        ghost.animate()
+            .x((loc[0] - rootLoc[0] + source.width / 2f) - half)
+            .y((loc[1] - rootLoc[1] + source.height / 2f) - half)
+            .setDuration(320)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .withEndAction {
+                ghost.visibility = View.GONE
+                source.animate().alpha(1f).setDuration(120).start()
+            }
+            .start()
     }
 
     private var suggestions: List<AppEntry?> = listOf(null, null, null)
@@ -1244,10 +1330,99 @@ class MainActivity : AppCompatActivity() {
         if (pages <= 1) return
         haptic(binding.suggestionsBlock)
         suggestionPage = (suggestionPage + direction + pages) % pages
-        applySuggestions(
-            suggestionPool.drop(suggestionPage * 3).take(3),
-            animate = true
-        )
+        val next = suggestionPool.drop(suggestionPage * 3).take(3)
+        if (prefs.animations) flipSuggestionsTo(next)
+        else applySuggestions(next, animate = false)
+    }
+
+    /** Coin-flip on the vertical axis: rotate out, swap the trio, rotate back in. */
+    private fun flipSuggestionsTo(entries: List<AppEntry>) {
+        val views = listOf(binding.suggestLeft, binding.suggestMain, binding.suggestRight)
+        val camera = 9000 * resources.displayMetrics.density
+        for (v in views) {
+            v.cameraDistance = camera
+            v.animate().rotationY(90f).setDuration(150)
+                .setInterpolator(android.view.animation.AccelerateInterpolator())
+                .start()
+        }
+        binding.suggestMain.postDelayed({
+            applySuggestions(entries, animate = false)
+            for ((i, v) in views.withIndex()) {
+                v.rotationY = -90f
+                v.animate().rotationY(0f).setDuration(190)
+                    .setStartDelay(35L * i)
+                    .setInterpolator(android.view.animation.DecelerateInterpolator())
+                    .start()
+            }
+        }, 160)
+    }
+
+    // ------------------------------------------------ suggestion swipe visuals
+
+    // Live feedback while swiping the suggestions row: an accent glow rides under
+    // the finger, blooming into sparkles as the swipe nears its trigger distance.
+    private var suggSwipeCandidate = false
+    private var suggSwipeActive = false
+    private var suggSwipeArmed = false
+
+    private fun suggTriggerPx(): Float = 64 * resources.displayMetrics.density
+
+    private fun updateSuggestionSwipe(event: MotionEvent) {
+        val dx = event.x - downX
+        val dy = event.y - downY
+        if (!suggSwipeActive) {
+            val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop
+            if (abs(dx) < slop || abs(dx) < abs(dy) * 1.2f) return
+            suggSwipeActive = true
+            suggSwipeArmed = false
+            binding.swipeGlow.setImageDrawable(glowDrawable(accentColor(), 48f))
+            binding.swipeSparkle.setTextColor(accentColor())
+            binding.swipeGlow.visibility = View.VISIBLE
+        }
+        val progress = (abs(dx) / suggTriggerPx()).coerceAtMost(1.3f)
+        val glow = binding.swipeGlow
+        val half = glow.layoutParams.width / 2f
+        glow.x = event.x - half
+        glow.y = event.y - half
+        glow.alpha = 0.35f + 0.65f * progress.coerceAtMost(1f)
+        val scale = 0.55f + 0.55f * progress
+        glow.scaleX = scale
+        glow.scaleY = scale
+        // Sparkles bloom over the last stretch before the swipe completes.
+        val sparkle = binding.swipeSparkle
+        val bloom = ((progress - 0.6f) / 0.4f).coerceIn(0f, 1f)
+        if (bloom > 0f) {
+            sparkle.visibility = View.VISIBLE
+            sparkle.alpha = bloom
+            sparkle.x = event.x - sparkle.width / 2f
+            sparkle.y = event.y - half - sparkle.height
+            sparkle.scaleX = 0.7f + 0.5f * bloom
+            sparkle.scaleY = 0.7f + 0.5f * bloom
+            sparkle.rotation = dx * 0.04f
+        } else {
+            sparkle.visibility = View.GONE
+        }
+        // A tick the moment the swipe is far enough to take.
+        if (progress >= 1f && !suggSwipeArmed) {
+            suggSwipeArmed = true
+            haptic(binding.suggestionsBlock)
+        } else if (progress < 1f) {
+            suggSwipeArmed = false
+        }
+    }
+
+    private fun finishSuggestionSwipe(dx: Float, confirmed: Boolean) {
+        suggSwipeActive = false
+        suggSwipeCandidate = false
+        binding.swipeGlow.animate().alpha(0f).setDuration(160).withEndAction {
+            binding.swipeGlow.visibility = View.GONE
+        }.start()
+        binding.swipeSparkle.animate().alpha(0f).setDuration(160).withEndAction {
+            binding.swipeSparkle.visibility = View.GONE
+        }.start()
+        if (confirmed && abs(dx) >= suggTriggerPx()) {
+            cycleSuggestions(if (dx < 0) 1 else -1)
+        }
     }
 
     private fun applySuggestions(entries: List<AppEntry>, animate: Boolean) {

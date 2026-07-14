@@ -411,6 +411,35 @@
 
     <!-- Two independent, background-less wheel drawers pinned to each edge. Non-modal:
          the narrow band leaves the center and command bar usable, and both can be open. -->
+    <!-- Follows the finger during a suggestions swipe; sparkles near completion. -->
+    <ImageView
+        android:id="@+id/swipeGlow"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
+        android:layout_gravity="top|start"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/swipeSparkle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:text="✦ ✧ ✦"
+        android:textColor="@color/accent_cyan"
+        android:textSize="16sp"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
+    <!-- Ghost icon that flies back to its origin when a drag is dropped nowhere. -->
+    <ImageView
+        android:id="@+id/dragGhost"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="top|start"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
     <!-- New-app spotlight: a freshly installed app shines on one edge for a while.
          Side and vertical offset are applied at runtime. -->
     <FrameLayout

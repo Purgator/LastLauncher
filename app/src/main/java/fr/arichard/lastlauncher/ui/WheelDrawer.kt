@@ -35,6 +35,22 @@ class WheelDrawer @JvmOverloads constructor(
     /** Carried by an app drag; [fromDrawer] is the source drawer index, -1 = external. */
     data class DragPayload(val componentKey: String, val fromDrawer: Int)
 
+    /** Enlarged drag shadow so the app visibly "lifts" under the finger. */
+    class IconShadow(view: View, private val scale: Float = 1.7f) :
+        View.DragShadowBuilder(view) {
+        override fun onProvideShadowMetrics(size: android.graphics.Point, touch: android.graphics.Point) {
+            val w = (view.width * scale).toInt().coerceAtLeast(1)
+            val h = (view.height * scale).toInt().coerceAtLeast(1)
+            size.set(w, h)
+            touch.set(w / 2, h / 2)
+        }
+
+        override fun onDrawShadow(canvas: android.graphics.Canvas) {
+            canvas.scale(scale, scale)
+            view.draw(canvas)
+        }
+    }
+
     /** -1 pinned to the left edge, +1 to the right. */
     var side: Int = -1
         private set
@@ -65,8 +81,14 @@ class WheelDrawer @JvmOverloads constructor(
     private var onClosed: () -> Unit = {}
     private var onVisibleChanged: (Boolean) -> Unit = {}
 
-    /** (componentKey, fromDrawer, toDrawer, position): the host mutates the lists. */
-    var onAppDropped: (String, Int, Int, Int) -> Unit = { _, _, _, _ -> }
+    /** (componentKey, fromDrawer, toDrawer, position) → whether the drop was accepted. */
+    var onAppDropped: (String, Int, Int, Int) -> Boolean = { _, _, _, _ -> false }
+
+    /** The host tracks the lifted app so it can dim it and fly it back if needed. */
+    var onItemDragStarted: (AppEntry, View) -> Unit = { _, _ -> }
+
+    /** Screen-space drag position updates while the finger is over this drawer. */
+    var onDragMoved: (Float, Float) -> Unit = { _, _ -> }
 
     init {
         clipChildren = false
@@ -77,17 +99,37 @@ class WheelDrawer @JvmOverloads constructor(
         setOnDragListener { _, event ->
             when (event.action) {
                 android.view.DragEvent.ACTION_DRAG_STARTED -> isVisibleAtAll
+                android.view.DragEvent.ACTION_DRAG_LOCATION -> {
+                    val loc = IntArray(2)
+                    getLocationInWindow(loc)
+                    onDragMoved(loc[0] + event.x, loc[1] + event.y)
+                    true
+                }
                 android.view.DragEvent.ACTION_DROP -> {
                     val payload = event.localState as? DragPayload
                         ?: return@setOnDragListener false
+                    // Returning the verdict lets a rejected drop fly back home.
                     onAppDropped(
                         payload.componentKey, payload.fromDrawer, boundIndex, dropSlot(event.y)
                     )
-                    true
                 }
                 else -> true
             }
         }
+    }
+
+    /** Entrance pop for the just-dropped item at [position]. */
+    fun popItem(position: Int) {
+        val view = items.getOrNull(position)?.root ?: return
+        val scale = view.scaleX
+        val alpha = view.alpha
+        view.scaleX = scale * 0.3f
+        view.scaleY = scale * 0.3f
+        view.alpha = 0f
+        view.animate().scaleX(scale).scaleY(scale).alpha(alpha)
+            .setDuration(280)
+            .setInterpolator(android.view.animation.OvershootInterpolator())
+            .start()
     }
 
     /** Nearest list position for a drop at [y], derived from the arc geometry. */
@@ -202,9 +244,10 @@ class WheelDrawer @JvmOverloads constructor(
             // other drawer); the app menu stays available from search and suggestions.
             item.root.setOnLongClickListener { view ->
                 onLongClick(entry, item.wheelIcon)
+                onItemDragStarted(entry, view)
                 val data = android.content.ClipData.newPlainText("app", entry.componentKey)
                 view.startDragAndDrop(
-                    data, View.DragShadowBuilder(item.wheelIcon),
+                    data, IconShadow(item.wheelIcon),
                     DragPayload(entry.componentKey, boundIndex), 0
                 )
                 true
