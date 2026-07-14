@@ -282,6 +282,7 @@ class WheelDrawer @JvmOverloads constructor(
 
     fun setProgress(p: Float) {
         settleAnimator?.cancel()
+        pendingSwap = null // a fresh finger drag overrides a swap in flight
         applyProgress(p)
     }
 
@@ -297,9 +298,34 @@ class WheelDrawer @JvmOverloads constructor(
     /** Positive [inward] = pulled toward the screen center (opening). */
     fun dragBy(inward: Float) = setProgress(inward / band())
 
-    fun open(animate: Boolean) = animateTo(1f, animate)
+    fun open(animate: Boolean) {
+        pendingSwap = null
+        animateTo(1f, animate)
+    }
 
-    fun close(animate: Boolean) = animateTo(0f, animate)
+    fun close(animate: Boolean) {
+        pendingSwap = null // an explicit close (tap outside, back…) cancels a swap
+        animateTo(0f, animate)
+    }
+
+    // A different drawer requested while this one is out: play the classic close,
+    // then bind the new content and play the classic open (instead of the old
+    // instant in-place content swap).
+    private var pendingSwap: (() -> Unit)? = null
+
+    /** Rolls the current wheel away, then rolls back in showing [apps]. */
+    fun swapTo(apps: List<AppEntry>, drawerIndex: Int) {
+        if (!isVisibleAtAll) {
+            bind(apps, drawerIndex)
+            open(animate = true)
+            return
+        }
+        close(animate = true)
+        pendingSwap = {
+            bind(apps, drawerIndex)
+            open(animate = true)
+        }
+    }
 
     /** On release, snap open or closed by drag distance, biased by a decisive flick. */
     fun settle(velocityX: Float) {
@@ -316,8 +342,13 @@ class WheelDrawer @JvmOverloads constructor(
         // that already crossed the half-open mark before release — announcedOpen
         // (reset while below 1) dedupes instead of the pre-settle isOpen state.
         fun settled() {
-            if (target <= 0f) onClosed()
-            else if (target >= 1f && !announcedOpen) {
+            if (target <= 0f) {
+                onClosed()
+                pendingSwap?.let {
+                    pendingSwap = null
+                    it()
+                }
+            } else if (target >= 1f && !announcedOpen) {
                 announcedOpen = true
                 onOpened()
             }
@@ -460,11 +491,13 @@ class WheelDrawer @JvmOverloads constructor(
             downScroll = scrollAngle
         } else if (abs(dx) > slop && abs(dx) > abs(dy)) {
             val outward = if (side < 0) dx < 0 else dx > 0
-            // Outward is the drawer's own close drag; inward belongs to the host
-            // (same-side gesture bindings must keep working over an open drawer).
+            // One-finger outward is the drawer's own close drag. Everything else
+            // belongs to the host: inward swipes, and ANY multi-finger swipe —
+            // `<<`/`>>` must run their bound action whichever drawer is open.
             // Inward asks for double the slop: it steals the touch from an icon
             // tap, so a slightly sloppy tap must not be mistaken for a swipe.
-            if (outward) mode = Mode.CLOSE
+            if (maxPointers > 1) mode = Mode.FORWARD
+            else if (outward) mode = Mode.CLOSE
             else if (abs(dx) > slop * 2) mode = Mode.FORWARD
         }
     }

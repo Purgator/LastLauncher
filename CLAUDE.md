@@ -18,9 +18,10 @@ before touching code.
    (reflection, XML `app:fragment` resolution, etc.) without a direct code reference
    or a proguard keep rule. This has already caused one release-only crash — check
    `app/build/outputs/mapping/release/mapping.txt` when in doubt.
-4. **Locale-safe formatting.** The owner's device is French: always
-   `"%…".format(Locale.US, …)` when code parses/trims the result, and add
-   translations to `values-fr/strings.xml` for every new string (owner writes both).
+4. **Locale-safe formatting.** The owner is French (device language English, may
+   change): always `"%…".format(Locale.US, …)` when code parses/trims the result,
+   and add translations to `values-fr/strings.xml` for every new string — the app
+   must stay fully usable in both English and French.
 5. **Battery is a feature.** No polling, no wakelocks, no continuous animations that
    run while the screen is idle unless the user explicitly asked (gesture hints are
    the sanctioned exception, and they stop on pause/search). Prefer static styling
@@ -40,9 +41,9 @@ before touching code.
   Never commit them, never print their contents. `assembleRelease` signs
   automatically when they exist. Auto-update requires the same key forever.
 - **No emulator/device on this machine.** Verification = compile + unit tests +
-  lint + reasoning. The owner tests on a MIUI (Xiaomi) phone and reports back;
-  MIUI quirks are real (e.g. `AlarmClockInfo` pre-wake offsets). Be explicit in
-  your summary about what could not be exercised.
+  lint + reasoning. The owner tests on a **Pixel 8 Pro** (system language English)
+  and reports back — earlier notes blaming MIUI quirks were wrong, it was never a
+  Xiaomi. Be explicit in your summary about what could not be exercised.
 
 ## Commands
 
@@ -83,7 +84,8 @@ impractical — prioritize a readable history.
 | `predict/ContextSignals.kt` | Bluetooth/headset/charger trigger events (5-minute window). |
 | `notify/NotifListener.kt` | NotificationListenerService → badge counts + ticker messages, in-memory only. |
 | `ui/WheelDrawer.kt` | Custom view: the arc/wheel edge drawer. Angular layout, roll/fling physics, swipe-to-close, drag & drop target. Feel constants in its companion. |
-| `ui/StatusLine.kt` | Pure formatter for the terminal status line (unit-tested); MainActivity adds per-token ClickableSpans. |
+| `ui/SparkleView.kt` | Canvas particle overlay: firework powder around the finger during the suggestion swipe. Self-stopping frame loop — animates only while particles are alive. |
+| `ui/StatusLine.kt` | Pure formatter for the terminal status line (unit-tested) + next-alarm reconciliation helpers; MainActivity adds per-token ClickableSpans. |
 | `ui/AppAdapter.kt`, `ui/AppPickerDialog.kt` | Results list rows; icon-row dialogs used for all menus/pickers. |
 | `command/CommandProcessor.kt` | Command-bar smarts: quick actions, settings jump, calculator, URL, assistant routing. Modes in `command/SearchMode.kt`. |
 | `weather/WeatherProvider.kt` | Open-Meteo (key-less), last-known coarse location, 1 h cache. |
@@ -108,9 +110,16 @@ the two `WheelDrawer`s (last = on top).
 - Edge pulls (40 dp zones) track the finger when that edge's gesture slot is bound to
   a drawer; flings elsewhere fire `GestureBinding` actions (1- vs 2-finger slots).
 - Suggestions: trio = top of a 12-deep ranking; a one-finger horizontal swipe
-  starting anywhere from mid-screen down to the row pages it (live glow + sparkle
-  feedback, coin-flip switch). Long-press = menu, or drag into an open drawer. The
-  just-launched app is excluded-ish for 45 min (15 s grace).
+  starting in the lower band (60% of screen height down to the row, any x) pages it.
+  Live feedback: glow under the finger, particle sparkles (`ui/SparkleView`), the
+  trio leans into its coin flip as the swipe builds; release completes or cancels
+  the turn. Long-press-for-Settings is disabled inside the band. Long-press on the
+  trio = menu, or drag into an open drawer. The just-launched app is excluded-ish
+  for 45 min (15 s grace).
+- Opening a different drawer on a side that already shows one plays close-then-open
+  (`WheelDrawer.swapTo`); an explicit close cancels the pending swap. One-finger
+  swipes matching the close direction close the drawer; two-finger swipes always
+  run their bound action.
 - Haptics on every deliberate action, gated by `prefs.haptics` via `haptic(view)`.
 - Hints, spotlight and ticker all yield to drawers/search and stop on pause.
 

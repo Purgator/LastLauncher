@@ -116,7 +116,10 @@ class MainActivity : AppCompatActivity() {
         binding.statusLine.opensSettings(SettingsActivity.SCREEN_APPEARANCE)
         binding.ticker.opensSettings(SettingsActivity.SCREEN_NOTIFICATIONS)
         binding.searchBar.opensSettings(SettingsActivity.SCREEN_GENERAL)
-        binding.suggestionsBlock.opensSettings(SettingsActivity.SCREEN_SUGGESTIONS)
+        // Deliberately NOT on suggestionsBlock: a long-clickable row would swallow
+        // every touch starting on it, killing the paging swipe there — and a slow
+        // swipe attempt used to long-press into Settings instead of switching apps.
+        // (Suggestions settings stay reachable from the main Settings list.)
     }
 
     override fun onDestroy() {
@@ -231,7 +234,9 @@ class MainActivity : AppCompatActivity() {
                 suggSwipeCandidate = drawerCandidateSide == 0 &&
                     binding.suggestionsBlock.visibility == View.VISIBLE &&
                     downInSuggestions()
-                detector.setIsLongpressEnabled(drawerCandidateSide == 0)
+                // A hesitant start to a drawer pull or a suggestion swipe must not
+                // fire the long-press Settings shortcut mid-gesture.
+                detector.setIsLongpressEnabled(drawerCandidateSide == 0 && !suggSwipeCandidate)
                 if (drawerCandidateSide != 0) {
                     velocityTracker = android.view.VelocityTracker.obtain()
                     velocityTracker?.addMovement(event)
@@ -262,7 +267,7 @@ class MainActivity : AppCompatActivity() {
                         drawerDragging = false
                     } else if (suggSwipeActive) {
                         finishSuggestionSwipe(
-                            event.x - downX,
+                            event.x - downX, event.x, event.y,
                             confirmed = event.actionMasked == MotionEvent.ACTION_UP
                         )
                     } else if (event.actionMasked == MotionEvent.ACTION_UP) {
@@ -340,12 +345,13 @@ class MainActivity : AppCompatActivity() {
                 cycleSuggestions(if (dx < 0) 1 else -1)
                 return
             }
-            // A swipe matching an open drawer's closing motion closes it and stops there.
-            if (dx > 0 && binding.rightDrawer.isVisibleAtAll) {
+            // A one-finger swipe matching an open drawer's closing motion closes it and
+            // stops there; two-finger swipes always run their bound action instead.
+            if (fingers == 1 && dx > 0 && binding.rightDrawer.isVisibleAtAll) {
                 binding.rightDrawer.close(animate = true)
                 return
             }
-            if (dx < 0 && binding.leftDrawer.isVisibleAtAll) {
+            if (fingers == 1 && dx < 0 && binding.leftDrawer.isVisibleAtAll) {
                 binding.leftDrawer.close(animate = true)
                 return
             }
@@ -372,11 +378,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * True when the gesture started in the suggestion-paging band: anywhere from
-     * mid-screen down to the bottom of the row, so cycling the trio doesn't demand
-     * landing the finger on the icons themselves. Two-finger swipes and edge pulls
-     * are excluded upstream, and everything above mid-screen still runs the bound
-     * one-finger gestures.
+     * True when the gesture started in the suggestion-paging band: the lower part
+     * of the screen (60% down to the bottom of the row), so cycling the trio doesn't
+     * demand landing the finger on the icons — any horizontal start position works.
+     * The band deliberately stops well below mid-screen: everything above it keeps
+     * running the bound one-finger `>`/`>>` gestures. Two-finger swipes and edge
+     * pulls are excluded upstream.
      */
     private fun downInSuggestions(): Boolean {
         val loc = IntArray(2)
@@ -384,7 +391,7 @@ class MainActivity : AppCompatActivity() {
         val rootLoc = IntArray(2)
         binding.root.getLocationInWindow(rootLoc)
         val blockTop = (loc[1] - rootLoc[1]).toFloat()
-        val top = minOf(blockTop, binding.root.height * 0.45f)
+        val top = minOf(blockTop, binding.root.height * 0.6f)
         return downY >= top && downY <= blockTop + binding.suggestionsBlock.height
     }
 
@@ -490,8 +497,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun openDrawer(side: Int, index: Int, animate: Boolean) {
         val drawer = drawerForSide(side)
-        drawer.bind(drawerContents(index), index)
-        drawer.open(animate && prefs.animations)
+        val anim = animate && prefs.animations
+        if (anim && drawer.isVisibleAtAll && drawer.boundIndex != index) {
+            // A different drawer already out on this side: classic close, then
+            // classic open with the new content — not a silent in-place swap.
+            drawer.swapTo(drawerContents(index), index)
+        } else {
+            drawer.bind(drawerContents(index), index)
+            drawer.open(anim)
+        }
     }
 
     /** Applies a drag & drop: reorder within a drawer, or move/copy into another. */
@@ -1369,37 +1383,52 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun suggestionViews() =
+        listOf(binding.suggestLeft, binding.suggestMain, binding.suggestRight)
+
     /** Pages the visible trio through the deeper ranking (wraps around). */
     private fun cycleSuggestions(direction: Int) {
         val pages = (suggestionPool.size + 2) / 3
-        if (pages <= 1) return
+        if (pages <= 1) {
+            // Nothing to page to; if a live lean had started, straighten back up.
+            if (prefs.animations) {
+                for (v in suggestionViews()) v.animate().rotationY(0f).setDuration(160).start()
+            }
+            return
+        }
         haptic(binding.suggestionsBlock)
         suggestionPage = (suggestionPage + direction + pages) % pages
         val next = suggestionPool.drop(suggestionPage * 3).take(3)
-        if (prefs.animations) flipSuggestionsTo(next)
+        // Page direction is opposite the finger: the coin turns with the finger.
+        if (prefs.animations) flipSuggestionsTo(next, -direction)
         else applySuggestions(next, animate = false)
     }
 
-    /** Coin-flip on the vertical axis: rotate out, swap the trio, rotate back in. */
-    private fun flipSuggestionsTo(entries: List<AppEntry>) {
-        val views = listOf(binding.suggestLeft, binding.suggestMain, binding.suggestRight)
+    /**
+     * Coin-flip on the vertical axis toward [visualDir] (the finger's direction):
+     * completes the turn from wherever the live lean left the trio, swaps it, and
+     * rotates the new one back in.
+     */
+    private fun flipSuggestionsTo(entries: List<AppEntry>, visualDir: Int) {
+        val views = suggestionViews()
         val camera = 9000 * resources.displayMetrics.density
+        val out = 90f * visualDir
         for (v in views) {
             v.cameraDistance = camera
-            v.animate().rotationY(90f).setDuration(150)
+            v.animate().rotationY(out).setDuration(130)
                 .setInterpolator(android.view.animation.AccelerateInterpolator())
                 .start()
         }
         binding.suggestMain.postDelayed({
             applySuggestions(entries, animate = false)
             for ((i, v) in views.withIndex()) {
-                v.rotationY = -90f
+                v.rotationY = -out
                 v.animate().rotationY(0f).setDuration(190)
                     .setStartDelay(35L * i)
                     .setInterpolator(android.view.animation.DecelerateInterpolator())
                     .start()
             }
-        }, 160)
+        }, 140)
     }
 
     // ------------------------------------------------ suggestion swipe visuals
@@ -1421,7 +1450,7 @@ class MainActivity : AppCompatActivity() {
             suggSwipeActive = true
             suggSwipeArmed = false
             binding.swipeGlow.setImageDrawable(glowDrawable(accentColor(), 48f))
-            binding.swipeSparkle.setTextColor(accentColor())
+            binding.swipeSparkle.setColor(accentColor())
             binding.swipeGlow.visibility = View.VISIBLE
         }
         val progress = (abs(dx) / suggTriggerPx()).coerceAtMost(1.3f)
@@ -1433,22 +1462,18 @@ class MainActivity : AppCompatActivity() {
         val scale = 0.55f + 0.55f * progress
         glow.scaleX = scale
         glow.scaleY = scale
-        // Sparkles bloom early and grow with the pull, overdriving past the trigger
-        // point so the payoff is unmistakable rather than a last-moment flicker.
-        val sparkle = binding.swipeSparkle
-        val bloom = ((progress - 0.25f) / 0.45f).coerceIn(0f, 1f)
-        if (bloom > 0f) {
-            val overdrive = ((progress - 1f).coerceAtLeast(0f) / 0.3f) * 0.6f
-            val pop = 0.8f + 0.9f * bloom + overdrive
-            sparkle.visibility = View.VISIBLE
-            sparkle.alpha = 0.4f + 0.6f * bloom
-            sparkle.x = event.x - sparkle.width / 2f
-            sparkle.y = event.y - half - sparkle.height
-            sparkle.scaleX = pop
-            sparkle.scaleY = pop
-            sparkle.rotation = dx * 0.06f
-        } else {
-            sparkle.visibility = View.GONE
+        if (prefs.animations) {
+            // The coin flip starts with the finger: the trio leans further over as
+            // the swipe builds, and the release animation completes the turn from
+            // wherever the finger left it.
+            val lean = LIVE_FLIP_DEG * progress.coerceAtMost(1f) * (if (dx < 0) -1 else 1)
+            val camera = 9000 * resources.displayMetrics.density
+            for (v in suggestionViews()) {
+                v.cameraDistance = camera
+                v.rotationY = lean
+            }
+            // Powder sparkles living around the finger, denser toward the trigger.
+            binding.swipeSparkle.emit(event.x, event.y, progress.coerceAtMost(1f))
         }
         // A tick the moment the swipe is far enough to take.
         if (progress >= 1f && !suggSwipeArmed) {
@@ -1459,30 +1484,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun finishSuggestionSwipe(dx: Float, confirmed: Boolean) {
+    private fun finishSuggestionSwipe(dx: Float, x: Float, y: Float, confirmed: Boolean) {
         suggSwipeActive = false
         suggSwipeCandidate = false
         val taken = confirmed && abs(dx) >= suggTriggerPx()
         binding.swipeGlow.animate().alpha(0f).setDuration(160).withEndAction {
             binding.swipeGlow.visibility = View.GONE
         }.start()
-        val sparkle = binding.swipeSparkle
-        if (taken && sparkle.visibility == View.VISIBLE) {
-            // Completion burst: the sparkles flare outward as they go, instead of
-            // the same quiet fade a cancelled swipe gets.
-            sparkle.animate()
-                .scaleX(sparkle.scaleX * 1.8f).scaleY(sparkle.scaleY * 1.8f)
-                .rotationBy(if (dx < 0) -25f else 25f)
-                .alpha(0f).setDuration(300)
-                .setInterpolator(android.view.animation.DecelerateInterpolator())
-                .withEndAction { sparkle.visibility = View.GONE }
-                .start()
-        } else {
-            sparkle.animate().alpha(0f).setDuration(160).withEndAction {
-                sparkle.visibility = View.GONE
-            }.start()
+        if (taken) {
+            // Completion firework at the release point; leftover powder dies on its own.
+            if (prefs.animations) binding.swipeSparkle.burst(x, y)
+            cycleSuggestions(if (dx < 0) 1 else -1)
+        } else if (prefs.animations) {
+            // Cancelled: the trio leans back upright.
+            for (v in suggestionViews()) v.animate().rotationY(0f).setDuration(160).start()
         }
-        if (taken) cycleSuggestions(if (dx < 0) 1 else -1)
     }
 
     private fun applySuggestions(entries: List<AppEntry>, animate: Boolean) {
@@ -1505,6 +1521,7 @@ class MainActivity : AppCompatActivity() {
     private fun bindSuggestion(
         entry: AppEntry?, container: View, icon: ImageView, label: TextView, badge: TextView,
     ) {
+        container.rotationY = 0f // clear any leftover coin-flip lean
         if (entry == null) {
             container.visibility = View.INVISIBLE
             return
@@ -1816,11 +1833,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun nextAlarmText(): String? {
         // Two flawed sources, reconciled: AlarmClockInfo.triggerTime is authoritative
-        // and timezone-safe but MIUI bakes a pre-wake offset into it (07:50 for an
-        // 08:00 alarm); NEXT_ALARM_FORMATTED matches the Clock app but is a deprecated
-        // string some ROMs leave stale or format oddly. Trusting it verbatim is what
-        // used to show plainly wrong (even timezone-shifted-looking) times, so it is
-        // now only believed when it lands within the pre-wake window of the trigger.
+        // and timezone-safe but some clock apps schedule it earlier than the alarm
+        // they display (smart-wake / pre-wake offsets); NEXT_ALARM_FORMATTED matches
+        // the Clock app but is a deprecated string some ROMs leave stale or format
+        // oddly. Trusting it verbatim showed plainly wrong times, so it is only
+        // believed when it lands within the pre-wake window after the trigger.
+        // (Raw values from both sources are visible in the Insights screen.)
         val am = getSystemService(android.app.AlarmManager::class.java) ?: return null
         val info = am.nextAlarmClock ?: return null // framework says no alarm: show none
         val formatted = try {
@@ -1835,7 +1853,7 @@ class MainActivity : AppCompatActivity() {
         val display =
             StatusLine.reconcileAlarmMinutes(StatusLine.parseTimeOfDay(formatted), triggerMinutes)
         if (display != triggerMinutes) {
-            // MIUI pre-wake case: re-time the trigger instant to the Clock app's hour.
+            // Pre-wake case: re-time the trigger instant to the Clock app's hour.
             cal.set(java.util.Calendar.HOUR_OF_DAY, display / 60)
             cal.set(java.util.Calendar.MINUTE, display % 60)
         }
@@ -2013,5 +2031,8 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val SUGGESTION_POOL_SIZE = 12
         const val SPOT_ROTATE_MS = 4500L
+        // Max live lean of the trio while the finger drags; the release animation
+        // finishes the coin turn from there to 90°.
+        const val LIVE_FLIP_DEG = 55f
     }
 }

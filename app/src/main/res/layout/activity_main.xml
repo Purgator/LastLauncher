@@ -420,14 +420,10 @@
         android:importantForAccessibility="no"
         android:visibility="gone" />
 
-    <TextView
+    <fr.arichard.lastlauncher.ui.SparkleView
         android:id="@+id/swipeSparkle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|start"
-        android:text="✧ ✦ ✧ ✦ ✧"
-        android:textColor="@color/accent_cyan"
-        android:textSize="20sp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:importantForAccessibility="no"
         android:visibility="gone" />
 
