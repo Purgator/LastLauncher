@@ -86,7 +86,11 @@ object ApkInstaller {
                         @Suppress("DEPRECATION")
                         intent.getParcelableExtra(Intent.EXTRA_INTENT)
                     }
-                    confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    if (confirm == null) {
+                        Log.w(TAG, "PENDING_USER_ACTION without a confirmation intent")
+                        return
+                    }
+                    confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     try {
                         context.startActivity(confirm)
                     } catch (e: Exception) {
