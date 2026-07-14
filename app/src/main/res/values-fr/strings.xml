@@ -214,6 +214,7 @@
     <string name="insights_ranking_title">Classement actuel (top 10)</string>
     <string name="insights_no_data">pas encore de données — lancez des applications !</string>
     <string name="insights_footer">◈ = trio actuel · ↑boost = boosté par vous · ✉ = notifications actives\nTout ce qui précède ne quitte jamais ce téléphone.</string>
+    <string name="insights_alarm_title">Prochaine alarme — sources système brutes</string>
 
     <string name="cat_updates">Mises à jour</string>
     <string name="pref_auto_update">Mises à jour automatiques</string>
