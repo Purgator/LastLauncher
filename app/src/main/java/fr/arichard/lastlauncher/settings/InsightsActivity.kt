@@ -23,8 +23,70 @@ class InsightsActivity : AppCompatActivity() {
 
         binding.insightsText.text = getString(R.string.insights_loading)
         PredictionEngine.snapshot(this) { snap ->
-            binding.insightsText.text = render(snap)
+            val base = render(snap)
+            binding.insightsText.text = base
+            // The alarm block reads system sources (binder/provider) — off-thread.
+            val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+            executor.execute {
+                val alarm = renderAlarmSources()
+                runOnUiThread {
+                    if (!isDestroyed) binding.insightsText.text = base + alarm
+                }
+                executor.shutdown()
+            }
         }
+    }
+
+    /**
+     * Raw next-alarm data from both system sources, as the launcher sees them.
+     * Diagnostic block: the status-line alarm has repeatedly shown a wrong hour on
+     * the owner's device, and this is the only way to see which source lies.
+     */
+    private fun renderAlarmSources(): String {
+        val sb = StringBuilder()
+        sb.append("\n\n§ ").append(getString(R.string.insights_alarm_title)).append("\n")
+        val tz = java.util.TimeZone.getDefault()
+        sb.append(
+            "  timezone: %s (UTC%+d min)\n".format(
+                java.util.Locale.US, tz.id, tz.getOffset(System.currentTimeMillis()) / 60000
+            )
+        )
+        val info = getSystemService(android.app.AlarmManager::class.java)?.nextAlarmClock
+        if (info == null) {
+            sb.append("  AlarmClockInfo: null\n")
+        } else {
+            val fmt = java.text.SimpleDateFormat(
+                "EEE yyyy-MM-dd HH:mm:ss zzz", java.util.Locale.US
+            )
+            sb.append("  AlarmClockInfo.triggerTime: ").append(info.triggerTime).append("\n")
+            sb.append("    local: ").append(fmt.format(java.util.Date(info.triggerTime))).append("\n")
+            sb.append("    owner: ")
+                .append(info.showIntent?.creatorPackage ?: "?").append("\n")
+        }
+        val formatted = try {
+            @Suppress("DEPRECATION")
+            android.provider.Settings.System.getString(
+                contentResolver, android.provider.Settings.System.NEXT_ALARM_FORMATTED
+            )
+        } catch (e: Exception) {
+            null
+        }
+        sb.append("  NEXT_ALARM_FORMATTED: ")
+            .append(formatted?.let { "\"$it\"" } ?: "null").append("\n")
+        val parsed = StatusLine.parseTimeOfDay(formatted)
+        sb.append("    parsed: ").append(
+            parsed?.let { "%02d:%02d".format(java.util.Locale.US, it / 60, it % 60) } ?: "null"
+        ).append("\n")
+        if (info != null) {
+            val cal = java.util.Calendar.getInstance().apply { timeInMillis = info.triggerTime }
+            val trigger =
+                cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+            val display = StatusLine.reconcileAlarmMinutes(parsed, trigger)
+            sb.append("  status line shows: ").append(
+                "%02d:%02d".format(java.util.Locale.US, display / 60, display % 60)
+            ).append("\n")
+        }
+        return sb.toString()
     }
 
     private fun render(s: PredictionEngine.Snapshot): String {
