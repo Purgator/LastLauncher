@@ -323,14 +323,20 @@ class MainActivity : AppCompatActivity() {
         drawer.dragBy(if (drawerCandidateSide < 0) dx else -dx)
     }
 
-    private fun handleSwipe(dx: Float, dy: Float, dtMs: Long) {
+    private fun handleSwipe(
+        dx: Float, dy: Float, dtMs: Long,
+        fingers: Int = maxPointers.coerceIn(1, 2),
+        fromDrawer: Boolean = false,
+    ) {
         if (dtMs > 700) return
         val density = resources.displayMetrics.density
         val minDist = 90 * density
-        val fingers = maxPointers.coerceIn(1, 2)
         if (abs(dx) > abs(dy) && abs(dx) > minDist) {
             // Across the suggestions row, a horizontal swipe pages the proposed trio.
-            if (binding.suggestionsBlock.visibility == View.VISIBLE && downInSuggestions()) {
+            // (Not for swipes forwarded by a drawer: those never started on the row.)
+            if (!fromDrawer &&
+                binding.suggestionsBlock.visibility == View.VISIBLE && downInSuggestions()
+            ) {
                 cycleSuggestions(if (dx < 0) 1 else -1)
                 return
             }
@@ -355,19 +361,31 @@ class MainActivity : AppCompatActivity() {
             runGesture(GestureBinding.decode(prefs.gestureBinding(key)), drawerSide = if (dx > 0) -1 else 1)
         } else if (abs(dy) > abs(dx) && abs(dy) > minDist) {
             // Vertical stays fixed: up = all apps, down = notifications.
-            if (dy < 0) openAllApps()
-            else if (prefs.swipeDownNotifications) LockService.openNotificationShade(this)
+            if (dy < 0) {
+                haptic(binding.root)
+                openAllApps()
+            } else if (prefs.swipeDownNotifications) {
+                haptic(binding.root)
+                LockService.openNotificationShade(this)
+            }
         }
     }
 
-    /** True when the gesture started within the suggestions row's vertical band. */
+    /**
+     * True when the gesture started in the suggestion-paging band: anywhere from
+     * mid-screen down to the bottom of the row, so cycling the trio doesn't demand
+     * landing the finger on the icons themselves. Two-finger swipes and edge pulls
+     * are excluded upstream, and everything above mid-screen still runs the bound
+     * one-finger gestures.
+     */
     private fun downInSuggestions(): Boolean {
         val loc = IntArray(2)
         binding.suggestionsBlock.getLocationInWindow(loc)
         val rootLoc = IntArray(2)
         binding.root.getLocationInWindow(rootLoc)
-        val top = (loc[1] - rootLoc[1]).toFloat()
-        return downY >= top && downY <= top + binding.suggestionsBlock.height
+        val blockTop = (loc[1] - rootLoc[1]).toFloat()
+        val top = minOf(blockTop, binding.root.height * 0.45f)
+        return downY >= top && downY <= blockTop + binding.suggestionsBlock.height
     }
 
     private fun runGesture(bindingSpec: GestureBinding, drawerSide: Int = -1) {
@@ -410,6 +428,11 @@ class MainActivity : AppCompatActivity() {
             view.onAppDropped = { key, from, to, position -> handleAppDrop(key, from, to, position) }
             view.onItemDragStarted = { entry, v -> onAppDragStarted(entry, v) }
             view.onDragMoved = { x, y -> dragLastX = x; dragLastY = y }
+            // Swipes the drawer doesn't own (inward, or multi-finger) still run their
+            // bound action: `>>` from the left must work while the left drawer is out.
+            view.onSwipe = { dx, dy, dtMs, fingers ->
+                handleSwipe(dx, dy, dtMs, fingers.coerceIn(1, 2), fromDrawer = true)
+            }
             view.init(
                 side = drawer.second,
                 iconOf = { entry -> repo.icon(entry) },
@@ -647,6 +670,9 @@ class MainActivity : AppCompatActivity() {
     private fun onDragEnded(success: Boolean) {
         val source = dragSourceView ?: return
         dragSourceView = null
+        // A rejected drop deserves feedback too — the accepted path buzzes in
+        // handleAppDrop, so without this a failed drop just feels dead.
+        if (!success) haptic(binding.root)
         if (success || !prefs.animations || dragIcon == null) {
             source.animate().alpha(1f).setDuration(150).start()
             return
@@ -1074,15 +1100,25 @@ class MainActivity : AppCompatActivity() {
      */
     private fun showStarterPicker() {
         val apps = repo.visibleApps(prefs.hiddenApps)
-        if (apps.isEmpty()) return
-        val current = prefs.favorites.ifEmpty { PredictionEngine.defaultPicks(this) }
-        val items = apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
-        val checked = BooleanArray(apps.size) { apps[it].packageName in current }
-        AppPickerDialog.multiChoice(this, getString(R.string.starter_dialog_title), items, checked) {
-            prefs.favorites = apps.indices.filter { checked[it] }.map { apps[it].packageName }
-            prefs.onboardingDone = true
-            updateStarterPill()
-            refreshSuggestions()
+        if (apps.isEmpty() || ioExecutor.isShutdown) return
+        ioExecutor.execute {
+            // defaultPicks resolves phone/SMS/browser/camera via PackageManager — IPC,
+            // so not UI-thread work.
+            val current = prefs.favorites.ifEmpty { PredictionEngine.defaultPicks(this) }
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                val items = apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
+                val checked = BooleanArray(apps.size) { apps[it].packageName in current }
+                AppPickerDialog.multiChoice(
+                    this, getString(R.string.starter_dialog_title), items, checked
+                ) {
+                    prefs.favorites =
+                        apps.indices.filter { checked[it] }.map { apps[it].packageName }
+                    prefs.onboardingDone = true
+                    updateStarterPill()
+                    refreshSuggestions()
+                }
+            }
         }
     }
 
@@ -1397,17 +1433,20 @@ class MainActivity : AppCompatActivity() {
         val scale = 0.55f + 0.55f * progress
         glow.scaleX = scale
         glow.scaleY = scale
-        // Sparkles bloom over the last stretch before the swipe completes.
+        // Sparkles bloom early and grow with the pull, overdriving past the trigger
+        // point so the payoff is unmistakable rather than a last-moment flicker.
         val sparkle = binding.swipeSparkle
-        val bloom = ((progress - 0.6f) / 0.4f).coerceIn(0f, 1f)
+        val bloom = ((progress - 0.25f) / 0.45f).coerceIn(0f, 1f)
         if (bloom > 0f) {
+            val overdrive = ((progress - 1f).coerceAtLeast(0f) / 0.3f) * 0.6f
+            val pop = 0.8f + 0.9f * bloom + overdrive
             sparkle.visibility = View.VISIBLE
-            sparkle.alpha = bloom
+            sparkle.alpha = 0.4f + 0.6f * bloom
             sparkle.x = event.x - sparkle.width / 2f
             sparkle.y = event.y - half - sparkle.height
-            sparkle.scaleX = 0.7f + 0.5f * bloom
-            sparkle.scaleY = 0.7f + 0.5f * bloom
-            sparkle.rotation = dx * 0.04f
+            sparkle.scaleX = pop
+            sparkle.scaleY = pop
+            sparkle.rotation = dx * 0.06f
         } else {
             sparkle.visibility = View.GONE
         }
@@ -1423,15 +1462,27 @@ class MainActivity : AppCompatActivity() {
     private fun finishSuggestionSwipe(dx: Float, confirmed: Boolean) {
         suggSwipeActive = false
         suggSwipeCandidate = false
+        val taken = confirmed && abs(dx) >= suggTriggerPx()
         binding.swipeGlow.animate().alpha(0f).setDuration(160).withEndAction {
             binding.swipeGlow.visibility = View.GONE
         }.start()
-        binding.swipeSparkle.animate().alpha(0f).setDuration(160).withEndAction {
-            binding.swipeSparkle.visibility = View.GONE
-        }.start()
-        if (confirmed && abs(dx) >= suggTriggerPx()) {
-            cycleSuggestions(if (dx < 0) 1 else -1)
+        val sparkle = binding.swipeSparkle
+        if (taken && sparkle.visibility == View.VISIBLE) {
+            // Completion burst: the sparkles flare outward as they go, instead of
+            // the same quiet fade a cancelled swipe gets.
+            sparkle.animate()
+                .scaleX(sparkle.scaleX * 1.8f).scaleY(sparkle.scaleY * 1.8f)
+                .rotationBy(if (dx < 0) -25f else 25f)
+                .alpha(0f).setDuration(300)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .withEndAction { sparkle.visibility = View.GONE }
+                .start()
+        } else {
+            sparkle.animate().alpha(0f).setDuration(160).withEndAction {
+                sparkle.visibility = View.GONE
+            }.start()
         }
+        if (taken) cycleSuggestions(if (dx < 0) 1 else -1)
     }
 
     private fun applySuggestions(entries: List<AppEntry>, animate: Boolean) {
@@ -1657,44 +1708,55 @@ class MainActivity : AppCompatActivity() {
             binding.statusLine.visibility = View.GONE
             return
         }
-        // Compute only the fields that are actually shown.
-        var percent = 0
-        var charging = false
-        if (StatusLine.BATTERY in enabled) {
-            val battery = registerReceiver(
-                null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-            )
-            val level = battery?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
-            val scale = battery?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100) ?: 100
-            percent = if (level >= 0 && scale > 0) level * 100 / scale else 0
-            val status = battery?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
-            charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
-                status == android.os.BatteryManager.BATTERY_STATUS_FULL
-        }
-        val net = if (StatusLine.NETWORK in enabled) currentNet() else StatusLine.Net.OFFLINE
-        val alarm = if (StatusLine.ALARM in enabled) nextAlarmText() else null
-        val storage = if (StatusLine.STORAGE in enabled) freeStorageGb() else 0.0
-        val dbBytes = if (StatusLine.DB in enabled) {
-            try {
-                getDatabasePath("usage.db").length()
-            } catch (e: Exception) {
-                0L
+        if (ioExecutor.isShutdown) return
+        // This runs every minute while the launcher is in front, and each field is a
+        // binder or disk read — gather them off-thread, render back on main.
+        ioExecutor.execute {
+            // Compute only the fields that are actually shown.
+            var percent = 0
+            var charging = false
+            if (StatusLine.BATTERY in enabled) {
+                val battery = registerReceiver(
+                    null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+                )
+                val level = battery?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                val scale = battery?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100) ?: 100
+                percent = if (level >= 0 && scale > 0) level * 100 / scale else 0
+                val status = battery?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+                charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                    status == android.os.BatteryManager.BATTERY_STATUS_FULL
             }
-        } else 0L
+            val net = if (StatusLine.NETWORK in enabled) currentNet() else StatusLine.Net.OFFLINE
+            val alarm = if (StatusLine.ALARM in enabled) nextAlarmText() else null
+            val storage = if (StatusLine.STORAGE in enabled) freeStorageGb() else 0.0
+            val dbBytes = if (StatusLine.DB in enabled) {
+                try {
+                    getDatabasePath("usage.db").length()
+                } catch (e: Exception) {
+                    0L
+                }
+            } else 0L
 
-        fun render(launches: Int) {
-            binding.statusLine.text = clickableStatusText(
-                StatusLine.segments(
-                    enabled,
-                    StatusLine.Values(percent, charging, net, alarm, launches, storage, dbBytes)
-                ),
-                net
-            )
-            binding.statusLine.movementMethod = android.text.method.LinkMovementMethod.getInstance()
-            binding.statusLine.visibility = View.VISIBLE
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                fun render(launches: Int) {
+                    binding.statusLine.text = clickableStatusText(
+                        StatusLine.segments(
+                            enabled,
+                            StatusLine.Values(
+                                percent, charging, net, alarm, launches, storage, dbBytes
+                            )
+                        ),
+                        net
+                    )
+                    binding.statusLine.movementMethod =
+                        android.text.method.LinkMovementMethod.getInstance()
+                    binding.statusLine.visibility = View.VISIBLE
+                }
+                if (StatusLine.LAUNCHES in enabled) PredictionEngine.launchesToday(this) { render(it) }
+                else render(0)
+            }
         }
-        if (StatusLine.LAUNCHES in enabled) PredictionEngine.launchesToday(this) { render(it) }
-        else render(0)
     }
 
     /** Each token becomes tappable, opening its related app or settings screen. */
@@ -1753,21 +1815,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun nextAlarmText(): String? {
-        // Prefer the system's own formatted next-alarm string: some OEM clocks (MIUI…)
-        // report AlarmClockInfo with a pre-wake offset, showing e.g. 07:50 for an
-        // 08:00 alarm, while this setting matches what the Clock app displays.
-        try {
-            @Suppress("DEPRECATION")
-            val formatted = Settings.System.getString(
-                contentResolver, Settings.System.NEXT_ALARM_FORMATTED
-            )
-            if (!formatted.isNullOrBlank()) return formatted.trim()
-        } catch (e: Exception) {
-            // fall through to AlarmClockInfo
-        }
+        // Two flawed sources, reconciled: AlarmClockInfo.triggerTime is authoritative
+        // and timezone-safe but MIUI bakes a pre-wake offset into it (07:50 for an
+        // 08:00 alarm); NEXT_ALARM_FORMATTED matches the Clock app but is a deprecated
+        // string some ROMs leave stale or format oddly. Trusting it verbatim is what
+        // used to show plainly wrong (even timezone-shifted-looking) times, so it is
+        // now only believed when it lands within the pre-wake window of the trigger.
         val am = getSystemService(android.app.AlarmManager::class.java) ?: return null
-        val info = am.nextAlarmClock ?: return null
-        return android.text.format.DateFormat.getTimeFormat(this).format(info.triggerTime)
+        val info = am.nextAlarmClock ?: return null // framework says no alarm: show none
+        val formatted = try {
+            @Suppress("DEPRECATION")
+            Settings.System.getString(contentResolver, Settings.System.NEXT_ALARM_FORMATTED)
+        } catch (e: Exception) {
+            null
+        }
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = info.triggerTime }
+        val triggerMinutes =
+            cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+        val display =
+            StatusLine.reconcileAlarmMinutes(StatusLine.parseTimeOfDay(formatted), triggerMinutes)
+        if (display != triggerMinutes) {
+            // MIUI pre-wake case: re-time the trigger instant to the Clock app's hour.
+            cal.set(java.util.Calendar.HOUR_OF_DAY, display / 60)
+            cal.set(java.util.Calendar.MINUTE, display % 60)
+        }
+        return android.text.format.DateFormat.getTimeFormat(this).format(cal.time)
     }
 
     // ------------------------------------------------------ new-app spotlight
