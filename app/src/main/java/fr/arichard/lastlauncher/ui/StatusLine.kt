@@ -65,7 +65,7 @@ object StatusLine {
 
     private const val MINUTES_PER_DAY = 24 * 60
 
-    /** MIUI "sleep mode" reports the trigger up to ~this early vs the Clock app. */
+    /** Some OEM clocks report the trigger up to ~this early vs what their UI shows. */
     const val ALARM_PREWAKE_MAX_MIN = 20
 
     /**
@@ -94,8 +94,10 @@ object StatusLine {
         var hour = match.groupValues[1].toInt()
         val minute = match.groupValues[2].toInt()
         if (hour > 23 || minute > 59) return null
-        val rest = text.substring(match.range.last + 1).trimStart()
-            .take(4).lowercase().replace(".", "")
+        // AM/PM may be separated by a narrow no-break space (U+202F on newer
+        // Android) that trimStart() won't touch — keep only letters instead.
+        val rest = text.substring(match.range.last + 1)
+            .filter { it.isLetter() }.take(2).lowercase()
         if (rest.startsWith("pm") && hour < 12) hour += 12
         if (rest.startsWith("am") && hour == 12) hour = 0
         return hour * 60 + minute

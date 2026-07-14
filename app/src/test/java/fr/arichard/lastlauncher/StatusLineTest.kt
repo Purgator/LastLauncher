@@ -82,6 +82,8 @@ class StatusLineTest {
         assertEquals(min(8, 0), StatusLine.parseTimeOfDay("Tue 8:00"))
         assertEquals(min(20, 0), StatusLine.parseTimeOfDay("8:00 PM"))
         assertEquals(min(20, 0), StatusLine.parseTimeOfDay("Tue 8:00 p.m."))
+        // Narrow no-break space before the meridiem (CLDR on recent Android).
+        assertEquals(min(20, 0), StatusLine.parseTimeOfDay("8:00\u202FPM"))
         assertEquals(min(0, 15), StatusLine.parseTimeOfDay("12:15 AM"))
         assertEquals(min(12, 15), StatusLine.parseTimeOfDay("12:15 PM"))
         assertEquals(null, StatusLine.parseTimeOfDay(null))
