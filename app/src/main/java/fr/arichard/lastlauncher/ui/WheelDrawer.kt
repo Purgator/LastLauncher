@@ -80,6 +80,7 @@ class WheelDrawer @JvmOverloads constructor(
     private var onLongClick: (AppEntry, View) -> Unit = { _, _ -> }
     private var onClosed: () -> Unit = {}
     private var onVisibleChanged: (Boolean) -> Unit = {}
+    private var onOpened: () -> Unit = {}
 
     /** (componentKey, fromDrawer, toDrawer, position) → whether the drop was accepted. */
     var onAppDropped: (String, Int, Int, Int) -> Boolean = { _, _, _, _ -> false }
@@ -152,6 +153,7 @@ class WheelDrawer @JvmOverloads constructor(
         onLongClick: (AppEntry, View) -> Unit,
         onClosed: () -> Unit,
         onVisibleChanged: (Boolean) -> Unit = {},
+        onOpened: () -> Unit = {},
     ) {
         this.side = side
         this.iconOf = iconOf
@@ -160,6 +162,7 @@ class WheelDrawer @JvmOverloads constructor(
         this.onLongClick = onLongClick
         this.onClosed = onClosed
         this.onVisibleChanged = onVisibleChanged
+        this.onOpened = onOpened
     }
 
     fun bind(apps: List<AppEntry>, drawerIndex: Int = boundIndex) {
@@ -298,9 +301,14 @@ class WheelDrawer @JvmOverloads constructor(
 
     private fun animateTo(target: Float, animate: Boolean) {
         settleAnimator?.cancel()
+        val wasOpen = isOpen
+        fun settled() {
+            if (target <= 0f) onClosed()
+            else if (target >= 1f && !wasOpen) onOpened()
+        }
         if (!animate) {
             applyProgress(target)
-            if (target <= 0f) onClosed()
+            settled()
             return
         }
         settleAnimator = ValueAnimator.ofFloat(progress, target).apply {
@@ -309,7 +317,7 @@ class WheelDrawer @JvmOverloads constructor(
             addUpdateListener { applyProgress(it.animatedValue as Float) }
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 override fun onAnimationEnd(a: android.animation.Animator) {
-                    if (target <= 0f) onClosed()
+                    settled()
                 }
             })
             start()
