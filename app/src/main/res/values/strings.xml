@@ -46,6 +46,17 @@
     <string name="menu_unboost">Remove boost</string>
     <string name="menu_uninstall">Uninstall</string>
     <string name="menu_hide">Hide from list</string>
+    <string name="menu_add_to_drawer">Add to a drawer…</string>
+    <string name="drawer_drop_needs_list">This drawer shows all apps — pick its apps first (Settings → Apps) to give it an order</string>
+
+    <!-- New-app spotlight -->
+    <string name="cat_new_app_spot">New-app spotlight</string>
+    <string name="pref_new_app_spot">Shine fresh installs</string>
+    <string name="pref_new_app_spot_summary">A just-installed app glows on the screen edge for a while, so you remember it. Several new apps take turns.</string>
+    <string name="pref_new_app_side">Spotlight side</string>
+    <string name="pref_new_app_hours">Hours it stays</string>
+    <string name="side_left">Left</string>
+    <string name="side_right">Right</string>
 
     <!-- Lock / gestures -->
     <string name="lock_service_label">LastLauncher actions</string>
