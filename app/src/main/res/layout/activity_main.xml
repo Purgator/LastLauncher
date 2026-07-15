@@ -88,6 +88,17 @@
             tools:text="› 82%⚡  ·  wifi  ·  ⏰07:00  ·  ↑23"
             tools:visibility="visible" />
 
+        <!-- Agenda stream: upcoming calendar events as quiet terminal lines. -->
+        <fr.arichard.lastlauncher.calendar.AgendaView
+            android:id="@+id/agenda"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:requiresFadingEdge="vertical"
+            android:fadingEdgeLength="16dp"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
         <!-- Message ticker: one unread message at a time, fading between them. -->
         <LinearLayout
             android:id="@+id/ticker"

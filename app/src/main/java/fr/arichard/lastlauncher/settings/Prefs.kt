@@ -151,6 +151,28 @@ class Prefs(context: Context) {
             .apply()
     }
 
+    // --------------------------------------------------------------- agenda
+
+    /** Upcoming calendar events on the home screen (needs READ_CALENDAR). */
+    val agendaEnabled: Boolean get() = sp.getBoolean(KEY_AGENDA_ENABLED, true)
+
+    /** How many days ahead the stream covers. */
+    val agendaDays: Int
+        get() = (sp.getString(KEY_AGENDA_DAYS, "7") ?: "7").toIntOrNull()?.coerceIn(1, 31) ?: 7
+
+    /** Tapping an event: unfold inline (default) or jump to the calendar app. */
+    val agendaTapOpensApp: Boolean
+        get() = (sp.getString(KEY_AGENDA_TAP, "inline") ?: "inline") == "app"
+
+    /** Calendar ids hidden from the stream (empty = show every calendar). */
+    var agendaExcludedCalendars: Set<String>
+        get() = sp.getStringSet(KEY_AGENDA_EXCLUDED, emptySet()) ?: emptySet()
+        set(value) = sp.edit().putStringSet(KEY_AGENDA_EXCLUDED, value).apply()
+
+    var calendarPermissionAsked: Boolean
+        get() = sp.getBoolean(KEY_CAL_PERM_ASKED, false)
+        set(value) = sp.edit().putBoolean(KEY_CAL_PERM_ASKED, value).apply()
+
     // -------------------------------------------------------- notifications
 
     /** Show unread-count bubbles on app icons (needs notification access). */
@@ -306,5 +328,10 @@ class Prefs(context: Context) {
         const val KEY_NEW_APPS = "new_apps"
         const val MAX_NEW_APPS = 10
         const val KEY_SEARCH_MODE = "search_mode"
+        const val KEY_AGENDA_ENABLED = "agenda_enabled"
+        const val KEY_AGENDA_DAYS = "agenda_days"
+        const val KEY_AGENDA_TAP = "agenda_tap"
+        const val KEY_AGENDA_EXCLUDED = "agenda_excluded_calendars"
+        const val KEY_CAL_PERM_ASKED = "calendar_permission_asked"
     }
 }

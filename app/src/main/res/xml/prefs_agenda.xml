@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <SwitchPreferenceCompat
+        android:key="agenda_enabled"
+        android:title="@string/pref_agenda_enabled"
+        android:summary="@string/pref_agenda_enabled_summary"
+        android:defaultValue="true" />
+    <ListPreference
+        android:key="agenda_days"
+        android:title="@string/pref_agenda_days"
+        android:entries="@array/agenda_days_entries"
+        android:entryValues="@array/agenda_days_values"
+        android:defaultValue="7"
+        android:dependency="agenda_enabled"
+        app:useSimpleSummaryProvider="true" />
+    <ListPreference
+        android:key="agenda_tap"
+        android:title="@string/pref_agenda_tap"
+        android:entries="@array/agenda_tap_entries"
+        android:entryValues="@array/agenda_tap_values"
+        android:defaultValue="inline"
+        android:dependency="agenda_enabled"
+        app:useSimpleSummaryProvider="true" />
+    <Preference
+        android:key="agenda_calendars"
+        android:title="@string/pref_agenda_calendars"
+        android:summary="@string/pref_agenda_calendars_summary"
+        android:dependency="agenda_enabled" />
+</PreferenceScreen>

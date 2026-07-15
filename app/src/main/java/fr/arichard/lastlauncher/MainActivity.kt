@@ -33,6 +33,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import fr.arichard.lastlauncher.apps.AppEntry
 import fr.arichard.lastlauncher.apps.AppRepository
+import fr.arichard.lastlauncher.calendar.Agenda
+import fr.arichard.lastlauncher.calendar.CalendarFeed
 import fr.arichard.lastlauncher.command.CommandProcessor
 import fr.arichard.lastlauncher.command.SearchMode
 import fr.arichard.lastlauncher.databinding.ActivityMainBinding
@@ -97,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         }
         setupContextualLongPress()
         setupDragWatcher()
+        setupAgenda()
         repo.addListener(repoListener)
         NotifListener.addListener(notifListener)
     }
@@ -136,11 +139,14 @@ class MainActivity : AppCompatActivity() {
         updateStarterPill()
         refreshSuggestions()
         maybeRequestBluetoothPermission()
+        maybeRequestCalendarPermission()
         checkForUpdate()
         setupStatusLine()
         NotifListener.ensureBound(this)
         startTicker()
         refreshWeather()
+        refreshAgenda()
+        registerAgendaObserver()
         updateNewAppSpot()
     }
 
@@ -150,6 +156,7 @@ class MainActivity : AppCompatActivity() {
         stopTicker()
         stopNewAppSpot()
         unregisterStatusReceiver()
+        unregisterAgendaObserver()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -731,6 +738,7 @@ class MainActivity : AppCompatActivity() {
             binding.results.visibility = View.GONE
             binding.suggestionsBlock.visibility = View.VISIBLE
             startHints()
+            renderAgenda()
             return
         }
 
@@ -747,6 +755,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.results.visibility = View.VISIBLE
         binding.suggestionsBlock.visibility = View.INVISIBLE
+        binding.agenda.visibility = View.GONE
         binding.results.scrollToPosition(0)
         stopHints()
         binding.hintLeft.visibility = View.GONE
@@ -797,6 +806,7 @@ class MainActivity : AppCompatActivity() {
         binding.results.visibility = View.GONE
         binding.suggestionsBlock.visibility = View.VISIBLE
         startHints()
+        renderAgenda()
         updateNewAppSpot()
         if (prefs.keyboardAlways) {
             focusSearch(show = true)
@@ -1682,24 +1692,26 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupStatusLine() {
         unregisterStatusReceiver()
-        if (!prefs.showStatusLine) {
-            binding.statusLine.visibility = View.GONE
-            return
-        }
         val enabled = prefs.statusTokens
-        if (enabled.isEmpty()) {
+        val statusOn = prefs.showStatusLine && enabled.isNotEmpty()
+        if (!statusOn) {
             binding.statusLine.visibility = View.GONE
-            return
+        } else {
+            binding.statusLine.setTextColor(ColorUtils.setAlphaComponent(accentColor(), 0xC0))
+            refreshStatusLine()
         }
-        binding.statusLine.setTextColor(ColorUtils.setAlphaComponent(accentColor(), 0xC0))
-        refreshStatusLine()
-        // A minute tick covers alarm/launches/network; only subscribe to the (frequent)
+        // The minute tick drives both the status line and the agenda countdown, so
+        // it's registered when either is live. Only subscribe to the (frequent)
         // battery broadcasts when the battery token is actually shown.
+        if (!statusOn && !prefs.agendaEnabled) return
         statusReceiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(c: android.content.Context?, i: Intent?) = refreshStatusLine()
+            override fun onReceive(c: android.content.Context?, i: Intent?) {
+                if (statusOn) refreshStatusLine()
+                if (i?.action == Intent.ACTION_TIME_TICK) renderAgenda()
+            }
         }
         val filter = android.content.IntentFilter(Intent.ACTION_TIME_TICK)
-        if (StatusLine.BATTERY in enabled) {
+        if (statusOn && StatusLine.BATTERY in enabled) {
             filter.addAction(Intent.ACTION_BATTERY_CHANGED)
             filter.addAction(Intent.ACTION_POWER_CONNECTED)
             filter.addAction(Intent.ACTION_POWER_DISCONNECTED)
@@ -1858,6 +1870,96 @@ class MainActivity : AppCompatActivity() {
             cal.set(java.util.Calendar.MINUTE, display % 60)
         }
         return android.text.format.DateFormat.getTimeFormat(this).format(cal.time)
+    }
+
+    // --------------------------------------------------------------- agenda
+
+    private var agendaEvents: List<Agenda.EventInstance> = emptyList()
+    private var agendaObserver: android.database.ContentObserver? = null
+    private val agendaHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val agendaReload = Runnable { refreshAgenda() }
+
+    private fun setupAgenda() {
+        binding.agenda.haptic = { v -> haptic(v) }
+        binding.agenda.onLocationClick = { location ->
+            // Straight into navigation: any maps app resolves the geo query.
+            startActivitySafely(
+                Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(location)))
+            )
+        }
+        binding.agenda.onOpenEvent = { event ->
+            startActivitySafely(
+                Intent(Intent.ACTION_VIEW)
+                    .setData(
+                        android.content.ContentUris.withAppendedId(
+                            android.provider.CalendarContract.Events.CONTENT_URI, event.eventId
+                        )
+                    )
+                    .putExtra(
+                        android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.begin
+                    )
+                    .putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, event.end)
+            )
+        }
+        // The stream forwards what it doesn't use, like the drawers do.
+        binding.agenda.onSwipe = { dx, dy, dtMs, fingers ->
+            handleSwipe(dx, dy, dtMs, fingers.coerceIn(1, 2), fromDrawer = true)
+        }
+    }
+
+    private fun refreshAgenda() {
+        if (!prefs.agendaEnabled || !CalendarFeed.hasPermission(this)) {
+            binding.agenda.visibility = View.GONE
+            return
+        }
+        CalendarFeed.load(this, prefs.agendaDays, prefs.agendaExcludedCalendars) { events ->
+            if (isDestroyed) return@load
+            agendaEvents = events
+            renderAgenda()
+        }
+    }
+
+    /** Re-derives rows from cached events — cheap, also runs on the minute tick. */
+    private fun renderAgenda() {
+        if (!prefs.agendaEnabled || !CalendarFeed.hasPermission(this)) {
+            binding.agenda.visibility = View.GONE
+            return
+        }
+        val rows = Agenda.rows(agendaEvents, System.currentTimeMillis())
+        binding.agenda.tapOpensApp = prefs.agendaTapOpensApp
+        binding.agenda.setAccent(accentColor())
+        binding.agenda.submit(rows)
+        binding.agenda.visibility =
+            if (rows.isEmpty() || binding.results.visibility == View.VISIBLE) View.GONE
+            else View.VISIBLE
+    }
+
+    private fun registerAgendaObserver() {
+        if (!prefs.agendaEnabled || !CalendarFeed.hasPermission(this)) return
+        val observer = object : android.database.ContentObserver(agendaHandler) {
+            override fun onChange(selfChange: Boolean) {
+                // Provider syncs fire bursts of change events; coalesce to one reload.
+                agendaHandler.removeCallbacks(agendaReload)
+                agendaHandler.postDelayed(agendaReload, 500)
+            }
+        }
+        contentResolver.registerContentObserver(
+            android.provider.CalendarContract.CONTENT_URI, true, observer
+        )
+        agendaObserver = observer
+    }
+
+    private fun unregisterAgendaObserver() {
+        agendaHandler.removeCallbacks(agendaReload)
+        agendaObserver?.let { contentResolver.unregisterContentObserver(it) }
+        agendaObserver = null
+    }
+
+    private fun maybeRequestCalendarPermission() {
+        if (!prefs.agendaEnabled || prefs.calendarPermissionAsked) return
+        if (CalendarFeed.hasPermission(this)) return
+        prefs.calendarPermissionAsked = true
+        requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 2)
     }
 
     // ------------------------------------------------------ new-app spotlight

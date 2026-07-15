@@ -216,6 +216,28 @@
     <string name="insights_footer">◈ = trio actuel · ↑boost = boosté par vous · ✉ = notifications actives\nTout ce qui précède ne quitte jamais ce téléphone.</string>
     <string name="insights_alarm_title">Prochaine alarme — sources système brutes</string>
 
+    <!-- Agenda stream -->
+    <string name="cat_agenda">Calendrier</string>
+    <string name="screen_agenda_summary">Les prochains événements sur l\'écran d\'accueil</string>
+    <string name="pref_agenda_enabled">Afficher les prochains événements</string>
+    <string name="pref_agenda_enabled_summary">Un fil d\'agenda discret sous la ligne d\'état. Les événements ne quittent jamais le téléphone.</string>
+    <string name="pref_agenda_days">Jours affichés</string>
+    <string name="pref_agenda_tap">Appui sur un événement</string>
+    <string name="pref_agenda_calendars">Calendriers</string>
+    <string name="pref_agenda_calendars_summary">Choisir les calendriers affichés</string>
+    <string name="agenda_needs_permission">L\'accès au calendrier est nécessaire pour afficher les événements</string>
+    <string name="agenda_days_3">3 jours</string>
+    <string name="agenda_days_7">7 jours</string>
+    <string name="agenda_days_14">14 jours</string>
+    <string name="agenda_tap_inline">Déplier les détails sur place</string>
+    <string name="agenda_tap_app">Ouvrir l\'application agenda</string>
+    <string name="agenda_tomorrow">demain</string>
+    <string name="agenda_all_day">journée</string>
+    <string name="agenda_now">maintenant</string>
+    <string name="agenda_in_min">dans %d min</string>
+    <string name="agenda_in_hours">dans %1$d h %2$02d</string>
+    <string name="agenda_open_event">ouvrir dans l\'agenda</string>
+
     <string name="cat_updates">Mises à jour</string>
     <string name="pref_auto_update">Mises à jour automatiques</string>
     <string name="pref_auto_update_summary">Vérifie GitHub une fois par jour et télécharge les nouvelles versions en Wi-Fi</string>
