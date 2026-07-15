@@ -33,4 +33,32 @@
         android:title="@string/pref_agenda_calendars"
         android:summary="@string/pref_agenda_calendars_summary"
         android:dependency="agenda_enabled" />
+    <ListPreference
+        android:key="agenda_lines"
+        android:title="@string/pref_agenda_lines"
+        android:entries="@array/agenda_lines_entries"
+        android:entryValues="@array/agenda_lines_values"
+        android:defaultValue="6"
+        android:dependency="agenda_enabled"
+        app:useSimpleSummaryProvider="true" />
+    <ListPreference
+        android:key="agenda_text_size"
+        android:title="@string/pref_agenda_text_size"
+        android:entries="@array/agenda_text_entries"
+        android:entryValues="@array/agenda_text_values"
+        android:defaultValue="medium"
+        android:dependency="agenda_enabled"
+        app:useSimpleSummaryProvider="true" />
+    <SwitchPreferenceCompat
+        android:key="agenda_all_day"
+        android:title="@string/pref_agenda_all_day"
+        android:summary="@string/pref_agenda_all_day_summary"
+        android:defaultValue="true"
+        android:dependency="agenda_enabled" />
+    <SwitchPreferenceCompat
+        android:key="agenda_countdown"
+        android:title="@string/pref_agenda_countdown"
+        android:summary="@string/pref_agenda_countdown_summary"
+        android:defaultValue="true"
+        android:dependency="agenda_enabled" />
 </PreferenceScreen>

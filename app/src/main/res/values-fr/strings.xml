@@ -240,6 +240,19 @@
     <string name="agenda_in_hours">dans %1$d h %2$02d</string>
     <string name="agenda_open_event">ouvrir dans l\'agenda</string>
     <string name="gesture_agenda">Agenda</string>
+    <string name="pref_agenda_lines">Hauteur du fil</string>
+    <string name="agenda_lines_4">4 lignes</string>
+    <string name="agenda_lines_6">6 lignes</string>
+    <string name="agenda_lines_8">8 lignes</string>
+    <string name="agenda_lines_10">10 lignes</string>
+    <string name="pref_agenda_text_size">Taille du texte</string>
+    <string name="agenda_text_small">Petite</string>
+    <string name="agenda_text_medium">Moyenne</string>
+    <string name="agenda_text_large">Grande</string>
+    <string name="pref_agenda_all_day">Événements sur la journée</string>
+    <string name="pref_agenda_all_day_summary">Afficher anniversaires, fêtes et autres entrées d\'une journée</string>
+    <string name="pref_agenda_countdown">Compte à rebours du prochain événement</string>
+    <string name="pref_agenda_countdown_summary">« dans 25 min » à côté de l\'événement en surbrillance, actualisé chaque minute</string>
     <string name="pref_agenda_on_gesture">Afficher via un geste uniquement</string>
     <string name="pref_agenda_on_gesture_summary">Garde l\'accueil épuré : le fil apparaît quand un geste lié à « Agenda » l\'appelle (à lier dans Gestes)</string>
 
