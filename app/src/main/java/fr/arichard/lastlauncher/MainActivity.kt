@@ -885,6 +885,7 @@ class MainActivity : AppCompatActivity() {
             CommandProcessor.QuickAction("flashlight", getString(R.string.cmd_flashlight), R.drawable.ic_flashlight, "torch light lamp"),
             CommandProcessor.QuickAction("assistant", getString(R.string.cmd_assistant), R.drawable.ic_assistant, "gemini voice"),
             CommandProcessor.QuickAction("all_apps", getString(R.string.cmd_all_apps), R.drawable.ic_apps, "drawer list"),
+            CommandProcessor.QuickAction("launcher_settings", getString(R.string.cmd_launcher_settings), R.drawable.ic_settings, "launcher lastlauncher home options preferences settings parametres paramètres reglages réglages"),
             // Settings destinations
             CommandProcessor.QuickAction("wifi", getString(R.string.cmd_wifi), R.drawable.ic_wifi, "wifi network internet"),
             CommandProcessor.QuickAction("bluetooth", getString(R.string.cmd_bluetooth), R.drawable.ic_bluetooth, "bluetooth bt"),
@@ -929,6 +930,7 @@ class MainActivity : AppCompatActivity() {
             "flashlight" -> toggleFlashlight()
             "assistant" -> launchAssistant()
             "all_apps" -> openAllApps()
+            "launcher_settings" -> SettingsActivity.open(this)
             "wifi" -> openSettingsAction(Settings.ACTION_WIFI_SETTINGS)
             "bluetooth" -> openSettingsAction(Settings.ACTION_BLUETOOTH_SETTINGS)
             "battery" -> openSettingsAction(Intent.ACTION_POWER_USAGE_SUMMARY)

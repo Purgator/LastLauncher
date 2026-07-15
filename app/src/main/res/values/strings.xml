@@ -215,6 +215,8 @@
     <string name="insights_no_data">no data yet — launch some apps!</string>
     <string name="insights_footer">◈ = current trio · ↑boost = boosted by you · ✉ = active notifications\nEverything above lives only on this phone.</string>
     <string name="insights_alarm_title">Next alarm — raw system sources</string>
+    <string name="cmd_launcher_settings">Launcher settings</string>
+    <string name="default_launcher_done">LastLauncher is your default launcher ✓</string>
 
     <!-- Agenda stream -->
     <string name="cat_agenda">Calendar</string>
