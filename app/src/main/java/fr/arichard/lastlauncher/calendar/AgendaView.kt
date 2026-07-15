@@ -215,15 +215,20 @@ class AgendaView @JvmOverloads constructor(
         else -> context.getString(R.string.agenda_in_hours, minutes / 60, minutes % 60)
     }
 
-    // The stream shows at most the configured number of lines (defensively also
-    // never past 35% of the screen) — the launcher below must stay usable; deeper
-    // days scroll instead.
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+    /** Height budget in px: the configured lines, never past 30% of the screen. */
+    private fun heightCap(): Int {
         val lineH = textSizeSp * 1.75f * density // text + leading + row padding
-        val cap = minOf(
+        return minOf(
             (maxLines * lineH).toInt(),
-            (resources.displayMetrics.heightPixels * 0.35f).toInt(),
+            (resources.displayMetrics.heightPixels * 0.30f).toInt(),
         )
+    }
+
+    // The stream shows at most the configured number of lines — the launcher below
+    // must stay usable; deeper days scroll instead. The post-measure clamp is the
+    // hard guarantee: whatever spec the parent sends, the box never exceeds the cap.
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val cap = heightCap()
         val capped = when (MeasureSpec.getMode(heightMeasureSpec)) {
             MeasureSpec.UNSPECIFIED -> MeasureSpec.makeMeasureSpec(cap, MeasureSpec.AT_MOST)
             else -> MeasureSpec.makeMeasureSpec(
@@ -231,13 +236,15 @@ class AgendaView @JvmOverloads constructor(
             )
         }
         super.onMeasure(widthMeasureSpec, capped)
+        if (measuredHeight > cap) setMeasuredDimension(measuredWidth, cap)
     }
 
     /**
-     * Discrete scroll indicator: a thin accent rail to the right of the block,
-     * visible only when there is more to scroll — it both places you in the
-     * horizon and signals "this scrolls" (as opposed to the all-apps swipe).
-     * Static drawing, repainted only by real scroll invalidations.
+     * The box and the scroll rail, drawn only when the horizon overflows the
+     * viewport: a faint rounded outline that makes the stream read as a bounded
+     * widget, and a thin accent track+thumb that places you in the scroll — so
+     * a drag here clearly moves the agenda, not the app list. Static drawing,
+     * repainted only by real scroll invalidations.
      */
     override fun dispatchDraw(canvas: android.graphics.Canvas) {
         super.dispatchDraw(canvas)
@@ -245,18 +252,29 @@ class AgendaView @JvmOverloads constructor(
         val viewport = height
         if (content <= viewport || viewport == 0) return
         // The draw canvas is translated by scrollY: offset back to viewport space.
-        val x = minOf(list.right + 10 * density, width - 3 * density)
-        val trackTop = scrollY + 4 * density
-        val trackH = viewport - 8 * density
+        val railX = minOf(list.right + 10 * density, width - 4 * density)
+        indicatorPaint.style = android.graphics.Paint.Style.STROKE
+        indicatorPaint.strokeWidth = 1 * density
+        indicatorPaint.color = ColorUtils.setAlphaComponent(accent, 0x26)
+        canvas.drawRoundRect(
+            maxOf(list.left - 12 * density, 1 * density),
+            scrollY + 1 * density,
+            minOf(railX + 5 * density, width - 1 * density),
+            scrollY + viewport - 1 * density,
+            10 * density, 10 * density, indicatorPaint,
+        )
+        indicatorPaint.style = android.graphics.Paint.Style.FILL
+        val trackTop = scrollY + 7 * density
+        val trackH = viewport - 14 * density
         indicatorPaint.strokeWidth = 2 * density
         indicatorPaint.strokeCap = android.graphics.Paint.Cap.ROUND
         indicatorPaint.color = ColorUtils.setAlphaComponent(accent, 0x30)
-        canvas.drawLine(x, trackTop, x, trackTop + trackH, indicatorPaint)
+        canvas.drawLine(railX, trackTop, railX, trackTop + trackH, indicatorPaint)
         val thumbH = (trackH * viewport / content).coerceAtLeast(12 * density)
         val range = (content - viewport).toFloat()
         val offset = (trackH - thumbH) * (scrollY / range).coerceIn(0f, 1f)
         indicatorPaint.color = ColorUtils.setAlphaComponent(accent, 0xA8)
-        canvas.drawLine(x, trackTop + offset, x, trackTop + offset + thumbH, indicatorPaint)
+        canvas.drawLine(railX, trackTop + offset, railX, trackTop + offset + thumbH, indicatorPaint)
     }
 
     // ----------------------------------------------------------------- touch
