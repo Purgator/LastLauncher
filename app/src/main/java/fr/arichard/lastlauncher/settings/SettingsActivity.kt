@@ -148,6 +148,23 @@ class SettingsActivity : AppCompatActivity(),
     }
 
     class GeneralFragment : BaseFragment() {
+
+        // The ROLE_HOME dialog is silently dropped when launched with a plain
+        // startActivity — it only shows through the activity-result API.
+        private var roleLaunchTime = 0L
+        private val roleRequest = registerForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+        ) {
+            updateDefaultLauncherState()
+            // An instant "canceled" means Android suppressed the dialog (denied
+            // twice before): the settings page is the only remaining path.
+            if (!isDefaultLauncher() &&
+                System.currentTimeMillis() - roleLaunchTime < 400
+            ) {
+                openHomeSettings()
+            }
+        }
+
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.prefs_general, rootKey)
             findPreference<Preference>("default_launcher")?.setOnPreferenceClickListener {
@@ -156,21 +173,57 @@ class SettingsActivity : AppCompatActivity(),
             }
         }
 
+        override fun onResume() {
+            super.onResume()
+            updateDefaultLauncherState()
+        }
+
+        private fun isDefaultLauncher(): Boolean {
+            val context = context ?: return false
+            if (Build.VERSION.SDK_INT >= 29) {
+                return context.getSystemService(RoleManager::class.java)
+                    ?.isRoleHeld(RoleManager.ROLE_HOME) == true
+            }
+            val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            return context.packageManager
+                .resolveActivity(home, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+                ?.activityInfo?.packageName == context.packageName
+        }
+
+        private fun updateDefaultLauncherState() {
+            findPreference<Preference>("default_launcher")?.summary =
+                if (isDefaultLauncher()) getString(R.string.default_launcher_done)
+                else getString(R.string.pref_default_launcher_summary)
+        }
+
         private fun requestDefaultLauncher() {
             val context = requireContext()
             try {
                 if (Build.VERSION.SDK_INT >= 29) {
                     val rm = context.getSystemService(RoleManager::class.java)
-                    if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME) &&
-                        !rm.isRoleHeld(RoleManager.ROLE_HOME)
-                    ) {
-                        startActivity(rm.createRequestRoleIntent(RoleManager.ROLE_HOME))
+                    if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) {
+                        if (rm.isRoleHeld(RoleManager.ROLE_HOME)) {
+                            Toast.makeText(
+                                context, R.string.default_launcher_done, Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            roleLaunchTime = System.currentTimeMillis()
+                            roleRequest.launch(rm.createRequestRoleIntent(RoleManager.ROLE_HOME))
+                        }
                         return
                     }
                 }
+                openHomeSettings()
+            } catch (e: Exception) {
+                openHomeSettings()
+            }
+        }
+
+        private fun openHomeSettings() {
+            try {
                 startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
             } catch (e: Exception) {
-                Toast.makeText(context, e.message, Toast.LENGTH_SHORT).show()
+                context?.let { Toast.makeText(it, e.message, Toast.LENGTH_SHORT).show() }
             }
         }
     }
