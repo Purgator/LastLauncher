@@ -170,8 +170,14 @@ class MainActivity : AppCompatActivity() {
     @android.annotation.SuppressLint("MissingSuperCall")
     override fun onBackPressed() {
         // A launcher never finishes; back just closes overlays.
-        if (anyDrawerOpen) closeDrawers(animate = true)
-        else if (allAppsOpen || binding.searchInput.text.isNotEmpty()) resetToHome()
+        if (anyDrawerOpen) {
+            closeDrawers(animate = true)
+        } else if (agendaShownByGesture) {
+            agendaShownByGesture = false
+            renderAgenda()
+        } else if (allAppsOpen || binding.searchInput.text.isNotEmpty()) {
+            resetToHome()
+        }
     }
 
     // ---------------------------------------------------------------- setup
@@ -420,6 +426,7 @@ class MainActivity : AppCompatActivity() {
                 Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
             )
             GestureAction.DIALER -> startActivitySafely(Intent(Intent.ACTION_DIAL))
+            GestureAction.AGENDA -> toggleAgenda()
             GestureAction.OPEN_APP ->
                 bindingSpec.appKey?.let { key ->
                     repo.byComponentKey(key)?.let { launchApp(it, binding.root) }
@@ -460,6 +467,7 @@ class MainActivity : AppCompatActivity() {
                     val hint = if (drawer.second < 0) binding.hintLeft else binding.hintRight
                     if (visible) hint.visibility = View.INVISIBLE else startHints()
                     updateNewAppSpot()
+                    renderAgenda() // the stream yields to open drawers too
                     // Drop the keyboard while a drawer is out so the command bar sits
                     // at the bottom instead of riding up into the wheel; bring it back
                     // once every drawer is gone.
@@ -799,6 +807,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun resetToHome() {
         allAppsOpen = false
+        agendaShownByGesture = false
         closeDrawers(animate = false)
         if (binding.searchInput.text.isNotEmpty()) {
             binding.searchInput.setText("")
@@ -1880,6 +1889,23 @@ class MainActivity : AppCompatActivity() {
     private var agendaObserver: android.database.ContentObserver? = null
     private val agendaHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val agendaReload = Runnable { refreshAgenda() }
+    // "Show only on gesture" mode: the stream stays hidden until summoned.
+    private var agendaShownByGesture = false
+
+    /** The AGENDA gesture: summon/dismiss in gesture mode, refresh in always-on. */
+    private fun toggleAgenda() {
+        if (!prefs.agendaEnabled || !CalendarFeed.hasPermission(this)) {
+            // Not set up yet: land on the agenda settings rather than a dead swipe.
+            SettingsActivity.open(this, SettingsActivity.SCREEN_AGENDA)
+            return
+        }
+        if (prefs.agendaOnGesture) {
+            agendaShownByGesture = !agendaShownByGesture
+            if (agendaShownByGesture) refreshAgenda() else renderAgenda()
+        } else {
+            refreshAgenda()
+        }
+    }
 
     private fun setupAgenda() {
         binding.agenda.haptic = { v -> haptic(v) }
@@ -1931,9 +1957,11 @@ class MainActivity : AppCompatActivity() {
         binding.agenda.tapOpensApp = prefs.agendaTapOpensApp
         binding.agenda.setAccent(accentColor())
         binding.agenda.submit(rows)
-        binding.agenda.visibility =
-            if (rows.isEmpty() || binding.results.visibility == View.VISIBLE) View.GONE
-            else View.VISIBLE
+        val hidden = rows.isEmpty() ||
+            binding.results.visibility == View.VISIBLE ||
+            anyDrawerOpen || // the wheel needs the width; the stream yields
+            (prefs.agendaOnGesture && !agendaShownByGesture)
+        binding.agenda.visibility = if (hidden) View.GONE else View.VISIBLE
     }
 
     private fun registerAgendaObserver() {
