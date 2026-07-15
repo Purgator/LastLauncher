@@ -25,6 +25,13 @@
         app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$SuggestionsFragment" />
 
     <Preference
+        android:key="screen_agenda"
+        android:icon="@drawable/ic_clock"
+        android:title="@string/cat_agenda"
+        android:summary="@string/screen_agenda_summary"
+        app:fragment="fr.arichard.lastlauncher.settings.SettingsActivity$AgendaFragment" />
+
+    <Preference
         android:key="screen_gestures"
         android:icon="@drawable/ic_gesture"
         android:title="@string/cat_gestures"

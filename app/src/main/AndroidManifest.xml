@@ -22,6 +22,8 @@
     <!-- Long-press an app to uninstall it. -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Home-screen agenda stream: read-only, on-device, no calendar is ever written. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
 
     <application
         android:name=".LauncherApp"
