@@ -124,11 +124,14 @@ the two `WheelDrawer`s (last = on top).
   swipes matching the close direction close the drawer; two-finger swipes always
   run their bound action.
 - The agenda stream sits between the status line and the ticker, only on the empty
-  home (yields to search results). It scrolls its horizon vertically but hands the
-  host every gesture it can't use — horizontal, multi-finger, and verticals it has
-  no room to scroll toward — so `>`/`>>`, all-apps and the shade keep working over
-  it. Refresh: on resume + ContentObserver while resumed + the minute tick for the
-  countdown. Never polls.
+  home: it yields to search results AND to open drawers, and is a centered block
+  capped at 20% of screen height / 300dp width so the middle area keeps its room.
+  It scrolls its horizon vertically but hands the host every gesture it can't use —
+  horizontal, multi-finger, and verticals it has no room to scroll toward — so
+  `>`/`>>`, all-apps and the shade keep working over it. Optional gesture-summon
+  mode (`agenda_on_gesture` + `GestureAction.AGENDA`): hidden until the bound swipe
+  toggles it; back or resetToHome dismisses. Refresh: on resume + ContentObserver
+  while resumed + the minute tick for the countdown. Never polls.
 - Haptics on every deliberate action, gated by `prefs.haptics` via `haptic(view)`.
 - Hints, spotlight and ticker all yield to drawers/search and stop on pause.
 

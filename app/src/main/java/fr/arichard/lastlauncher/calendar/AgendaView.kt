@@ -53,9 +53,14 @@ class AgendaView @JvmOverloads constructor(
     private val timeFormat = android.text.format.DateFormat.getTimeFormat(context)
 
     init {
+        // The stream is a centered, width-capped block — full-bleed lines read as a
+        // wall of text and collide visually with the wheel drawers at the edges.
         addView(
             list,
-            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            LayoutParams(
+                LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER_HORIZONTAL,
+            )
         )
         isVerticalScrollBarEnabled = false
         overScrollMode = OVER_SCROLL_NEVER
@@ -92,17 +97,18 @@ class AgendaView @JvmOverloads constructor(
         post { scrollTo(0, scroll) }
     }
 
-    private fun line(sizeSp: Float = 13f): TextView = TextView(context).apply {
+    private fun line(sizeSp: Float = 12f): TextView = TextView(context).apply {
         typeface = Typeface.MONOSPACE
         letterSpacing = 0.02f
         textSize = sizeSp
         setSingleLine()
         ellipsize = android.text.TextUtils.TruncateAt.END
         gravity = Gravity.START
-        setPadding(0, (2 * density).toInt(), 0, (2 * density).toInt())
+        maxWidth = (300 * density).toInt()
+        setPadding(0, (1 * density).toInt(), 0, (1 * density).toInt())
     }
 
-    private fun dayHeaderView(row: Agenda.Row.DayHeader): TextView = line(12f).apply {
+    private fun dayHeaderView(row: Agenda.Row.DayHeader): TextView = line(11f).apply {
         text = when (row.kind) {
             Agenda.DayKind.TOMORROW -> "┄ ${context.getString(R.string.agenda_tomorrow)}"
             Agenda.DayKind.LATER -> "┄ " + java.text.SimpleDateFormat("EEE d", Locale.getDefault())
@@ -197,9 +203,10 @@ class AgendaView @JvmOverloads constructor(
         else -> context.getString(R.string.agenda_in_hours, minutes / 60, minutes % 60)
     }
 
-    // The stream never grows past a third of the screen; deeper days scroll.
+    // The stream never grows past a fifth of the screen — the middle area (hints,
+    // suggestions, swipe band) must keep its room; deeper days scroll instead.
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val cap = (resources.displayMetrics.heightPixels * 0.32f).toInt()
+        val cap = (resources.displayMetrics.heightPixels * 0.20f).toInt()
         val capped = when (MeasureSpec.getMode(heightMeasureSpec)) {
             MeasureSpec.UNSPECIFIED -> MeasureSpec.makeMeasureSpec(cap, MeasureSpec.AT_MOST)
             else -> MeasureSpec.makeMeasureSpec(

@@ -239,6 +239,9 @@
     <string name="agenda_in_min">in %d min</string>
     <string name="agenda_in_hours">in %1$d h %2$02d</string>
     <string name="agenda_open_event">open in calendar</string>
+    <string name="gesture_agenda">Agenda</string>
+    <string name="pref_agenda_on_gesture">Show only on gesture</string>
+    <string name="pref_agenda_on_gesture_summary">Keep the home clean: the stream appears when a swipe bound to "Agenda" summons it (bind one under Gestures)</string>
 
     <string name="cat_updates">Updates</string>
     <string name="pref_auto_update">Automatic updates</string>
