@@ -239,6 +239,9 @@
     <string name="agenda_in_min">dans %d min</string>
     <string name="agenda_in_hours">dans %1$d h %2$02d</string>
     <string name="agenda_open_event">ouvrir dans l\'agenda</string>
+    <string name="gesture_agenda">Agenda</string>
+    <string name="pref_agenda_on_gesture">Afficher via un geste uniquement</string>
+    <string name="pref_agenda_on_gesture_summary">Garde l\'accueil épuré : le fil apparaît quand un geste lié à « Agenda » l\'appelle (à lier dans Gestes)</string>
 
     <string name="cat_updates">Mises à jour</string>
     <string name="pref_auto_update">Mises à jour automatiques</string>
