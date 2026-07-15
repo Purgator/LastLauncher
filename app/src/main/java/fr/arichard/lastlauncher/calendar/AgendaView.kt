@@ -247,6 +247,11 @@ class AgendaView @JvmOverloads constructor(
      * repainted only by real scroll invalidations.
      */
     override fun dispatchDraw(canvas: android.graphics.Canvas) {
+        // The home column disables clipChildren for its overlay effects, so nothing
+        // upstream stops a scrolled child from painting past this frame — the rows
+        // used to spill down the whole screen (unclickable ghosts, since touch
+        // targeting still used the real bounds). Clip to the viewport ourselves.
+        canvas.clipRect(scrollX, scrollY, scrollX + width, scrollY + height)
         super.dispatchDraw(canvas)
         val content = list.height
         val viewport = height
