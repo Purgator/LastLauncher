@@ -206,6 +206,65 @@ class MainActivity : AppCompatActivity() {
     private var downTime = 0L
     private var maxPointers = 1
 
+    // Suggestion-swipe capture lives at dispatch level: the paging gesture must work
+    // wherever it starts in the band — including ON the suggestion icons, which
+    // consume touches and made row-level swipes die silently in the view hierarchy.
+    private var suggDispatchCandidate = false
+    private var suggDispatchClaimed = false
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = ev.x
+                downY = ev.y
+                downTime = ev.eventTime
+                maxPointers = 1
+                suggSwipeActive = false
+                suggDispatchClaimed = false
+                val edge = 40 * resources.displayMetrics.density
+                suggDispatchCandidate =
+                    binding.suggestionsBlock.visibility == View.VISIBLE &&
+                    downInSuggestions() &&
+                    ev.x > edge && ev.x < binding.root.width - edge // edges = drawer pulls
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                maxPointers = maxOf(maxPointers, ev.pointerCount)
+                suggDispatchCandidate = false // two-finger swipes run gesture actions
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (suggDispatchCandidate && !suggDispatchClaimed) {
+                    val dx = ev.x - downX
+                    val dy = ev.y - downY
+                    if (abs(dx) > slop * 1.5f && abs(dx) > abs(dy) * 1.2f) {
+                        suggDispatchClaimed = true
+                        // Whatever is under the finger (icon tap, long-press timer)
+                        // must let go of the gesture.
+                        val cancel = MotionEvent.obtain(ev)
+                        cancel.action = MotionEvent.ACTION_CANCEL
+                        super.dispatchTouchEvent(cancel)
+                        cancel.recycle()
+                    }
+                }
+                if (suggDispatchClaimed) {
+                    updateSuggestionSwipe(ev)
+                    return true
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (suggDispatchClaimed) {
+                    suggDispatchClaimed = false
+                    finishSuggestionSwipe(
+                        ev.x - downX, ev.x, ev.y,
+                        confirmed = ev.actionMasked == MotionEvent.ACTION_UP,
+                    )
+                    return true
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
     private fun setupGestures() {
         // Double-tap and long-press still come from GestureDetector; swipes are tracked
         // manually below to distinguish one- from two-finger horizontal gestures.
@@ -236,20 +295,16 @@ class MainActivity : AppCompatActivity() {
         binding.root.setOnTouchListener { v, event ->
             // ACTION_DOWN must be handled before the detector sees it: a pending drawer pull
             // disables long-press so a hesitant edge grab doesn't open Settings instead.
+            // (downX/downY/downTime/maxPointers are recorded in dispatchTouchEvent, which
+            // sees every stream — including the ones the suggestion icons consume.)
             if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-                downX = event.x
-                downY = event.y
-                downTime = event.eventTime
-                maxPointers = 1
                 drawerDragging = false
                 drawerCandidateSide = drawerEdgeCandidate(event.x, v.width, edgeZone)
-                suggSwipeActive = false
-                suggSwipeCandidate = drawerCandidateSide == 0 &&
-                    binding.suggestionsBlock.visibility == View.VISIBLE &&
-                    downInSuggestions()
-                // A hesitant start to a drawer pull or a suggestion swipe must not
-                // fire the long-press Settings shortcut mid-gesture.
-                detector.setIsLongpressEnabled(drawerCandidateSide == 0 && !suggSwipeCandidate)
+                // A hesitant start to a drawer pull or a suggestion swipe (claimed at
+                // dispatch level) must not fire the long-press Settings shortcut.
+                detector.setIsLongpressEnabled(
+                    drawerCandidateSide == 0 && !suggDispatchCandidate
+                )
                 if (drawerCandidateSide != 0) {
                     velocityTracker = android.view.VelocityTracker.obtain()
                     velocityTracker?.addMovement(event)
@@ -258,15 +313,12 @@ class MainActivity : AppCompatActivity() {
             detector.onTouchEvent(event)
             when (event.actionMasked) {
                 MotionEvent.ACTION_POINTER_DOWN -> {
-                    maxPointers = maxOf(maxPointers, event.pointerCount)
                     // The drawer is a one-finger edge pull; a second finger cancels it.
                     drawerCandidateSide = 0
-                    suggSwipeCandidate = false
                 }
                 MotionEvent.ACTION_MOVE -> {
                     velocityTracker?.addMovement(event)
                     updateDrawerDrag(event, touchSlop)
-                    if (suggSwipeCandidate && !drawerDragging) updateSuggestionSwipe(event)
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     v.performClick()
@@ -278,11 +330,6 @@ class MainActivity : AppCompatActivity() {
                         } ?: 0f
                         drawerForSide(drawerCandidateSide).settle(vx)
                         drawerDragging = false
-                    } else if (suggSwipeActive) {
-                        finishSuggestionSwipe(
-                            event.x - downX, event.x, event.y,
-                            confirmed = event.actionMasked == MotionEvent.ACTION_UP
-                        )
                     } else if (event.actionMasked == MotionEvent.ACTION_UP) {
                         handleSwipe(event.x - downX, event.y - downY, event.eventTime - downTime)
                     }
@@ -391,12 +438,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * True when the gesture started in the suggestion-paging band: the lower part
-     * of the screen (60% down to the bottom of the row), so cycling the trio doesn't
-     * demand landing the finger on the icons — any horizontal start position works.
-     * The band deliberately stops well below mid-screen: everything above it keeps
-     * running the bound one-finger `>`/`>>` gestures. Two-finger swipes and edge
-     * pulls are excluded upstream.
+     * True when the gesture started in the suggestion-paging band: the row itself
+     * (including the icons — dispatch-level capture makes those work) plus a
+     * reach margin above it. Anchored to the row, NOT to a screen fraction:
+     * anything higher keeps running the bound one-finger `>`/`>>` gestures.
+     * Two-finger swipes and edge pulls are excluded upstream.
      */
     private fun downInSuggestions(): Boolean {
         val loc = IntArray(2)
@@ -404,7 +450,7 @@ class MainActivity : AppCompatActivity() {
         val rootLoc = IntArray(2)
         binding.root.getLocationInWindow(rootLoc)
         val blockTop = (loc[1] - rootLoc[1]).toFloat()
-        val top = minOf(blockTop, binding.root.height * 0.6f)
+        val top = blockTop - 72 * resources.displayMetrics.density
         return downY >= top && downY <= blockTop + binding.suggestionsBlock.height
     }
 
@@ -1456,11 +1502,10 @@ class MainActivity : AppCompatActivity() {
 
     // Live feedback while swiping the suggestions row: an accent glow rides under
     // the finger, blooming into sparkles as the swipe nears its trigger distance.
-    private var suggSwipeCandidate = false
     private var suggSwipeActive = false
     private var suggSwipeArmed = false
 
-    private fun suggTriggerPx(): Float = 64 * resources.displayMetrics.density
+    private fun suggTriggerPx(): Float = 56 * resources.displayMetrics.density
 
     private fun updateSuggestionSwipe(event: MotionEvent) {
         val dx = event.x - downX
@@ -1507,7 +1552,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun finishSuggestionSwipe(dx: Float, x: Float, y: Float, confirmed: Boolean) {
         suggSwipeActive = false
-        suggSwipeCandidate = false
         val taken = confirmed && abs(dx) >= suggTriggerPx()
         binding.swipeGlow.animate().alpha(0f).setDuration(160).withEndAction {
             binding.swipeGlow.visibility = View.GONE
