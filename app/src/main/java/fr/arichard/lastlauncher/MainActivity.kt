@@ -1953,8 +1953,13 @@ class MainActivity : AppCompatActivity() {
             binding.agenda.visibility = View.GONE
             return
         }
-        val rows = Agenda.rows(agendaEvents, System.currentTimeMillis())
+        val source =
+            if (prefs.agendaShowAllDay) agendaEvents else agendaEvents.filter { !it.allDay }
+        val rows = Agenda.rows(source, System.currentTimeMillis())
         binding.agenda.tapOpensApp = prefs.agendaTapOpensApp
+        binding.agenda.configure(
+            prefs.agendaTextSizeSp, prefs.agendaLines, prefs.agendaShowCountdown
+        )
         binding.agenda.setAccent(accentColor())
         binding.agenda.submit(rows)
         val hidden = rows.isEmpty() ||

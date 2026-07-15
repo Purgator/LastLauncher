@@ -51,6 +51,18 @@ class AgendaView @JvmOverloads constructor(
     private var expandedKey: Pair<Long, Long>? = null
     private val density = resources.displayMetrics.density
     private val timeFormat = android.text.format.DateFormat.getTimeFormat(context)
+    private val indicatorPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+
+    private var textSizeSp = 12f
+    private var maxLines = 6
+    private var showCountdown = true
+
+    /** Applies the user's sizing/content options; call before [submit]. */
+    fun configure(textSp: Float, lines: Int, countdown: Boolean) {
+        textSizeSp = textSp
+        maxLines = lines
+        showCountdown = countdown
+    }
 
     init {
         // The stream is a centered, width-capped block — full-bleed lines read as a
@@ -97,7 +109,7 @@ class AgendaView @JvmOverloads constructor(
         post { scrollTo(0, scroll) }
     }
 
-    private fun line(sizeSp: Float = 12f): TextView = TextView(context).apply {
+    private fun line(sizeSp: Float = textSizeSp): TextView = TextView(context).apply {
         typeface = Typeface.MONOSPACE
         letterSpacing = 0.02f
         textSize = sizeSp
@@ -108,7 +120,7 @@ class AgendaView @JvmOverloads constructor(
         setPadding(0, (1 * density).toInt(), 0, (1 * density).toInt())
     }
 
-    private fun dayHeaderView(row: Agenda.Row.DayHeader): TextView = line(11f).apply {
+    private fun dayHeaderView(row: Agenda.Row.DayHeader): TextView = line(textSizeSp - 1f).apply {
         text = when (row.kind) {
             Agenda.DayKind.TOMORROW -> "┄ ${context.getString(R.string.agenda_tomorrow)}"
             Agenda.DayKind.LATER -> "┄ " + java.text.SimpleDateFormat("EEE d", Locale.getDefault())
@@ -123,7 +135,7 @@ class AgendaView @JvmOverloads constructor(
         val time = if (e.allDay) context.getString(R.string.agenda_all_day)
         else timeFormat.format(Date(e.begin))
         val suffix = when {
-            !row.next || e.allDay -> ""
+            !showCountdown || !row.next || e.allDay -> ""
             row.ongoing -> " · " + context.getString(R.string.agenda_now)
             else -> " · " + countdown(Agenda.minutesUntil(e.begin, now))
         }
@@ -186,7 +198,7 @@ class AgendaView @JvmOverloads constructor(
                 }
             })
         }
-        block.addView(line(12f).apply {
+        block.addView(line(textSizeSp - 1f).apply {
             text = "▸ " + context.getString(R.string.agenda_open_event)
             setTextColor(ColorUtils.setAlphaComponent(context.getColor(R.color.text_secondary), 0xB0))
             setOnClickListener { view ->
@@ -203,10 +215,15 @@ class AgendaView @JvmOverloads constructor(
         else -> context.getString(R.string.agenda_in_hours, minutes / 60, minutes % 60)
     }
 
-    // The stream never grows past a fifth of the screen — the middle area (hints,
-    // suggestions, swipe band) must keep its room; deeper days scroll instead.
+    // The stream shows at most the configured number of lines (defensively also
+    // never past 35% of the screen) — the launcher below must stay usable; deeper
+    // days scroll instead.
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val cap = (resources.displayMetrics.heightPixels * 0.20f).toInt()
+        val lineH = textSizeSp * 1.75f * density // text + leading + row padding
+        val cap = minOf(
+            (maxLines * lineH).toInt(),
+            (resources.displayMetrics.heightPixels * 0.35f).toInt(),
+        )
         val capped = when (MeasureSpec.getMode(heightMeasureSpec)) {
             MeasureSpec.UNSPECIFIED -> MeasureSpec.makeMeasureSpec(cap, MeasureSpec.AT_MOST)
             else -> MeasureSpec.makeMeasureSpec(
@@ -214,6 +231,32 @@ class AgendaView @JvmOverloads constructor(
             )
         }
         super.onMeasure(widthMeasureSpec, capped)
+    }
+
+    /**
+     * Discrete scroll indicator: a thin accent rail to the right of the block,
+     * visible only when there is more to scroll — it both places you in the
+     * horizon and signals "this scrolls" (as opposed to the all-apps swipe).
+     * Static drawing, repainted only by real scroll invalidations.
+     */
+    override fun dispatchDraw(canvas: android.graphics.Canvas) {
+        super.dispatchDraw(canvas)
+        val content = list.height
+        val viewport = height
+        if (content <= viewport || viewport == 0) return
+        // The draw canvas is translated by scrollY: offset back to viewport space.
+        val x = minOf(list.right + 10 * density, width - 3 * density)
+        val trackTop = scrollY + 4 * density
+        val trackH = viewport - 8 * density
+        indicatorPaint.strokeWidth = 2 * density
+        indicatorPaint.strokeCap = android.graphics.Paint.Cap.ROUND
+        indicatorPaint.color = ColorUtils.setAlphaComponent(accent, 0x30)
+        canvas.drawLine(x, trackTop, x, trackTop + trackH, indicatorPaint)
+        val thumbH = (trackH * viewport / content).coerceAtLeast(12 * density)
+        val range = (content - viewport).toFloat()
+        val offset = (trackH - thumbH) * (scrollY / range).coerceIn(0f, 1f)
+        indicatorPaint.color = ColorUtils.setAlphaComponent(accent, 0xA8)
+        canvas.drawLine(x, trackTop + offset, x, trackTop + offset + thumbH, indicatorPaint)
     }
 
     // ----------------------------------------------------------------- touch
@@ -229,11 +272,14 @@ class AgendaView @JvmOverloads constructor(
     private fun shouldForward(ev: MotionEvent): Boolean {
         val dx = ev.rawX - downX
         val dy = ev.rawY - downY
-        // Claim for the host: multi-finger swipes, horizontal swipes, and
-        // verticals this view has no room to scroll toward.
+        // Claim for the host: multi-finger swipes, horizontal swipes, and verticals
+        // when the stream has nothing to scroll AT ALL. (Not per-direction: a
+        // scrollable stream sits at its top edge most of the time, and per-direction
+        // forwarding turned slightly-wobbly taps into cancelled clicks and end-of-
+        // scroll drags into surprise all-apps launches.)
         val horizontal = abs(dx) > slop * 2 && abs(dx) > abs(dy)
-        val deadVertical = abs(dy) > slop && abs(dy) > abs(dx) &&
-            !canScrollVertically(if (dy < 0) 1 else -1)
+        val deadVertical = abs(dy) > slop * 2 && abs(dy) > abs(dx) &&
+            !canScrollVertically(1) && !canScrollVertically(-1)
         return maxPointers > 1 || horizontal || deadVertical
     }
 
