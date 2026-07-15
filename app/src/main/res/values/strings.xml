@@ -240,6 +240,19 @@
     <string name="agenda_in_hours">in %1$d h %2$02d</string>
     <string name="agenda_open_event">open in calendar</string>
     <string name="gesture_agenda">Agenda</string>
+    <string name="pref_agenda_lines">Stream height</string>
+    <string name="agenda_lines_4">4 lines</string>
+    <string name="agenda_lines_6">6 lines</string>
+    <string name="agenda_lines_8">8 lines</string>
+    <string name="agenda_lines_10">10 lines</string>
+    <string name="pref_agenda_text_size">Text size</string>
+    <string name="agenda_text_small">Small</string>
+    <string name="agenda_text_medium">Medium</string>
+    <string name="agenda_text_large">Large</string>
+    <string name="pref_agenda_all_day">All-day events</string>
+    <string name="pref_agenda_all_day_summary">Show birthdays, holidays and other day-long entries</string>
+    <string name="pref_agenda_countdown">Countdown to the next event</string>
+    <string name="pref_agenda_countdown_summary">"in 25 min" next to the highlighted event, updated every minute</string>
     <string name="pref_agenda_on_gesture">Show only on gesture</string>
     <string name="pref_agenda_on_gesture_summary">Keep the home clean: the stream appears when a swipe bound to "Agenda" summons it (bind one under Gestures)</string>
 

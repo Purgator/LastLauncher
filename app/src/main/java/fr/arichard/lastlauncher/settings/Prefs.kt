@@ -167,6 +167,24 @@ class Prefs(context: Context) {
     /** Keep the stream hidden until a swipe bound to the Agenda action summons it. */
     val agendaOnGesture: Boolean get() = sp.getBoolean(KEY_AGENDA_ON_GESTURE, false)
 
+    /** Visible lines before the stream scrolls (its height, in effect). */
+    val agendaLines: Int
+        get() = (sp.getString(KEY_AGENDA_LINES, "6") ?: "6").toIntOrNull()?.coerceIn(3, 12) ?: 6
+
+    /** Stream text size in sp. */
+    val agendaTextSizeSp: Float
+        get() = when (sp.getString(KEY_AGENDA_TEXT_SIZE, "medium")) {
+            "small" -> 11f
+            "large" -> 13.5f
+            else -> 12f
+        }
+
+    /** Include all-day events (birthdays, holidays…) in the stream. */
+    val agendaShowAllDay: Boolean get() = sp.getBoolean(KEY_AGENDA_ALL_DAY, true)
+
+    /** Live countdown next to the highlighted event. */
+    val agendaShowCountdown: Boolean get() = sp.getBoolean(KEY_AGENDA_COUNTDOWN, true)
+
     /** Calendar ids hidden from the stream (empty = show every calendar). */
     var agendaExcludedCalendars: Set<String>
         get() = sp.getStringSet(KEY_AGENDA_EXCLUDED, emptySet()) ?: emptySet()
@@ -333,6 +351,10 @@ class Prefs(context: Context) {
         const val KEY_SEARCH_MODE = "search_mode"
         const val KEY_AGENDA_ENABLED = "agenda_enabled"
         const val KEY_AGENDA_ON_GESTURE = "agenda_on_gesture"
+        const val KEY_AGENDA_LINES = "agenda_lines"
+        const val KEY_AGENDA_TEXT_SIZE = "agenda_text_size"
+        const val KEY_AGENDA_ALL_DAY = "agenda_all_day"
+        const val KEY_AGENDA_COUNTDOWN = "agenda_countdown"
         const val KEY_AGENDA_DAYS = "agenda_days"
         const val KEY_AGENDA_TAP = "agenda_tap"
         const val KEY_AGENDA_EXCLUDED = "agenda_excluded_calendars"
