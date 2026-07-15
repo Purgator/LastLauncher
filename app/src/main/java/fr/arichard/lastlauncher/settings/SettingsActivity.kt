@@ -16,6 +16,7 @@ import fr.arichard.lastlauncher.BuildConfig
 import fr.arichard.lastlauncher.LauncherApp
 import fr.arichard.lastlauncher.R
 import fr.arichard.lastlauncher.apps.AppRepository
+import fr.arichard.lastlauncher.calendar.CalendarFeed
 import fr.arichard.lastlauncher.gesture.GestureAction
 import fr.arichard.lastlauncher.gesture.GestureBinding
 import fr.arichard.lastlauncher.lock.LockService
@@ -62,6 +63,7 @@ class SettingsActivity : AppCompatActivity(),
         SCREEN_GENERAL -> GeneralFragment()
         SCREEN_CLOCK_WEATHER -> ClockWeatherFragment()
         SCREEN_SUGGESTIONS -> SuggestionsFragment()
+        SCREEN_AGENDA -> AgendaFragment()
         SCREEN_GESTURES -> GesturesFragment()
         SCREEN_APPEARANCE -> AppearanceFragment()
         SCREEN_APPS -> AppsFragment()
@@ -75,6 +77,7 @@ class SettingsActivity : AppCompatActivity(),
         const val SCREEN_GENERAL = "general"
         const val SCREEN_CLOCK_WEATHER = "clock_weather"
         const val SCREEN_SUGGESTIONS = "suggestions"
+        const val SCREEN_AGENDA = "agenda"
         const val SCREEN_GESTURES = "gestures"
         const val SCREEN_APPEARANCE = "appearance"
         const val SCREEN_APPS = "apps"
@@ -271,6 +274,58 @@ class SettingsActivity : AppCompatActivity(),
                     .setNegativeButton(R.string.cancel, null)
                     .show()
                 true
+            }
+        }
+    }
+
+    class AgendaFragment : BaseFragment() {
+        override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+            setPreferencesFromResource(R.xml.prefs_agenda, rootKey)
+
+            findPreference<SwitchPreferenceCompat>("agenda_enabled")
+                ?.setOnPreferenceChangeListener { _, newValue ->
+                    if (newValue == true &&
+                        !CalendarFeed.hasPermission(requireContext())
+                    ) {
+                        requestPermissions(
+                            arrayOf(android.Manifest.permission.READ_CALENDAR), 43
+                        )
+                        Toast.makeText(
+                            requireContext(), R.string.agenda_needs_permission, Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    true
+                }
+
+            findPreference<Preference>("agenda_calendars")?.setOnPreferenceClickListener {
+                pickCalendars()
+                true
+            }
+        }
+
+        /** Multi-choice over the device's calendars; unchecked ones are excluded. */
+        private fun pickCalendars() {
+            val context = requireContext()
+            if (!CalendarFeed.hasPermission(context)) {
+                Toast.makeText(context, R.string.agenda_needs_permission, Toast.LENGTH_SHORT)
+                    .show()
+                return
+            }
+            CalendarFeed.calendars(context) { calendars ->
+                if (!isAdded || calendars.isEmpty()) return@calendars
+                val excluded = prefs.agendaExcludedCalendars
+                val items = calendars.map { AppPickerDialog.Item(it.name, null) }
+                val checked = BooleanArray(calendars.size) {
+                    calendars[it].id.toString() !in excluded
+                }
+                AppPickerDialog.multiChoice(
+                    requireContext(), getString(R.string.pref_agenda_calendars), items, checked
+                ) {
+                    prefs.agendaExcludedCalendars = calendars.indices
+                        .filter { !checked[it] }
+                        .map { calendars[it].id.toString() }
+                        .toSet()
+                }
             }
         }
     }

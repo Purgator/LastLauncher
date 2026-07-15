@@ -83,6 +83,9 @@ impractical — prioritize a readable history.
 | `predict/UsageDb.kt` | SQLite log of launches (pruned at 5000 rows). Never leaves the device. |
 | `predict/ContextSignals.kt` | Bluetooth/headset/charger trigger events (5-minute window). |
 | `notify/NotifListener.kt` | NotificationListenerService → badge counts + ticker messages, in-memory only. |
+| `calendar/Agenda.kt` | Pure agenda logic (unit-tested): event instances → row list with day separators, next-event flag, countdown minutes; all-day UTC-midnight normalization. |
+| `calendar/CalendarFeed.kt` | CalendarContract reads on a dedicated executor (instances window, calendar list); results post to main. READ_CALENDAR, read-only. |
+| `calendar/AgendaView.kt` | The home agenda stream: terminal-style event lines under the status line, capped-height vertical scroll, tap-to-unfold (location → maps, open-in-calendar), long-press → calendar app. Forwards horizontal/multi-finger/dead-vertical swipes to the host. |
 | `ui/WheelDrawer.kt` | Custom view: the arc/wheel edge drawer. Angular layout, roll/fling physics, swipe-to-close, drag & drop target. Feel constants in its companion. |
 | `ui/SparkleView.kt` | Canvas particle overlay: firework powder around the finger during the suggestion swipe. Self-stopping frame loop — animates only while particles are alive. |
 | `ui/StatusLine.kt` | Pure formatter for the terminal status line (unit-tested) + next-alarm reconciliation helpers; MainActivity adds per-token ClickableSpans. |
@@ -120,6 +123,12 @@ the two `WheelDrawer`s (last = on top).
   (`WheelDrawer.swapTo`); an explicit close cancels the pending swap. One-finger
   swipes matching the close direction close the drawer; two-finger swipes always
   run their bound action.
+- The agenda stream sits between the status line and the ticker, only on the empty
+  home (yields to search results). It scrolls its horizon vertically but hands the
+  host every gesture it can't use — horizontal, multi-finger, and verticals it has
+  no room to scroll toward — so `>`/`>>`, all-apps and the shade keep working over
+  it. Refresh: on resume + ContentObserver while resumed + the minute tick for the
+  countdown. Never polls.
 - Haptics on every deliberate action, gated by `prefs.haptics` via `haptic(view)`.
 - Hints, spotlight and ticker all yield to drawers/search and stop on pause.
 
