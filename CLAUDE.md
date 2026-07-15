@@ -112,8 +112,11 @@ the two `WheelDrawer`s (last = on top).
   multi-finger swipes to the host instead of eating them).
 - Edge pulls (40 dp zones) track the finger when that edge's gesture slot is bound to
   a drawer; flings elsewhere fire `GestureBinding` actions (1- vs 2-finger slots).
-- Suggestions: trio = top of a 12-deep ranking; a one-finger horizontal swipe
-  starting in the lower band (60% of screen height down to the row, any x) pages it.
+- Suggestions: trio = top of a 12-deep ranking; a one-finger horizontal swipe pages
+  it. The band is anchored to the row (72 dp above it down to its bottom, any x
+  outside the 40 dp edge zones) and capture happens in `dispatchTouchEvent` —
+  BEFORE the icons can consume the touch — claiming the gesture at ~1.5×slop of
+  horizontal travel and cancelling whatever was under the finger; trigger = 56 dp.
   Live feedback: glow under the finger, particle sparkles (`ui/SparkleView`), the
   trio leans into its coin flip as the swipe builds; release completes or cancels
   the turn. Long-press-for-Settings is disabled inside the band. Long-press on the
@@ -125,9 +128,10 @@ the two `WheelDrawer`s (last = on top).
   run their bound action.
 - The agenda stream sits between the status line and the ticker, only on the empty
   home: it yields to search results AND to open drawers, and is a centered block
-  capped at N visible lines (setting, default 6; hard cap 35% of screen) / 300dp
-  width so the middle area keeps its room. A thin accent rail at the block's right
-  (drawn in dispatchDraw) appears when there is more to scroll. It scrolls its
+  capped at N visible lines (setting, default 6; hard cap 30% of screen, enforced
+  by a post-measure clamp in onMeasure) / 300dp width so the middle area keeps its
+  room. When there is more to scroll, a faint rounded outline boxes the block and
+  a thin accent rail with a thumb (both drawn in dispatchDraw) shows the position. It scrolls its
   horizon vertically but hands the host every gesture it can't use — horizontal,
   multi-finger, and verticals ONLY when the content doesn't scroll at all
   (per-direction forwarding cancelled taps at the scroll edges and fired all-apps
