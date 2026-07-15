@@ -125,13 +125,17 @@ the two `WheelDrawer`s (last = on top).
   run their bound action.
 - The agenda stream sits between the status line and the ticker, only on the empty
   home: it yields to search results AND to open drawers, and is a centered block
-  capped at 20% of screen height / 300dp width so the middle area keeps its room.
-  It scrolls its horizon vertically but hands the host every gesture it can't use —
-  horizontal, multi-finger, and verticals it has no room to scroll toward — so
-  `>`/`>>`, all-apps and the shade keep working over it. Optional gesture-summon
-  mode (`agenda_on_gesture` + `GestureAction.AGENDA`): hidden until the bound swipe
-  toggles it; back or resetToHome dismisses. Refresh: on resume + ContentObserver
-  while resumed + the minute tick for the countdown. Never polls.
+  capped at N visible lines (setting, default 6; hard cap 35% of screen) / 300dp
+  width so the middle area keeps its room. A thin accent rail at the block's right
+  (drawn in dispatchDraw) appears when there is more to scroll. It scrolls its
+  horizon vertically but hands the host every gesture it can't use — horizontal,
+  multi-finger, and verticals ONLY when the content doesn't scroll at all
+  (per-direction forwarding cancelled taps at the scroll edges and fired all-apps
+  at the end of a scroll — don't reintroduce it). Optional gesture-summon mode
+  (`agenda_on_gesture` + `GestureAction.AGENDA`): hidden until the bound swipe
+  toggles it; back or resetToHome dismisses. Options: lines, text size, all-day
+  on/off, countdown on/off, days, tap behavior, calendars. Refresh: on resume +
+  ContentObserver while resumed + the minute tick for the countdown. Never polls.
 - Haptics on every deliberate action, gated by `prefs.haptics` via `haptic(view)`.
 - Hints, spotlight and ticker all yield to drawers/search and stop on pause.
 

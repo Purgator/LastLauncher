@@ -41,6 +41,28 @@
         <item>7</item>
         <item>14</item>
     </string-array>
+    <string-array name="agenda_lines_entries">
+        <item>@string/agenda_lines_4</item>
+        <item>@string/agenda_lines_6</item>
+        <item>@string/agenda_lines_8</item>
+        <item>@string/agenda_lines_10</item>
+    </string-array>
+    <string-array name="agenda_lines_values">
+        <item>4</item>
+        <item>6</item>
+        <item>8</item>
+        <item>10</item>
+    </string-array>
+    <string-array name="agenda_text_entries">
+        <item>@string/agenda_text_small</item>
+        <item>@string/agenda_text_medium</item>
+        <item>@string/agenda_text_large</item>
+    </string-array>
+    <string-array name="agenda_text_values">
+        <item>small</item>
+        <item>medium</item>
+        <item>large</item>
+    </string-array>
     <string-array name="agenda_tap_entries">
         <item>@string/agenda_tap_inline</item>
         <item>@string/agenda_tap_app</item>
