@@ -164,6 +164,9 @@ class Prefs(context: Context) {
     val agendaTapOpensApp: Boolean
         get() = (sp.getString(KEY_AGENDA_TAP, "inline") ?: "inline") == "app"
 
+    /** Keep the stream hidden until a swipe bound to the Agenda action summons it. */
+    val agendaOnGesture: Boolean get() = sp.getBoolean(KEY_AGENDA_ON_GESTURE, false)
+
     /** Calendar ids hidden from the stream (empty = show every calendar). */
     var agendaExcludedCalendars: Set<String>
         get() = sp.getStringSet(KEY_AGENDA_EXCLUDED, emptySet()) ?: emptySet()
@@ -329,6 +332,7 @@ class Prefs(context: Context) {
         const val MAX_NEW_APPS = 10
         const val KEY_SEARCH_MODE = "search_mode"
         const val KEY_AGENDA_ENABLED = "agenda_enabled"
+        const val KEY_AGENDA_ON_GESTURE = "agenda_on_gesture"
         const val KEY_AGENDA_DAYS = "agenda_days"
         const val KEY_AGENDA_TAP = "agenda_tap"
         const val KEY_AGENDA_EXCLUDED = "agenda_excluded_calendars"

@@ -6,6 +6,12 @@
         android:title="@string/pref_agenda_enabled"
         android:summary="@string/pref_agenda_enabled_summary"
         android:defaultValue="true" />
+    <SwitchPreferenceCompat
+        android:key="agenda_on_gesture"
+        android:title="@string/pref_agenda_on_gesture"
+        android:summary="@string/pref_agenda_on_gesture_summary"
+        android:defaultValue="false"
+        android:dependency="agenda_enabled" />
     <ListPreference
         android:key="agenda_days"
         android:title="@string/pref_agenda_days"

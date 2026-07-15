@@ -20,6 +20,7 @@ enum class GestureAction(val id: String, val labelRes: Int, val iconRes: Int = 0
     SEARCH("search", R.string.gesture_search, R.drawable.ic_search),
     CAMERA("camera", R.string.gesture_camera, R.drawable.ic_camera),
     DIALER("dialer", R.string.gesture_dialer, R.drawable.ic_phone),
+    AGENDA("agenda", R.string.gesture_agenda, R.drawable.ic_clock),
     OPEN_APP("open_app", R.string.gesture_open_app, R.drawable.ic_apps);
 
     companion object {
