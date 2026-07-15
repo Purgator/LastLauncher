@@ -216,6 +216,28 @@
     <string name="insights_footer">◈ = current trio · ↑boost = boosted by you · ✉ = active notifications\nEverything above lives only on this phone.</string>
     <string name="insights_alarm_title">Next alarm — raw system sources</string>
 
+    <!-- Agenda stream -->
+    <string name="cat_agenda">Calendar</string>
+    <string name="screen_agenda_summary">Upcoming events on the home screen</string>
+    <string name="pref_agenda_enabled">Show upcoming events</string>
+    <string name="pref_agenda_enabled_summary">A quiet agenda stream under the status line. Events never leave the phone.</string>
+    <string name="pref_agenda_days">Days shown</string>
+    <string name="pref_agenda_tap">Tap on an event</string>
+    <string name="pref_agenda_calendars">Calendars</string>
+    <string name="pref_agenda_calendars_summary">Choose which calendars appear</string>
+    <string name="agenda_needs_permission">Calendar access is needed to show events</string>
+    <string name="agenda_days_3">3 days</string>
+    <string name="agenda_days_7">7 days</string>
+    <string name="agenda_days_14">14 days</string>
+    <string name="agenda_tap_inline">Unfold details in place</string>
+    <string name="agenda_tap_app">Open the calendar app</string>
+    <string name="agenda_tomorrow">tomorrow</string>
+    <string name="agenda_all_day">all day</string>
+    <string name="agenda_now">now</string>
+    <string name="agenda_in_min">in %d min</string>
+    <string name="agenda_in_hours">in %1$d h %2$02d</string>
+    <string name="agenda_open_event">open in calendar</string>
+
     <string name="cat_updates">Updates</string>
     <string name="pref_auto_update">Automatic updates</string>
     <string name="pref_auto_update_summary">Check GitHub once a day and download new versions on Wi-Fi</string>

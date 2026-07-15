@@ -31,6 +31,25 @@
         <item>right</item>
     </string-array>
 
+    <string-array name="agenda_days_entries">
+        <item>@string/agenda_days_3</item>
+        <item>@string/agenda_days_7</item>
+        <item>@string/agenda_days_14</item>
+    </string-array>
+    <string-array name="agenda_days_values">
+        <item>3</item>
+        <item>7</item>
+        <item>14</item>
+    </string-array>
+    <string-array name="agenda_tap_entries">
+        <item>@string/agenda_tap_inline</item>
+        <item>@string/agenda_tap_app</item>
+    </string-array>
+    <string-array name="agenda_tap_values">
+        <item>inline</item>
+        <item>app</item>
+    </string-array>
+
     <string-array name="weather_units_entries">
         <item>Celsius (°C)</item>
         <item>Fahrenheit (°F)</item>
