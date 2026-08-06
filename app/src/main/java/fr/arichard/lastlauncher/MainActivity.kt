@@ -1208,7 +1208,10 @@ class MainActivity : AppCompatActivity() {
         val fahrenheit = prefs.weatherUnits == "f"
         val temp = if (fahrenheit) weather.tempC * 9 / 5 + 32 else weather.tempC
         val degrees = "${Math.round(temp)}°"
-        val glyph = WeatherProvider.glyph(weather.code)
+        val night = WeatherProvider.isNight(
+            java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        )
+        val glyph = WeatherProvider.glyph(weather.code, night)
         binding.weather.text = when (prefs.weatherStyle) {
             "temp" -> degrees
             "icon" -> glyph
@@ -1802,9 +1805,8 @@ class MainActivity : AppCompatActivity() {
         val visible = now != null && binding.results.visibility != View.VISIBLE
         binding.musicRow.visibility = if (visible) View.VISIBLE else View.GONE
         if (now != null) {
-            val label = listOf(now.artist, now.title)
-                .filter { it.isNotBlank() }
-                .joinToString(" — ")
+            val label = fr.arichard.lastlauncher.notify.MediaState
+                .displayLabel(now.artist, now.title)
                 .ifBlank { repo.byPackage(now.pkg)?.label ?: now.pkg }
             binding.musicInfo.text = "♪ $label"
             binding.musicPlay.text = if (now.playing) "❚❚" else "►"
