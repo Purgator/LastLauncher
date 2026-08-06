@@ -11,6 +11,11 @@
         android:summary="@string/pref_notif_badges_summary"
         android:defaultValue="true" />
     <SwitchPreferenceCompat
+        android:key="music_widget"
+        android:title="@string/pref_music_widget"
+        android:summary="@string/pref_music_widget_summary"
+        android:defaultValue="true" />
+    <SwitchPreferenceCompat
         android:key="message_ticker"
         android:title="@string/pref_message_ticker"
         android:summary="@string/pref_message_ticker_summary"
