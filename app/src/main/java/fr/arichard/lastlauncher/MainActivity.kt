@@ -161,8 +161,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        // Home pressed while already home: return to the clean state.
+        // Home pressed while already home: return to the clean state, and read the
+        // second press as "I want to type" — summon the command bar. (When merely
+        // returning from an app, onNewIntent arrives before onResume, so the
+        // resumed-state check keeps that path keyboard-free.)
         resetToHome()
+        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            focusSearch(show = true)
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -313,8 +319,10 @@ class MainActivity : AppCompatActivity() {
             detector.onTouchEvent(event)
             when (event.actionMasked) {
                 MotionEvent.ACTION_POINTER_DOWN -> {
-                    // The drawer is a one-finger edge pull; a second finger cancels it.
-                    drawerCandidateSide = 0
+                    // The drawer is a one-finger pull; a second finger cancels the
+                    // candidacy — but never mid-drag, or release would settle the
+                    // wrong side.
+                    if (!drawerDragging) drawerCandidateSide = 0
                 }
                 MotionEvent.ACTION_MOVE -> {
                     velocityTracker?.addMovement(event)
@@ -372,6 +380,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateDrawerDrag(event: MotionEvent, touchSlop: Int) {
+        // Not an edge grab: a one-finger horizontal drag from anywhere still becomes
+        // a live, finger-tracking pull when that direction's slot opens a drawer —
+        // starting near the middle must feel the same as starting at the edge, not
+        // "nothing moves, then it animates open at release".
+        if (drawerCandidateSide == 0 && !drawerDragging && maxPointers == 1) {
+            val dx = event.x - downX
+            val dy = event.y - downY
+            val bandDown = binding.suggestionsBlock.visibility == View.VISIBLE &&
+                downInSuggestions() // that zone belongs to the suggestion swipe
+            if (!bandDown && abs(dx) > touchSlop && abs(dx) > abs(dy)) {
+                val key = if (dx > 0) Prefs.KEY_GESTURE_LR_1 else Prefs.KEY_GESTURE_RL_1
+                val spec = GestureBinding.decode(prefs.gestureBinding(key))
+                val side = if (dx > 0) -1 else 1
+                if (spec.action == GestureAction.APP_DRAWER &&
+                    !drawerForSide(side).isVisibleAtAll
+                ) {
+                    drawerCandidateSide = side
+                    drawerCandidateIndex = spec.drawerIndex
+                    if (velocityTracker == null) {
+                        velocityTracker = android.view.VelocityTracker.obtain()
+                        velocityTracker?.addMovement(event)
+                    }
+                }
+            }
+        }
         if (drawerCandidateSide == 0) return
         val dx = event.x - downX
         if (!drawerDragging) {
@@ -804,7 +837,12 @@ class MainActivity : AppCompatActivity() {
             query.isEmpty() -> repo.visibleApps(prefs.hiddenApps).reversed()
             else -> repo.search(query, prefs.hiddenApps)
         }
-        val commands = if (allAppsOpen) emptyList() else buildCommands(query, mode, apps.size)
+        // All-apps starts as a pure app list, but the moment the user types they're
+        // searching: the smart rows (calculator, URL, assistant…) must work exactly
+        // like they do when the bar was focused by a tap.
+        val commands =
+            if (allAppsOpen && query.isEmpty()) emptyList()
+            else buildCommands(query, mode, apps.size)
         adapter.submit(apps, commands)
 
         binding.results.visibility = View.VISIBLE
