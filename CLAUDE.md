@@ -163,12 +163,18 @@ the two `WheelDrawer`s (last = on top).
   calendar app, `+` fires ACTION_INSERT, long-press (header or stream) deep-links to
   the agenda settings. All-day view intents must send providerBegin (raw UTC) +
   EXTRA_EVENT_ALL_DAY or calendar apps fall back to their slow main view.
-- The new-app spotlight sits just above the suggestion trio (bottom-anchored,
-  spotBottomMargin) and exhales rising soda bubbles via SparkleView.bubble while
-  visible. The park slot mirrors it on the opposite side: drag any app in flight
+- The floating slots (new-app spotlight + park slot) are visual siblings: same
+  geometry (placeSlot — bottom-anchored above the trio, 22 dp in from the border,
+  margin computed only while the IME is hidden; insets changes re-place them, or
+  a closed keyboard's shift freezes into the position), same glow breath, same
+  rising soda bubbles (shared slotBubbles runnable). Park specifics: any app drag
   reveals its dashed drop circle (kept VISIBLE at alpha 0 otherwise — GONE views
   never join a drag), attraction scaling within 120 dp, drop pins for park_hours,
-  park_multi rotates several. Tap launches, long-press = app menu.
+  park_multi rotates several. Tap launches, long-press = app menu. Apps shown in
+  either slot (and the now-playing app) are excluded from the suggestion trio
+  (visibleSuggestionPool).
+- The gesture hints are ROOT-level children centered on the screen — inside the
+  middle area the agenda's height dragged them below center.
 - Corrected-trio feedback: cycling the suggestions snapshots the pre-swipe trio;
   launching an app outside it within 8 s logs a miss (MissLog) that dampens those
   apps in that time bucket. Cycling with no launch after = play, no signal.
