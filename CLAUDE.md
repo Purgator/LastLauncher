@@ -81,7 +81,8 @@ impractical — prioritize a readable history.
 | `apps/AppRepository.kt` | In-memory app catalog + icon cache, loaded/refreshed off-thread; fuzzy search (prefix > word > initials > substring > subsequence > package tokens). UI reads immutable snapshots. |
 | `predict/PredictionEngine.kt` | The "launcher memory". Scores = recency-decayed launches × hour/day-type match + Markov transition + context trigger + notification bonus + user boost − just-used penalty. All weights are named constants at the top. `snapshot()` powers the insights screen. |
 | `predict/UsageDb.kt` | SQLite log of launches (pruned at 5000 rows). Never leaves the device. |
-| `predict/ContextSignals.kt` | Bluetooth/headset/charger trigger events (5-minute window). |
+| `predict/ContextSignals.kt` | Trigger events (5-minute window): Bluetooth/headset/charger receivers, Wi-Fi join/leave + connectivity lost/regained (NetworkCallbacks), "started moving" via the one-shot significant-motion sensor (never the raw accelerometer — battery). |
+| `predict/MissLog.kt` | Pure codec (unit-tested) for corrected-trio feedback: swiped the trio then launched something else within 8 s → shown apps take a decaying penalty in that 3-hour bucket; swipes with no launch record nothing. |
 | `notify/NotifListener.kt` | NotificationListenerService → badge counts + ticker messages, in-memory only. |
 | `notify/MediaWatch.kt` | Active media sessions via MediaSessionManager (rides the notification-listener grant): the now-playing row's data + transport controls. Registered only while resumed. |
 | `notify/MediaState.kt` | Pure playback-state ranking (unit-tested): which session the row shows. |
@@ -158,6 +159,19 @@ the two `WheelDrawer`s (last = on top).
   open (typing/all-apps/keyboard up) → clean home. Returning home from an app stays
   keyboard-free unless `keyboardAlways`.
 - Haptics on every deliberate action, gated by `prefs.haptics` via `haptic(view)`.
+- The agenda has a header line above the box (`▤ agenda … +`): title tap opens the
+  calendar app, `+` fires ACTION_INSERT, long-press (header or stream) deep-links to
+  the agenda settings. All-day view intents must send providerBegin (raw UTC) +
+  EXTRA_EVENT_ALL_DAY or calendar apps fall back to their slow main view.
+- The new-app spotlight sits just above the suggestion trio (bottom-anchored,
+  spotBottomMargin) and exhales rising soda bubbles via SparkleView.bubble while
+  visible. The park slot mirrors it on the opposite side: drag any app in flight
+  reveals its dashed drop circle (kept VISIBLE at alpha 0 otherwise — GONE views
+  never join a drag), attraction scaling within 120 dp, drop pins for park_hours,
+  park_multi rotates several. Tap launches, long-press = app menu.
+- Corrected-trio feedback: cycling the suggestions snapshots the pre-swipe trio;
+  launching an app outside it within 8 s logs a miss (MissLog) that dampens those
+  apps in that time bucket. Cycling with no launch after = play, no signal.
 - Hints, spotlight and ticker all yield to drawers/search and stop on pause.
 
 ## Testing
