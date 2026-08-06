@@ -110,8 +110,14 @@ the two `WheelDrawer`s (last = on top).
   keyboard. A swipe matching a drawer's closing direction closes it; other swipes run
   their bound action even over an open drawer (the drawer forwards inward and
   multi-finger swipes to the host instead of eating them).
-- Edge pulls (40 dp zones) track the finger when that edge's gesture slot is bound to
-  a drawer; flings elsewhere fire `GestureBinding` actions (1- vs 2-finger slots).
+- Edge pulls (40 dp zones) arm on touch-down; additionally, a one-finger horizontal
+  drag from anywhere outside the suggestion band arms mid-gesture when that
+  direction's one-finger slot is bound to a drawer — both track the finger live.
+  Flings elsewhere fire `GestureBinding` actions (1- vs 2-finger slots).
+- Home pressed while already home resets to the clean state AND focuses the command
+  bar (keyboard up); returning home from an app stays keyboard-free unless
+  `keyboardAlways`. Typing in all-apps shows the same smart command rows as normal
+  search — all-apps is only command-free while its query is empty.
 - Suggestions: trio = top of a 12-deep ranking; a one-finger horizontal swipe pages
   it. The band is anchored to the row (72 dp above it down to its bottom, any x
   outside the 40 dp edge zones) and capture happens in `dispatchTouchEvent` —

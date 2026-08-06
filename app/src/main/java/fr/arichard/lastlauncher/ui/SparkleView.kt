@@ -104,10 +104,11 @@ class SparkleView @JvmOverloads constructor(
 
     private fun wake() {
         if (visibility != VISIBLE) visibility = VISIBLE
-        if (lastFrameNs == 0L) {
-            lastFrameNs = System.nanoTime()
-            postInvalidateOnAnimation()
-        }
+        if (lastFrameNs == 0L) lastFrameNs = System.nanoTime()
+        // Always reschedule: after the pool drains, the loop stops with a stale
+        // clock, and gating this on it left the next emission invisible until
+        // something else happened to invalidate the view.
+        postInvalidateOnAnimation()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -150,7 +151,7 @@ class SparkleView @JvmOverloads constructor(
                 canvas.drawCircle(p.x, p.y, p.size * (0.5f + 0.5f * fraction), paint)
             }
         }
-        if (particles.isNotEmpty()) postInvalidateOnAnimation()
+        if (particles.isNotEmpty()) postInvalidateOnAnimation() else lastFrameNs = 0L
     }
 
     override fun onDetachedFromWindow() {
