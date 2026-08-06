@@ -166,11 +166,12 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         // Home pressed while already home: return to the clean state, and read the
-        // second press as "I want to type" — summon the command bar. (When merely
-        // returning from an app, onNewIntent arrives before onResume, so the
-        // resumed-state check keeps that path keyboard-free.)
+        // second press as "I want to type" — summon the command bar. The activity
+        // is PAUSED (not resumed) while onNewIntent runs even when it was in front,
+        // so the test for "was already home" is STARTED (visible); returning from
+        // an app arrives stopped and stays keyboard-free.
         resetToHome()
-        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
             focusSearch(show = true)
         }
     }
@@ -1691,10 +1692,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Shows/refreshes the now-playing row; also re-derives the suggestion trio
-     *  so the app the row already controls steps out of it. */
+    /** Shows/refreshes the now-playing row; also re-derives the suggestion trio —
+     *  the playing app steps out of it (row on) or jumps to its front (row off). */
     private fun renderMusic() {
-        val now = if (prefs.musicWidget) MediaWatch.current else null
+        val session = MediaWatch.current
+        val now = if (prefs.musicWidget) session else null
         val visible = now != null && binding.results.visibility != View.VISIBLE
         binding.musicRow.visibility = if (visible) View.VISIBLE else View.GONE
         if (now != null) {
@@ -1709,18 +1711,23 @@ class MainActivity : AppCompatActivity() {
             binding.musicPlay.setTextColor(accent)
             binding.musicNext.setTextColor(accent)
         }
-        if (lastMusicPkg != now?.pkg) {
-            lastMusicPkg = now?.pkg
+        if (lastMusicPkg != session?.pkg) {
+            lastMusicPkg = session?.pkg
             suggestionPage = 0
             applySuggestions(visibleSuggestionPool().take(3), animate = false)
         }
     }
 
-    /** The ranking minus the app the now-playing row already covers. */
+    /**
+     * The ranking, adjusted for what's playing: with the now-playing row on, the
+     * playing app is redundant and leaves the pool; with the row off, it's the
+     * single most likely next tap and jumps to the trio's front instead.
+     */
     private fun visibleSuggestionPool(): List<AppEntry> {
-        val music = if (prefs.musicWidget) MediaWatch.current?.pkg else null
-        return if (music == null) suggestionPool
-        else suggestionPool.filter { it.packageName != music }
+        val music = MediaWatch.current?.pkg ?: return suggestionPool
+        val rest = suggestionPool.filter { it.packageName != music }
+        return if (prefs.musicWidget) rest
+        else listOfNotNull(repo.byPackage(music)) + rest
     }
 
     // ------------------------------------------- notification badges & ticker
