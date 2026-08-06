@@ -111,9 +111,10 @@ object WeatherProvider {
     }
 
     /** Open-Meteo WMO weather code → a compact emoji glyph. */
-    fun glyph(code: Int): String = when (code) {
-        0 -> "☀"
-        1, 2 -> "⛅"
+    /** Weather glyph for an Open-Meteo code; clear skies get a moon at [night]. */
+    fun glyph(code: Int, night: Boolean = false): String = when (code) {
+        0 -> if (night) "🌙" else "☀"
+        1, 2 -> if (night) "🌙" else "⛅"
         3 -> "☁"
         in 45..48 -> "🌫"
         in 51..67 -> "🌧"
@@ -123,4 +124,7 @@ object WeatherProvider {
         in 95..99 -> "⛈"
         else -> "☁"
     }
+
+    /** Rough night heuristic — no sunrise API call for a glyph. */
+    fun isNight(hour: Int): Boolean = hour >= 21 || hour < 7
 }
