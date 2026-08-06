@@ -1720,10 +1720,11 @@ class MainActivity : AppCompatActivity() {
     private var lastMusicPkg: String? = null
 
     private fun setupMusic() {
-        // U+FE0E forces text presentation: without it these glyphs render as
-        // colored emoji and ignore the accent tint.
-        binding.musicPrev.text = "⏮︎"
-        binding.musicNext.text = "⏭︎"
+        // Pure text glyphs only: the ⏮⏸⏭ family renders as colored emoji on Pixel
+        // even with the U+FE0E text-presentation selector, ignoring the accent
+        // tint. « » ► ❚ have no emoji form — and match the CLI notation anyway.
+        binding.musicPrev.text = "«"
+        binding.musicNext.text = "»"
         binding.musicPlay.setOnClickListener {
             haptic(it)
             MediaWatch.playPause()
@@ -1766,8 +1767,7 @@ class MainActivity : AppCompatActivity() {
                 .joinToString(" — ")
                 .ifBlank { repo.byPackage(now.pkg)?.label ?: now.pkg }
             binding.musicInfo.text = "♪ $label"
-            // Text-presentation selector: the emoji form ignores the accent tint.
-            binding.musicPlay.text = if (now.playing) "⏸︎" else "▶︎"
+            binding.musicPlay.text = if (now.playing) "❚❚" else "►"
             val accent = accentColor()
             binding.musicPrev.setTextColor(accent)
             binding.musicPlay.setTextColor(accent)
