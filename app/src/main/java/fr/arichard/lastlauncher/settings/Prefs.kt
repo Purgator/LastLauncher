@@ -202,6 +202,13 @@ class Prefs(context: Context) {
     /** Home-screen ticker cycling through unread messages. Opt-in (privacy). */
     val messageTicker: Boolean get() = sp.getBoolean(KEY_MESSAGE_TICKER, false)
 
+    /**
+     * Now-playing row with transport controls while a media session is live
+     * (needs the same notification access as badges). The playing app also
+     * steps out of the suggestion trio while the row covers it.
+     */
+    val musicWidget: Boolean get() = sp.getBoolean(KEY_MUSIC_WIDGET, true)
+
     /** Ordered go-to apps: cold-start suggestions and the static mode's content. */
     var favorites: List<String>
         get() = (sp.getString(KEY_FAVORITES, "") ?: "")
@@ -339,6 +346,7 @@ class Prefs(context: Context) {
         const val MAX_DRAWERS = 5
         const val KEY_NOTIF_BADGES = "notif_badges"
         const val KEY_MESSAGE_TICKER = "message_ticker"
+        const val KEY_MUSIC_WIDGET = "music_widget"
         const val KEY_ONBOARDING_DONE = "onboarding_done"
         const val KEY_BT_PERM_ASKED = "bt_permission_asked"
         const val KEY_LAST_LAUNCHED = "last_launched_pkg"
