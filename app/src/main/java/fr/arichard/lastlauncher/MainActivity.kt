@@ -102,6 +102,7 @@ class MainActivity : AppCompatActivity() {
         setupDragWatcher()
         setupAgenda()
         setupMusic()
+        setupPark()
         repo.addListener(repoListener)
         NotifListener.addListener(notifListener)
     }
@@ -810,13 +811,23 @@ class MainActivity : AppCompatActivity() {
     private fun setupDragWatcher() {
         binding.root.setOnDragListener { _, event ->
             when (event.action) {
-                android.view.DragEvent.ACTION_DRAG_STARTED -> true
+                android.view.DragEvent.ACTION_DRAG_STARTED -> {
+                    // Any app drag reveals the park slot's drop circle.
+                    dragInFlight = true
+                    updateParkSpot()
+                    true
+                }
                 android.view.DragEvent.ACTION_DRAG_LOCATION -> {
                     dragLastX = event.x
                     dragLastY = event.y
+                    parkAttract(event.x, event.y)
                     true
                 }
                 android.view.DragEvent.ACTION_DRAG_ENDED -> {
+                    dragInFlight = false
+                    binding.parkSpot.scaleX = 1f
+                    binding.parkSpot.scaleY = 1f
+                    updateParkSpot()
                     onDragEnded(event.result)
                     true
                 }
@@ -863,6 +874,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun suggestionAt(rank: Int): AppEntry? = suggestions.getOrNull(rank)
 
+    // "Corrected trio" feedback: the trio shown before a swipe burst, and when the
+    // burst started. A launch of a different app within the window = the engine
+    // was wrong; a swipe with no launch after = the user was just playing.
+    private var preSwipeTrio: List<String> = emptyList()
+    private var lastTrioSwipeTs = 0L
+
     // ------------------------------------------------------------- behavior
 
     private fun onQueryChanged(raw: String) {
@@ -899,6 +916,7 @@ class MainActivity : AppCompatActivity() {
         binding.results.visibility = View.VISIBLE
         binding.suggestionsBlock.visibility = View.INVISIBLE
         binding.agenda.visibility = View.GONE
+        binding.agendaHeader.visibility = View.GONE
         binding.musicRow.visibility = View.GONE
         binding.results.scrollToPosition(0)
         stopHints()
@@ -982,7 +1000,18 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, entry.label, Toast.LENGTH_SHORT).show()
             return
         }
-        if (prefs.predictions) PredictionEngine.logLaunch(this, entry.packageName)
+        if (prefs.predictions) {
+            PredictionEngine.logLaunch(this, entry.packageName)
+            // Swiped the trio away, then launched something it didn't contain,
+            // within seconds: the engine's pick was wrong for this moment.
+            if (lastTrioSwipeTs > 0 &&
+                System.currentTimeMillis() - lastTrioSwipeTs < TRIO_MISS_WINDOW_MS &&
+                preSwipeTrio.isNotEmpty() && entry.packageName !in preSwipeTrio
+            ) {
+                PredictionEngine.logSuggestionMiss(this, preSwipeTrio)
+            }
+            lastTrioSwipeTs = 0
+        }
         // Clear the query once we're out of sight so the return feels instant.
         binding.root.postDelayed({ resetToHome() }, 400)
     }
@@ -1556,6 +1585,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
         haptic(binding.suggestionsBlock)
+        // Remember what the engine proposed before the first swipe of this burst:
+        // if a different app launches within seconds, that trio was wrong.
+        if (System.currentTimeMillis() - lastTrioSwipeTs > TRIO_MISS_WINDOW_MS) {
+            preSwipeTrio = suggestions.mapNotNull { it?.packageName }
+        }
+        lastTrioSwipeTs = System.currentTimeMillis()
         suggestionPage = (suggestionPage + direction + pages) % pages
         // Wrap-around window: a pool not divisible by 3 must not leave blank
         // slots on the last page (the music filter makes 12 into 11, e.g.).
@@ -2135,6 +2170,8 @@ class MainActivity : AppCompatActivity() {
             )
         }
         binding.agenda.onOpenEvent = { event ->
+            // All-day instances must carry their raw UTC begin + the all-day flag,
+            // or the calendar app can't resolve them and slowly opens its main view.
             startActivitySafely(
                 Intent(Intent.ACTION_VIEW)
                     .setData(
@@ -2143,20 +2180,48 @@ class MainActivity : AppCompatActivity() {
                         )
                     )
                     .putExtra(
-                        android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.begin
+                        android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME,
+                        event.providerBegin
                     )
                     .putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, event.end)
+                    .putExtra(android.provider.CalendarContract.EXTRA_EVENT_ALL_DAY, event.allDay)
             )
         }
         // The stream forwards what it doesn't use, like the drawers do.
         binding.agenda.onSwipe = { dx, dy, dtMs, fingers ->
             handleSwipe(dx, dy, dtMs, fingers.coerceIn(1, 2), fromDrawer = true)
         }
+        // Header: tap opens the calendar app, + creates an event, long-press = settings.
+        binding.agendaHeaderTitle.text = "▤ " + getString(R.string.agenda_header_title)
+        binding.agendaHeaderTitle.setOnClickListener {
+            haptic(it)
+            startActivitySafely(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR)
+            )
+        }
+        binding.agendaNewEvent.setOnClickListener {
+            haptic(it)
+            startActivitySafely(
+                Intent(Intent.ACTION_INSERT)
+                    .setData(android.provider.CalendarContract.Events.CONTENT_URI)
+            )
+        }
+        fun View.opensAgendaSettings() {
+            setOnLongClickListener {
+                haptic(this)
+                SettingsActivity.open(this@MainActivity, SettingsActivity.SCREEN_AGENDA)
+                true
+            }
+        }
+        binding.agendaHeader.opensAgendaSettings()
+        binding.agendaHeaderTitle.opensAgendaSettings()
+        binding.agenda.opensAgendaSettings() // empty area below the last row
     }
 
     private fun refreshAgenda() {
         if (!prefs.agendaEnabled || !CalendarFeed.hasPermission(this)) {
             binding.agenda.visibility = View.GONE
+            binding.agendaHeader.visibility = View.GONE
             return
         }
         CalendarFeed.load(this, prefs.agendaDays, prefs.agendaExcludedCalendars) { events ->
@@ -2170,6 +2235,7 @@ class MainActivity : AppCompatActivity() {
     private fun renderAgenda() {
         if (!prefs.agendaEnabled || !CalendarFeed.hasPermission(this)) {
             binding.agenda.visibility = View.GONE
+            binding.agendaHeader.visibility = View.GONE
             return
         }
         val source =
@@ -2186,6 +2252,12 @@ class MainActivity : AppCompatActivity() {
             anyDrawerOpen || // the wheel needs the width; the stream yields
             (prefs.agendaOnGesture && !agendaShownByGesture)
         binding.agenda.visibility = if (hidden) View.GONE else View.VISIBLE
+        binding.agendaHeader.visibility = binding.agenda.visibility
+        if (!hidden) {
+            val accent = accentColor()
+            binding.agendaHeaderTitle.setTextColor(ColorUtils.setAlphaComponent(accent, 0x99))
+            binding.agendaNewEvent.setTextColor(ColorUtils.setAlphaComponent(accent, 0xCC))
+        }
     }
 
     private fun registerAgendaObserver() {
@@ -2230,9 +2302,44 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Rising soda bubbles around the spotlight — alive, not an inert sparkle. */
+    private val spotBubble = object : Runnable {
+        override fun run() {
+            if (binding.newAppSpot.visibility != View.VISIBLE) return
+            val loc = IntArray(2)
+            binding.newAppSpot.getLocationInWindow(loc)
+            val rootLoc = IntArray(2)
+            binding.root.getLocationInWindow(rootLoc)
+            binding.swipeSparkle.setColor(accentColor())
+            binding.swipeSparkle.bubble(
+                (loc[0] - rootLoc[0]) + binding.newAppSpot.width / 2f,
+                (loc[1] - rootLoc[1]) + binding.newAppSpot.height * 0.5f,
+            )
+            spotHandler.postDelayed(this, 300L)
+        }
+    }
+
+    /** Bottom margin placing the floating spots just above the suggestion trio. */
+    private fun spotBottomMargin(): Int {
+        val loc = IntArray(2)
+        binding.suggestionsBlock.getLocationInWindow(loc)
+        val rootLoc = IntArray(2)
+        binding.root.getLocationInWindow(rootLoc)
+        val blockTop = loc[1] - rootLoc[1]
+        return if (blockTop > 0) {
+            binding.root.height - blockTop + (6 * resources.displayMetrics.density).toInt()
+        } else {
+            // Pre-layout fallback: roughly above where the trio will land.
+            (binding.root.height * 0.22f).toInt()
+                .coerceAtLeast((160 * resources.displayMetrics.density).toInt())
+        }
+    }
+
     private fun updateNewAppSpot() {
         spotHandler.removeCallbacks(spotRunnable)
+        spotHandler.removeCallbacks(spotBubble)
         stopSpotPulse()
+        updateParkSpot() // the park slot shares every trigger the spotlight has
         val left = prefs.newAppSide == "left"
         val drawerOnSide =
             if (left) binding.leftDrawer.isVisibleAtAll else binding.rightDrawer.isVisibleAtAll
@@ -2246,17 +2353,18 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val lp = binding.newAppSpot.layoutParams as android.widget.FrameLayout.LayoutParams
-        lp.gravity = android.view.Gravity.TOP or
+        // Down by the suggestion trio: that's where the eyes and the thumb live.
+        lp.gravity = android.view.Gravity.BOTTOM or
             (if (left) android.view.Gravity.START else android.view.Gravity.END)
-        lp.topMargin = (binding.root.height * 0.17f).toInt()
-            .coerceAtLeast((110 * resources.displayMetrics.density).toInt())
+        lp.bottomMargin = spotBottomMargin()
+        lp.topMargin = 0
         binding.newAppSpot.layoutParams = lp
         binding.newAppGlow.setImageDrawable(glowDrawable(accentColor(), 42f))
-        binding.newAppStar.setTextColor(accentColor())
         binding.newAppSpot.visibility = View.VISIBLE
         spotIndex = 0
         spotHandler.post(spotRunnable)
         startSpotPulse()
+        if (prefs.animations) spotHandler.post(spotBubble)
     }
 
     private fun showNextSpotApp() {
@@ -2310,7 +2418,177 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopNewAppSpot() {
         spotHandler.removeCallbacks(spotRunnable)
+        spotHandler.removeCallbacks(spotBubble)
         stopSpotPulse()
+        parkHandler.removeCallbacks(parkRotate)
+    }
+
+    // ------------------------------------------------------------- park slot
+
+    // Drop any app into this slot (opposite side of the spotlight) to pin it for
+    // a few hours. Hidden until something is parked or a drag is in flight.
+    private val parkHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var parkIndex = 0
+    private var dragInFlight = false
+    private val parkRotate = object : Runnable {
+        override fun run() {
+            showNextParked()
+            parkHandler.postDelayed(this, SPOT_ROTATE_MS)
+        }
+    }
+
+    private fun setupPark() {
+        binding.parkSpot.setOnDragListener { _, event ->
+            when (event.action) {
+                android.view.DragEvent.ACTION_DRAG_STARTED -> prefs.parkEnabled
+                android.view.DragEvent.ACTION_DRAG_ENTERED -> {
+                    parkHover(engaged = true)
+                    true
+                }
+                android.view.DragEvent.ACTION_DRAG_EXITED -> {
+                    parkHover(engaged = false)
+                    true
+                }
+                android.view.DragEvent.ACTION_DROP -> {
+                    // The slot participates in every drag (it must be VISIBLE at
+                    // drag start to receive events) but only takes drops it shows.
+                    if (binding.parkSpot.alpha < 0.5f) return@setOnDragListener false
+                    val payload = event.localState as? WheelDrawer.DragPayload
+                        ?: return@setOnDragListener false
+                    haptic(binding.parkSpot)
+                    prefs.addParkedApp(payload.componentKey)
+                    parkHover(engaged = false)
+                    updateParkSpot()
+                    popParkedIcon()
+                    true
+                }
+                else -> true
+            }
+        }
+    }
+
+    /** Snap feedback while the drag is over the slot itself. */
+    private fun parkHover(engaged: Boolean) {
+        val scale = if (engaged) 1.25f else 1f
+        binding.parkSpot.animate().scaleX(scale).scaleY(scale).setDuration(120).start()
+    }
+
+    /** Gentle attraction as the drag approaches: the slot grows toward the finger. */
+    private fun parkAttract(x: Float, y: Float) {
+        if (binding.parkSpot.visibility != View.VISIBLE || binding.parkSpot.alpha < 0.5f) return
+        val loc = IntArray(2)
+        binding.parkSpot.getLocationInWindow(loc)
+        val rootLoc = IntArray(2)
+        binding.root.getLocationInWindow(rootLoc)
+        val cx = (loc[0] - rootLoc[0]) + binding.parkSpot.width / 2f
+        val cy = (loc[1] - rootLoc[1]) + binding.parkSpot.height / 2f
+        val radius = PARK_ATTRACT_DP * resources.displayMetrics.density
+        val d = kotlin.math.hypot((x - cx).toDouble(), (y - cy).toDouble()).toFloat()
+        val pull = (1f - d / radius).coerceIn(0f, 1f)
+        binding.parkSpot.scaleX = 1f + 0.18f * pull
+        binding.parkSpot.scaleY = 1f + 0.18f * pull
+        binding.parkGlow.alpha = 0.55f + 0.45f * pull
+    }
+
+    private fun updateParkSpot() {
+        parkHandler.removeCallbacks(parkRotate)
+        // Opposite side of the new-app spotlight.
+        val left = prefs.newAppSide != "left"
+        val drawerOnSide =
+            if (left) binding.leftDrawer.isVisibleAtAll else binding.rightDrawer.isVisibleAtAll
+        val parked =
+            if (prefs.parkEnabled) prefs.parkedApps().mapNotNull { repo.byComponentKey(it) }
+            else emptyList()
+        val show = prefs.parkEnabled && !drawerOnSide &&
+            binding.results.visibility != View.VISIBLE &&
+            (parked.isNotEmpty() || dragInFlight)
+        // Views that are GONE when a drag starts never receive that drag's events,
+        // so the slot hides via alpha and stays a live drop target: enabled →
+        // VISIBLE (possibly transparent), disabled → truly GONE.
+        binding.parkSpot.visibility = if (prefs.parkEnabled) View.VISIBLE else View.GONE
+        binding.parkSpot.alpha = if (show) 1f else 0f
+        if (!show) {
+            binding.parkSpot.setOnClickListener(null)
+            binding.parkSpot.setOnLongClickListener(null)
+            binding.parkSpot.isClickable = false
+            binding.parkSpot.isLongClickable = false
+            return
+        }
+        val lp = binding.parkSpot.layoutParams as android.widget.FrameLayout.LayoutParams
+        lp.gravity = android.view.Gravity.BOTTOM or
+            (if (left) android.view.Gravity.START else android.view.Gravity.END)
+        lp.bottomMargin = spotBottomMargin()
+        lp.topMargin = 0
+        binding.parkSpot.layoutParams = lp
+        val accent = accentColor()
+        binding.parkGlow.setImageDrawable(glowDrawable(accent, 42f))
+        binding.parkGlow.alpha = if (dragInFlight) 1f else 0.55f
+        // The dashed ring reads as "drop zone": always while empty, and during a
+        // drag even when occupied (the drop will replace or join).
+        binding.parkRing.visibility = if (parked.isEmpty() || dragInFlight) {
+            binding.parkRing.setImageDrawable(parkRingDrawable(accent))
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        if (parked.isEmpty()) {
+            binding.parkIcon.setImageDrawable(null)
+            binding.parkSpot.setOnClickListener(null)
+            binding.parkSpot.setOnLongClickListener(null)
+        } else {
+            parkIndex = 0
+            showNextParked()
+            if (prefs.parkMulti && parked.size > 1) {
+                parkHandler.postDelayed(parkRotate, SPOT_ROTATE_MS)
+            }
+        }
+        binding.parkSpot.visibility = View.VISIBLE
+    }
+
+    private fun showNextParked() {
+        val parked = prefs.parkedApps().mapNotNull { repo.byComponentKey(it) }
+        if (parked.isEmpty()) {
+            updateParkSpot()
+            return
+        }
+        val entry = parked[parkIndex % parked.size]
+        parkIndex++
+        val bindIcon = { binding.parkIcon.setImageDrawable(repo.icon(entry)) }
+        if (prefs.animations && parked.size > 1 && binding.parkIcon.drawable != null) {
+            binding.parkIcon.animate().alpha(0f).setDuration(220).withEndAction {
+                bindIcon()
+                binding.parkIcon.animate().alpha(1f).setDuration(220).start()
+            }.start()
+        } else {
+            bindIcon()
+        }
+        binding.parkSpot.setOnClickListener { launchApp(entry, binding.parkIcon) }
+        binding.parkSpot.setOnLongClickListener {
+            showAppMenu(entry, binding.parkIcon)
+            true
+        }
+    }
+
+    /** Landing pop when a drop settles into the slot. */
+    private fun popParkedIcon() {
+        if (!prefs.animations) return
+        binding.parkIcon.scaleX = 0.3f
+        binding.parkIcon.scaleY = 0.3f
+        binding.parkIcon.animate().scaleX(1f).scaleY(1f)
+            .setDuration(280)
+            .setInterpolator(android.view.animation.OvershootInterpolator())
+            .start()
+    }
+
+    /** Dashed accent circle marking the drop zone. */
+    private fun parkRingDrawable(color: Int): GradientDrawable = GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        val density = resources.displayMetrics.density
+        setStroke(
+            (1.5f * density).toInt().coerceAtLeast(2),
+            ColorUtils.setAlphaComponent(color, 0xAA),
+            6 * density, 5 * density,
+        )
     }
 
     // ----------------------------------------------------------- appearance
@@ -2392,5 +2670,9 @@ class MainActivity : AppCompatActivity() {
         const val LIVE_FLIP_DEG = 55f
         // Swipe distance (dp) on the now-playing row that skips a track.
         const val MUSIC_SKIP_PX = 48
+        // Radius (dp) inside which a drag makes the park slot lean toward the finger.
+        const val PARK_ATTRACT_DP = 120
+        // A launch this soon after cycling the trio counts as "the trio was wrong".
+        const val TRIO_MISS_WINDOW_MS = 8_000L
     }
 }

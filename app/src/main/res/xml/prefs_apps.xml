@@ -10,6 +10,33 @@
         android:title="@string/pref_drawers"
         android:summary="@string/pref_drawers_summary" />
 
+    <PreferenceCategory android:title="@string/cat_park">
+        <SwitchPreferenceCompat
+            android:key="park_enabled"
+            android:title="@string/pref_park_enabled"
+            android:summary="@string/pref_park_enabled_summary"
+            android:defaultValue="true" />
+        <SeekBarPreference
+            android:key="park_hours"
+            android:title="@string/pref_park_hours"
+            android:defaultValue="4"
+            android:max="24"
+            app:min="1"
+            app:showSeekBarValue="true"
+            android:dependency="park_enabled" />
+        <SwitchPreferenceCompat
+            android:key="park_multi"
+            android:title="@string/pref_park_multi"
+            android:summary="@string/pref_park_multi_summary"
+            android:defaultValue="false"
+            android:dependency="park_enabled" />
+        <Preference
+            android:key="park_pick"
+            android:title="@string/pref_park_pick"
+            android:summary="@string/pref_park_pick_summary"
+            android:dependency="park_enabled" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/cat_new_app_spot">
         <SwitchPreferenceCompat
             android:key="new_app_spot_enabled"
