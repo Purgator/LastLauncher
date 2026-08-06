@@ -29,6 +29,18 @@ class MediaStateTest {
     }
 
     @Test
+    fun displayLabelDeduplicatesArtistInTitle() {
+        assertEquals("Daft Punk — Around the World",
+            MediaState.displayLabel("Daft Punk", "Around the World"))
+        // Artist repeated at the title's start (case-insensitive): title wins alone.
+        assertEquals("Dj Milane feat. Someone",
+            MediaState.displayLabel("DJ Milane", "Dj Milane feat. Someone"))
+        assertEquals("Podcast Episode 12", MediaState.displayLabel("", "Podcast Episode 12"))
+        assertEquals("Some Artist", MediaState.displayLabel("Some Artist", ""))
+        assertEquals("", MediaState.displayLabel(" ", " "))
+    }
+
+    @Test
     fun pickPrefersPlayingOverPausedAndKeepsListOrder() {
         // A paused session listed first must lose to a playing one after it.
         assertEquals(

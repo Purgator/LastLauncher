@@ -19,6 +19,21 @@ object MediaState {
         state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
 
     /**
+     * The row's "artist — title" label, deduplicated: many apps repeat the artist
+     * at the start of the title ("DJ Milane — Dj Milane feat…"), which doubled the
+     * name and ate the useful part of the line. Blank parts are dropped.
+     */
+    fun displayLabel(artist: String, title: String): String {
+        val a = artist.trim()
+        val t = title.trim()
+        return when {
+            t.isEmpty() -> a
+            a.isEmpty() || t.startsWith(a, ignoreCase = true) -> t
+            else -> "$a — $t"
+        }
+    }
+
+    /**
      * Index of the session to surface among [states], or -1 when none deserves
      * the row: a playing session beats a paused one, list order breaks ties
      * (the system lists the most recently active first).
