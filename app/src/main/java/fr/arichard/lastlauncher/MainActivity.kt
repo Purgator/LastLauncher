@@ -212,7 +212,11 @@ class MainActivity : AppCompatActivity() {
             // Whatever summons the keyboard takes over from the drawers.
             val nowVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
             if (nowVisible && !imeVisible && anyDrawerOpen) closeDrawers(animate = true)
+            val changed = nowVisible != imeVisible
             imeVisible = nowVisible
+            // The floating slots anchor to the trio, which the keyboard shifts:
+            // re-place them once the insets settle (fixes the stuck-high slots).
+            if (changed) binding.root.post { updateNewAppSpot() }
             insets
         }
     }
@@ -1242,7 +1246,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        binding.weather.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, if (wantRow) 30f else 16f)
+        // 26sp, optically centered on the digits — 30sp read as a misaligned rival.
+        binding.weather.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, if (wantRow) 26f else 16f)
         binding.weather.typeface = android.graphics.Typeface.create(
             if (wantRow) "sans-serif-light" else "sans-serif", android.graphics.Typeface.NORMAL
         )
@@ -1820,15 +1825,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * The ranking, adjusted for what's playing: with the now-playing row on, the
-     * playing app is redundant and leaves the pool; with the row off, it's the
-     * single most likely next tap and jumps to the trio's front instead.
+     * The ranking, minus everything the home screen already shows elsewhere: the
+     * app in the now-playing row, the new-app spotlight's apps, and the parked
+     * apps — each of those is one tap away already, so suggesting it wastes a
+     * slot. With the now-playing row off, the playing app instead jumps to the
+     * trio's front (it's the single most likely next tap).
      */
     private fun visibleSuggestionPool(): List<AppEntry> {
-        val music = MediaWatch.current?.pkg ?: return suggestionPool
-        val rest = suggestionPool.filter { it.packageName != music }
-        return if (prefs.musicWidget) rest
-        else listOfNotNull(repo.byPackage(music)) + rest
+        val excluded = HashSet<String>()
+        val music = MediaWatch.current?.pkg
+        if (music != null && prefs.musicWidget) excluded += music
+        if (prefs.newAppSpotEnabled) excluded += prefs.newApps()
+        if (prefs.parkEnabled) {
+            for (key in prefs.parkedApps()) {
+                repo.byComponentKey(key)?.let { excluded += it.packageName }
+            }
+        }
+        val pool = suggestionPool.filter { it.packageName !in excluded }
+        return if (music != null && !prefs.musicWidget) {
+            listOfNotNull(repo.byPackage(music)) + pool.filter { it.packageName != music }
+        } else {
+            pool
+        }
     }
 
     // ------------------------------------------- notification badges & ticker
@@ -2302,42 +2320,69 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Rising soda bubbles around the spotlight — alive, not an inert sparkle. */
-    private val spotBubble = object : Runnable {
+    /** Rising soda bubbles around BOTH floating slots — same life for both. */
+    private val slotBubbles = object : Runnable {
         override fun run() {
-            if (binding.newAppSpot.visibility != View.VISIBLE) return
-            val loc = IntArray(2)
-            binding.newAppSpot.getLocationInWindow(loc)
-            val rootLoc = IntArray(2)
-            binding.root.getLocationInWindow(rootLoc)
-            binding.swipeSparkle.setColor(accentColor())
-            binding.swipeSparkle.bubble(
-                (loc[0] - rootLoc[0]) + binding.newAppSpot.width / 2f,
-                (loc[1] - rootLoc[1]) + binding.newAppSpot.height * 0.5f,
-            )
-            spotHandler.postDelayed(this, 300L)
+            var alive = false
+            for (spot in listOf(binding.newAppSpot, binding.parkSpot)) {
+                if (spot.visibility != View.VISIBLE || spot.alpha < 0.5f) continue
+                alive = true
+                val loc = IntArray(2)
+                spot.getLocationInWindow(loc)
+                val rootLoc = IntArray(2)
+                binding.root.getLocationInWindow(rootLoc)
+                binding.swipeSparkle.setColor(accentColor())
+                binding.swipeSparkle.bubble(
+                    (loc[0] - rootLoc[0]) + spot.width / 2f,
+                    (loc[1] - rootLoc[1]) + spot.height * 0.5f,
+                )
+            }
+            if (alive) spotHandler.postDelayed(this, 300L)
         }
     }
 
-    /** Bottom margin placing the floating spots just above the suggestion trio. */
+    private fun refreshSlotBubbles() {
+        spotHandler.removeCallbacks(slotBubbles)
+        if (prefs.animations) spotHandler.post(slotBubbles)
+    }
+
+    /**
+     * Bottom margin placing the floating slots just above the suggestion trio.
+     * Measured against the ROOT bottom (inset-independent): measuring against the
+     * live block position froze the keyboard's shift into the margin whenever the
+     * search closed before the IME insets settled, sending both slots up.
+     */
     private fun spotBottomMargin(): Int {
         val loc = IntArray(2)
         binding.suggestionsBlock.getLocationInWindow(loc)
         val rootLoc = IntArray(2)
         binding.root.getLocationInWindow(rootLoc)
         val blockTop = loc[1] - rootLoc[1]
-        return if (blockTop > 0) {
-            binding.root.height - blockTop + (6 * resources.displayMetrics.density).toInt()
+        return if (blockTop > 0 && !imeVisible) {
+            binding.root.height - blockTop + (18 * resources.displayMetrics.density).toInt()
         } else {
-            // Pre-layout fallback: roughly above where the trio will land.
-            (binding.root.height * 0.22f).toInt()
-                .coerceAtLeast((160 * resources.displayMetrics.density).toInt())
+            // Keyboard up or pre-layout: roughly above where the trio rests.
+            (binding.root.height * 0.24f).toInt()
+                .coerceAtLeast((170 * resources.displayMetrics.density).toInt())
         }
+    }
+
+    /** Applies the shared floating-slot geometry: bottom-anchored by the trio,
+     *  pulled in from the screen border. */
+    private fun placeSlot(spot: View, left: Boolean) {
+        val lp = spot.layoutParams as android.widget.FrameLayout.LayoutParams
+        lp.gravity = android.view.Gravity.BOTTOM or
+            (if (left) android.view.Gravity.START else android.view.Gravity.END)
+        lp.bottomMargin = spotBottomMargin()
+        lp.topMargin = 0
+        val inset = (22 * resources.displayMetrics.density).toInt()
+        lp.leftMargin = inset
+        lp.rightMargin = inset
+        spot.layoutParams = lp
     }
 
     private fun updateNewAppSpot() {
         spotHandler.removeCallbacks(spotRunnable)
-        spotHandler.removeCallbacks(spotBubble)
         stopSpotPulse()
         updateParkSpot() // the park slot shares every trigger the spotlight has
         val left = prefs.newAppSide == "left"
@@ -2350,21 +2395,17 @@ class MainActivity : AppCompatActivity() {
         }
         if (apps.isEmpty() || drawerOnSide || binding.results.visibility == View.VISIBLE) {
             binding.newAppSpot.visibility = View.GONE
+            refreshSlotBubbles()
             return
         }
-        val lp = binding.newAppSpot.layoutParams as android.widget.FrameLayout.LayoutParams
         // Down by the suggestion trio: that's where the eyes and the thumb live.
-        lp.gravity = android.view.Gravity.BOTTOM or
-            (if (left) android.view.Gravity.START else android.view.Gravity.END)
-        lp.bottomMargin = spotBottomMargin()
-        lp.topMargin = 0
-        binding.newAppSpot.layoutParams = lp
+        placeSlot(binding.newAppSpot, left)
         binding.newAppGlow.setImageDrawable(glowDrawable(accentColor(), 42f))
         binding.newAppSpot.visibility = View.VISIBLE
         spotIndex = 0
         spotHandler.post(spotRunnable)
         startSpotPulse()
-        if (prefs.animations) spotHandler.post(spotBubble)
+        refreshSlotBubbles()
     }
 
     private fun showNextSpotApp() {
@@ -2418,8 +2459,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopNewAppSpot() {
         spotHandler.removeCallbacks(spotRunnable)
-        spotHandler.removeCallbacks(spotBubble)
+        spotHandler.removeCallbacks(slotBubbles)
         stopSpotPulse()
+        stopParkPulse()
         parkHandler.removeCallbacks(parkRotate)
     }
 
@@ -2460,6 +2502,11 @@ class MainActivity : AppCompatActivity() {
                     parkHover(engaged = false)
                     updateParkSpot()
                     popParkedIcon()
+                    // The parked app leaves the trio immediately.
+                    if (suggestionPool.isNotEmpty()) {
+                        suggestionPage = 0
+                        applySuggestions(visibleSuggestionPool().take(3), animate = false)
+                    }
                     true
                 }
                 else -> true
@@ -2512,14 +2559,11 @@ class MainActivity : AppCompatActivity() {
             binding.parkSpot.setOnLongClickListener(null)
             binding.parkSpot.isClickable = false
             binding.parkSpot.isLongClickable = false
+            stopParkPulse()
+            refreshSlotBubbles()
             return
         }
-        val lp = binding.parkSpot.layoutParams as android.widget.FrameLayout.LayoutParams
-        lp.gravity = android.view.Gravity.BOTTOM or
-            (if (left) android.view.Gravity.START else android.view.Gravity.END)
-        lp.bottomMargin = spotBottomMargin()
-        lp.topMargin = 0
-        binding.parkSpot.layoutParams = lp
+        placeSlot(binding.parkSpot, left)
         val accent = accentColor()
         binding.parkGlow.setImageDrawable(glowDrawable(accent, 42f))
         binding.parkGlow.alpha = if (dragInFlight) 1f else 0.55f
@@ -2543,6 +2587,29 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.parkSpot.visibility = View.VISIBLE
+        // Same breath as the spotlight — the two slots must feel like siblings.
+        if (dragInFlight) stopParkPulse() else startParkPulse()
+        refreshSlotBubbles()
+    }
+
+    private var parkPulse: android.animation.ObjectAnimator? = null
+
+    private fun startParkPulse() {
+        stopParkPulse()
+        if (!prefs.animations) return
+        parkPulse = android.animation.ObjectAnimator.ofFloat(
+            binding.parkGlow, View.ALPHA, 0.55f, 1f
+        ).apply {
+            duration = 1600
+            repeatCount = android.animation.ObjectAnimator.INFINITE
+            repeatMode = android.animation.ObjectAnimator.REVERSE
+            start()
+        }
+    }
+
+    private fun stopParkPulse() {
+        parkPulse?.cancel()
+        parkPulse = null
     }
 
     private fun showNextParked() {
