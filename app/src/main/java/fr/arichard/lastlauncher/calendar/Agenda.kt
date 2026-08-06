@@ -10,7 +10,13 @@ import java.util.TimeZone
  */
 object Agenda {
 
-    /** One event instance pulled from the calendar provider. */
+    /**
+     * One event instance pulled from the calendar provider. For all-day events
+     * [begin] is re-anchored to local midnight for display; [providerBegin] keeps
+     * the provider's raw UTC value, which calendar apps expect back in view
+     * intents (a shifted value makes them fail to resolve the instance and fall
+     * back to their slow main view).
+     */
     data class EventInstance(
         val eventId: Long,
         val begin: Long,
@@ -19,6 +25,7 @@ object Agenda {
         val location: String,
         val allDay: Boolean,
         val calendarId: Long,
+        val providerBegin: Long = begin,
     )
 
     enum class DayKind { TOMORROW, LATER }
@@ -47,7 +54,11 @@ object Agenda {
         zone: TimeZone = TimeZone.getDefault(),
     ): List<Row> {
         val live = events
-            .map { if (it.allDay) it.copy(begin = allDayToLocal(it.begin, zone)) else it }
+            .map {
+                if (it.allDay) {
+                    it.copy(begin = allDayToLocal(it.begin, zone), providerBegin = it.begin)
+                } else it
+            }
             .filter { eventEnd(it, zone) > now }
             .sortedWith(compareBy({ dayStart(it.begin, zone) }, { !it.allDay }, { it.begin }))
         if (live.isEmpty()) return emptyList()

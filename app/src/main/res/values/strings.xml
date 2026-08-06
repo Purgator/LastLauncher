@@ -241,6 +241,16 @@
     <string name="agenda_in_min">in %d min</string>
     <string name="agenda_in_hours">in %1$d h %2$02d</string>
     <string name="agenda_open_event">open in calendar</string>
+    <string name="agenda_header_title">agenda</string>
+    <string name="cat_park">Quick slot</string>
+    <string name="pref_park_enabled">Drop-to-pin slot</string>
+    <string name="pref_park_enabled_summary">Drag any app onto the circle (opposite the new-app spotlight) to pin it there for a while</string>
+    <string name="pref_park_hours">Hours a dropped app stays</string>
+    <string name="pref_park_multi">Several apps, rotating</string>
+    <string name="pref_park_multi_summary">Advanced: drops join the slot and take turns; off, the last drop replaces</string>
+    <string name="pref_park_pick">Pin an app manually</string>
+    <string name="pref_park_pick_summary">Choose what sits in the slot without dragging</string>
+    <string name="park_pick_none">Empty</string>
     <string name="gesture_agenda">Agenda</string>
     <string name="pref_agenda_lines">Stream height</string>
     <string name="agenda_lines_4">4 lines</string>

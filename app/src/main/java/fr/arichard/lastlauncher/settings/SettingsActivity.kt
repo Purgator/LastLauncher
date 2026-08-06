@@ -515,6 +515,36 @@ class SettingsActivity : AppCompatActivity(),
                 showDrawersDialog()
                 true
             }
+
+            findPreference<Preference>("park_pick")?.setOnPreferenceClickListener {
+                pickParkedApps()
+                true
+            }
+        }
+
+        /** Manual park selection: multi-choice in multi mode, single pick otherwise. */
+        private fun pickParkedApps() {
+            val apps = repo.apps
+            if (apps.isEmpty()) return
+            if (prefs.parkMulti) {
+                val current = prefs.parkedApps()
+                val items = apps.map { AppPickerDialog.Item(it.label, repo.icon(it)) }
+                val checked = BooleanArray(apps.size) { apps[it].componentKey in current }
+                AppPickerDialog.multiChoice(
+                    requireContext(), getString(R.string.pref_park_pick), items, checked
+                ) {
+                    prefs.setParkedApps(
+                        apps.indices.filter { checked[it] }.map { apps[it].componentKey }
+                    )
+                }
+            } else {
+                pickComponentWithDefault(
+                    getString(R.string.pref_park_pick), getString(R.string.park_pick_none),
+                    prefs.parkedApps().firstOrNull() ?: "",
+                ) { key ->
+                    prefs.setParkedApps(if (key.isEmpty()) emptyList() else listOf(key))
+                }
+            }
         }
 
         /** Lists the configured drawers; pick one to edit, or add a new one. */

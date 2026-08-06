@@ -209,6 +209,11 @@ class Prefs(context: Context) {
      */
     val musicWidget: Boolean get() = sp.getBoolean(KEY_MUSIC_WIDGET, true)
 
+    /** Encoded "swiped the trio, then launched something else" corrections. */
+    var suggestionMissLog: String
+        get() = sp.getString(KEY_MISS_LOG, "") ?: ""
+        set(value) = sp.edit().putString(KEY_MISS_LOG, value).apply()
+
     /** Ordered go-to apps: cold-start suggestions and the static mode's content. */
     var favorites: List<String>
         get() = (sp.getString(KEY_FAVORITES, "") ?: "")
@@ -286,6 +291,54 @@ class Prefs(context: Context) {
         ).apply()
     }
 
+    // ------------------------------------------------------------- park slot
+
+    /** The drop-to-pin slot on the opposite side of the new-app spotlight. */
+    val parkEnabled: Boolean get() = sp.getBoolean(KEY_PARK_ENABLED, true)
+
+    /** How long a dropped app stays parked. */
+    val parkHours: Int get() = sp.getInt(KEY_PARK_HOURS, 4).coerceIn(1, 24)
+
+    /** Advanced: several parked apps rotating in place (else last drop replaces). */
+    val parkMulti: Boolean get() = sp.getBoolean(KEY_PARK_MULTI, false)
+
+    /** Parked component keys still within their window, newest first. */
+    fun parkedApps(now: Long = System.currentTimeMillis()): List<String> {
+        val cutoff = now - parkHours * 3_600_000L
+        val entries = readParked()
+        val live = entries.filter { it.second >= cutoff }
+        if (live.size != entries.size) writeParked(live)
+        return live.sortedByDescending { it.second }.map { it.first }
+    }
+
+    /** Drops [componentKey] into the slot (replacing, or joining in multi mode). */
+    fun addParkedApp(componentKey: String, now: Long = System.currentTimeMillis()) {
+        val kept =
+            if (parkMulti) readParked().filter { it.first != componentKey }
+            else emptyList()
+        writeParked((kept + (componentKey to now)).takeLast(MAX_PARKED))
+    }
+
+    /** Manual selection from settings: all entries restart their window now. */
+    fun setParkedApps(keys: List<String>, now: Long = System.currentTimeMillis()) {
+        writeParked(keys.distinct().takeLast(MAX_PARKED).map { it to now })
+    }
+
+    private fun readParked(): List<Pair<String, Long>> =
+        (sp.getString(KEY_PARKED, "") ?: "")
+            .split(',')
+            .mapNotNull {
+                val sep = it.lastIndexOf('|')
+                if (sep <= 0) null
+                else it.substring(0, sep) to (it.substring(sep + 1).toLongOrNull() ?: 0L)
+            }
+
+    private fun writeParked(entries: List<Pair<String, Long>>) {
+        sp.edit().putString(
+            KEY_PARKED, entries.joinToString(",") { "${it.first}|${it.second}" }
+        ).apply()
+    }
+
     fun hideApp(pkg: String) {
         hiddenApps = hiddenApps + pkg
     }
@@ -356,6 +409,12 @@ class Prefs(context: Context) {
         const val KEY_NEW_APP_HOURS = "new_app_hours"
         const val KEY_NEW_APPS = "new_apps"
         const val MAX_NEW_APPS = 10
+        const val KEY_PARK_ENABLED = "park_enabled"
+        const val KEY_PARK_HOURS = "park_hours"
+        const val KEY_PARK_MULTI = "park_multi"
+        const val KEY_PARKED = "parked_apps"
+        const val MAX_PARKED = 5
+        const val KEY_MISS_LOG = "suggestion_miss_log"
         const val KEY_SEARCH_MODE = "search_mode"
         const val KEY_AGENDA_ENABLED = "agenda_enabled"
         const val KEY_AGENDA_ON_GESTURE = "agenda_on_gesture"

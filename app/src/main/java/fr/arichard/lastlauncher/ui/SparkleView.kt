@@ -29,6 +29,7 @@ class SparkleView @JvmOverloads constructor(
         val size: Float,          // px
         val twinklePhase: Float,  // desynchronizes the flicker
         val star: Boolean,        // 4-point star vs powder grain
+        val buoyant: Boolean = false, // soda bubble: floats up instead of falling
     )
 
     private val particles = ArrayList<Particle>()
@@ -98,6 +99,29 @@ class SparkleView @JvmOverloads constructor(
         )
     }
 
+    /**
+     * One soda bubble born near ([x], [y]), drifting upward with a lazy wobble —
+     * the new-app spotlight's "champagne". The caller paces the emission.
+     */
+    fun bubble(x: Float, y: Float) {
+        if (particles.size >= MAX_PARTICLES) return
+        val life = 0.8f + random.nextFloat() * 0.7f
+        particles.add(
+            Particle(
+                x + gauss() * 16 * density,
+                y + gauss() * 10 * density,
+                vx = gauss() * 6 * density,
+                vy = -(25f + random.nextFloat() * 40f) * density,
+                life = life, maxLife = life,
+                size = (0.9f + random.nextFloat() * 1.4f) * density,
+                twinklePhase = random.nextFloat() * (Math.PI * 2).toFloat(),
+                star = random.nextFloat() < 0.25f,
+                buoyant = true,
+            )
+        )
+        wake()
+    }
+
     /** Rough normal distribution so grains cluster near the finger. */
     private fun gauss(): Float =
         (random.nextFloat() + random.nextFloat() + random.nextFloat()) / 1.5f - 1f
@@ -130,11 +154,17 @@ class SparkleView @JvmOverloads constructor(
                 it.remove()
                 continue
             }
+            val age0 = p.maxLife - p.life
             p.x += p.vx * dt
             p.y += p.vy * dt
-            p.vy += GRAVITY * density * dt      // gentle fall at the end of the arc
-            p.vx *= 1f - DRAG * dt
-            p.vy *= 1f - DRAG * dt
+            if (p.buoyant) {
+                p.vy -= BUOYANCY * density * dt // bubbles accelerate upward…
+                p.vx += sin(p.twinklePhase + age0 * 6f) * 30f * density * dt // …and wobble
+            } else {
+                p.vy += GRAVITY * density * dt  // gentle fall at the end of the arc
+                p.vx *= 1f - DRAG * dt
+                p.vy *= 1f - DRAG * dt
+            }
 
             val fraction = p.life / p.maxLife
             val age = p.maxLife - p.life
@@ -164,6 +194,7 @@ class SparkleView @JvmOverloads constructor(
         const val MAX_PARTICLES = 70   // emission cap; bursts may briefly exceed it
         const val BURST_PARTICLES = 26
         const val GRAVITY = 190f       // dp/s²
+        const val BUOYANCY = 55f       // dp/s² upward, for soda bubbles
         const val DRAG = 2.2f          // per-second velocity decay
     }
 }
