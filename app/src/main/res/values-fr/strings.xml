@@ -241,6 +241,16 @@
     <string name="agenda_in_min">dans %d min</string>
     <string name="agenda_in_hours">dans %1$d h %2$02d</string>
     <string name="agenda_open_event">ouvrir dans l\'agenda</string>
+    <string name="agenda_header_title">agenda</string>
+    <string name="cat_park">Emplacement rapide</string>
+    <string name="pref_park_enabled">Épingler par glisser-déposer</string>
+    <string name="pref_park_enabled_summary">Glissez n\'importe quelle application sur le cercle (à l\'opposé du spot nouveauté) pour l\'y épingler un moment</string>
+    <string name="pref_park_hours">Heures de maintien</string>
+    <string name="pref_park_multi">Plusieurs applications, en rotation</string>
+    <string name="pref_park_multi_summary">Avancé : les dépôts s\'ajoutent et alternent ; sinon le dernier remplace</string>
+    <string name="pref_park_pick">Épingler manuellement</string>
+    <string name="pref_park_pick_summary">Choisir le contenu de l\'emplacement sans glisser</string>
+    <string name="park_pick_none">Vide</string>
     <string name="gesture_agenda">Agenda</string>
     <string name="pref_agenda_lines">Hauteur du fil</string>
     <string name="agenda_lines_4">4 lignes</string>

@@ -62,6 +62,11 @@ object PredictionEngine {
     private const val MISTAKE_WINDOW_MS = 15_000L
     private const val JUST_USED_WINDOW_MS = 45L * 60_000
 
+    // "Corrected trio" feedback: each recorded miss multiplies the app's score by
+    // this within the same time bucket (capped so one bad day can't bury a habit).
+    private const val MISS_FACTOR = 0.6
+    private const val MISS_CAP = 3
+
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "predict") }
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -182,7 +187,34 @@ object PredictionEngine {
         for (pkg in Prefs(context).boostedApps) {
             scores[pkg] = (scores[pkg] ?: 0.0) * BOOST_FACTOR + BOOST_BASE
         }
+        // "I swiped past this trio and opened something else": what was shown gets
+        // quieter in this time bucket for a couple of weeks.
+        val misses = MissLog.penalties(
+            Prefs(context).suggestionMissLog, MissLog.bucketOf(hourNow), now
+        )
+        for ((pkg, count) in misses) {
+            val existing = scores[pkg] ?: continue
+            scores[pkg] = existing *
+                Math.pow(MISS_FACTOR, minOf(count, MISS_CAP).toDouble())
+        }
         return scores
+    }
+
+    /**
+     * Records the corrected-trio feedback: the shown [shownPkgs] were swiped away
+     * and a different app launched within seconds. Play-swipes (no launch after)
+     * must NOT be reported — the host enforces the timing rule.
+     */
+    fun logSuggestionMiss(context: Context, shownPkgs: Collection<String>) {
+        val appContext = context.applicationContext
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        executor.execute {
+            val prefs = Prefs(appContext)
+            prefs.suggestionMissLog = MissLog.record(
+                prefs.suggestionMissLog, shownPkgs,
+                MissLog.bucketOf(hour), System.currentTimeMillis(),
+            )
+        }
     }
 
     /** Sensible cold-start picks before any history exists: phone, SMS, browser, camera. */
