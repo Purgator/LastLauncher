@@ -83,6 +83,8 @@ impractical — prioritize a readable history.
 | `predict/UsageDb.kt` | SQLite log of launches (pruned at 5000 rows). Never leaves the device. |
 | `predict/ContextSignals.kt` | Bluetooth/headset/charger trigger events (5-minute window). |
 | `notify/NotifListener.kt` | NotificationListenerService → badge counts + ticker messages, in-memory only. |
+| `notify/MediaWatch.kt` | Active media sessions via MediaSessionManager (rides the notification-listener grant): the now-playing row's data + transport controls. Registered only while resumed. |
+| `notify/MediaState.kt` | Pure playback-state ranking (unit-tested): which session the row shows. |
 | `calendar/Agenda.kt` | Pure agenda logic (unit-tested): event instances → row list with day separators, next-event flag, countdown minutes; all-day UTC-midnight normalization. |
 | `calendar/CalendarFeed.kt` | CalendarContract reads on a dedicated executor (instances window, calendar list); results post to main. READ_CALENDAR, read-only. |
 | `calendar/AgendaView.kt` | The home agenda stream: terminal-style event lines under the status line, capped-height vertical scroll, tap-to-unfold (location → maps, open-in-calendar), long-press → calendar app. Forwards horizontal/multi-finger/dead-vertical swipes to the host. |
@@ -146,6 +148,11 @@ the two `WheelDrawer`s (last = on top).
   toggles it; back or resetToHome dismisses. Options: lines, text size, all-day
   on/off, countdown on/off, days, tap behavior, calendars. Refresh: on resume +
   ContentObserver while resumed + the minute tick for the countdown. Never polls.
+- The now-playing row (music_widget, on by default) sits under the ticker, only when
+  a media session is playing/paused and no search results are shown: `♪ artist —
+  title` (tap = open the app) + ⏮ ⏯ ⏭ transport controls. While it shows an app,
+  that app is filtered out of the suggestion trio (visibleSuggestionPool). Session
+  watching is event-driven and resumed-only; no polling.
 - Haptics on every deliberate action, gated by `prefs.haptics` via `haptic(view)`.
 - Hints, spotlight and ticker all yield to drawers/search and stop on pause.
 
