@@ -165,13 +165,16 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        // Home pressed while already home: return to the clean state, and read the
-        // second press as "I want to type" — summon the command bar. The activity
-        // is PAUSED (not resumed) while onNewIntent runs even when it was in front,
-        // so the test for "was already home" is STARTED (visible); returning from
-        // an app arrives stopped and stays keyboard-free.
+        // Home pressed while already home is a toggle: bar closed → summon it,
+        // keyboard up; bar open (typing, all-apps, or just the keyboard) → back to
+        // the clean state. The activity is PAUSED (not resumed) while onNewIntent
+        // runs even when it was in front, so the test for "was already home" is
+        // STARTED (visible); returning from an app arrives stopped, keyboard-free.
+        val searchWasOpen = allAppsOpen || binding.searchInput.text.isNotEmpty() || imeVisible
         resetToHome()
-        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+        if (!searchWasOpen &&
+            lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+        ) {
             focusSearch(show = true)
         }
     }
@@ -193,8 +196,10 @@ class MainActivity : AppCompatActivity() {
 
     // ---------------------------------------------------------------- setup
 
+    // Live IME state; also feeds the home-press toggle ("is the bar open?").
+    private var imeVisible = false
+
     private fun setupInsets() {
-        var imeWasVisible = false
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
@@ -204,9 +209,9 @@ class MainActivity : AppCompatActivity() {
                 binding.content.paddingRight, bars.bottom
             )
             // Whatever summons the keyboard takes over from the drawers.
-            val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
-            if (imeVisible && !imeWasVisible && anyDrawerOpen) closeDrawers(animate = true)
-            imeWasVisible = imeVisible
+            val nowVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+            if (nowVisible && !imeVisible && anyDrawerOpen) closeDrawers(animate = true)
+            imeVisible = nowVisible
             insets
         }
     }
@@ -222,6 +227,29 @@ class MainActivity : AppCompatActivity() {
     // consume touches and made row-level swipes die silently in the view hierarchy.
     private var suggDispatchCandidate = false
     private var suggDispatchClaimed = false
+    private var musicDispatchCandidate = false
+    private var musicDispatchClaimed = false
+
+    /** Whether the DOWN at ([x], [y]) landed on [view] (window coordinates). */
+    private fun downInView(view: View, x: Float, y: Float): Boolean {
+        if (view.visibility != View.VISIBLE) return false
+        val loc = IntArray(2)
+        view.getLocationInWindow(loc)
+        val rootLoc = IntArray(2)
+        binding.root.getLocationInWindow(rootLoc)
+        val left = (loc[0] - rootLoc[0]).toFloat()
+        val top = (loc[1] - rootLoc[1]).toFloat()
+        return x >= left && x <= left + view.width && y >= top && y <= top + view.height
+    }
+
+    /** Claims the stream for a dispatch-level gesture: cancels whatever view was
+     *  tracking a tap or long-press under the finger. */
+    private fun claimDispatchGesture(ev: MotionEvent) {
+        val cancel = MotionEvent.obtain(ev)
+        cancel.action = MotionEvent.ACTION_CANCEL
+        super.dispatchTouchEvent(cancel)
+        cancel.recycle()
+    }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop
@@ -233,29 +261,34 @@ class MainActivity : AppCompatActivity() {
                 maxPointers = 1
                 suggSwipeActive = false
                 suggDispatchClaimed = false
+                musicDispatchClaimed = false
                 val edge = 40 * resources.displayMetrics.density
                 suggDispatchCandidate =
                     binding.suggestionsBlock.visibility == View.VISIBLE &&
                     downInSuggestions() &&
                     ev.x > edge && ev.x < binding.root.width - edge // edges = drawer pulls
+                musicDispatchCandidate = downInView(binding.musicRow, ev.x, ev.y)
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 maxPointers = maxOf(maxPointers, ev.pointerCount)
                 suggDispatchCandidate = false // two-finger swipes run gesture actions
+                musicDispatchCandidate = false
             }
             MotionEvent.ACTION_MOVE -> {
-                if (suggDispatchCandidate && !suggDispatchClaimed) {
-                    val dx = ev.x - downX
-                    val dy = ev.y - downY
-                    if (abs(dx) > slop * 1.5f && abs(dx) > abs(dy) * 1.2f) {
-                        suggDispatchClaimed = true
-                        // Whatever is under the finger (icon tap, long-press timer)
-                        // must let go of the gesture.
-                        val cancel = MotionEvent.obtain(ev)
-                        cancel.action = MotionEvent.ACTION_CANCEL
-                        super.dispatchTouchEvent(cancel)
-                        cancel.recycle()
-                    }
+                val dx = ev.x - downX
+                val dy = ev.y - downY
+                if (musicDispatchCandidate && !musicDispatchClaimed &&
+                    abs(dx) > slop * 1.5f && abs(dx) > abs(dy) * 1.2f
+                ) {
+                    musicDispatchClaimed = true
+                    claimDispatchGesture(ev)
+                }
+                if (musicDispatchClaimed) return true
+                if (suggDispatchCandidate && !suggDispatchClaimed &&
+                    abs(dx) > slop * 1.5f && abs(dx) > abs(dy) * 1.2f
+                ) {
+                    suggDispatchClaimed = true
+                    claimDispatchGesture(ev)
                 }
                 if (suggDispatchClaimed) {
                     updateSuggestionSwipe(ev)
@@ -263,6 +296,18 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (musicDispatchClaimed) {
+                    musicDispatchClaimed = false
+                    val dx = ev.x - downX
+                    if (ev.actionMasked == MotionEvent.ACTION_UP &&
+                        abs(dx) >= MUSIC_SKIP_PX * resources.displayMetrics.density
+                    ) {
+                        haptic(binding.musicRow)
+                        // Swipe left = next track, swipe right = previous.
+                        if (dx < 0) MediaWatch.next() else MediaWatch.previous()
+                    }
+                    return true
+                }
                 if (suggDispatchClaimed) {
                     suggDispatchClaimed = false
                     finishSuggestionSwipe(
@@ -1512,7 +1557,9 @@ class MainActivity : AppCompatActivity() {
         }
         haptic(binding.suggestionsBlock)
         suggestionPage = (suggestionPage + direction + pages) % pages
-        val next = pool.drop(suggestionPage * 3).take(3)
+        // Wrap-around window: a pool not divisible by 3 must not leave blank
+        // slots on the last page (the music filter makes 12 into 11, e.g.).
+        val next = (0 until 3).map { pool[(suggestionPage * 3 + it) % pool.size] }
         // Page direction is opposite the finger: the coin turns with the finger.
         if (prefs.animations) flipSuggestionsTo(next, -direction)
         else applySuggestions(next, animate = false)
@@ -1673,6 +1720,10 @@ class MainActivity : AppCompatActivity() {
     private var lastMusicPkg: String? = null
 
     private fun setupMusic() {
+        // U+FE0E forces text presentation: without it these glyphs render as
+        // colored emoji and ignore the accent tint.
+        binding.musicPrev.text = "⏮︎"
+        binding.musicNext.text = "⏭︎"
         binding.musicPlay.setOnClickListener {
             haptic(it)
             MediaWatch.playPause()
@@ -1690,6 +1741,16 @@ class MainActivity : AppCompatActivity() {
                 repo.byPackage(now.pkg)?.let { launchApp(it, v) }
             }
         }
+        // Long-press anywhere on the row jumps to its settings domain.
+        fun View.opensMusicSettings() {
+            setOnLongClickListener {
+                haptic(this)
+                SettingsActivity.open(this@MainActivity, SettingsActivity.SCREEN_NOTIFICATIONS)
+                true
+            }
+        }
+        binding.musicRow.opensMusicSettings()
+        binding.musicInfo.opensMusicSettings()
     }
 
     /** Shows/refreshes the now-playing row; also re-derives the suggestion trio —
@@ -1705,7 +1766,8 @@ class MainActivity : AppCompatActivity() {
                 .joinToString(" — ")
                 .ifBlank { repo.byPackage(now.pkg)?.label ?: now.pkg }
             binding.musicInfo.text = "♪ $label"
-            binding.musicPlay.text = if (now.playing) "⏸" else "▶"
+            // Text-presentation selector: the emoji form ignores the accent tint.
+            binding.musicPlay.text = if (now.playing) "⏸︎" else "▶︎"
             val accent = accentColor()
             binding.musicPrev.setTextColor(accent)
             binding.musicPlay.setTextColor(accent)
@@ -1714,7 +1776,11 @@ class MainActivity : AppCompatActivity() {
         if (lastMusicPkg != session?.pkg) {
             lastMusicPkg = session?.pkg
             suggestionPage = 0
-            applySuggestions(visibleSuggestionPool().take(3), animate = false)
+            // Skip while the ranking hasn't arrived yet (resume race): applying an
+            // empty pool blanked the trio.
+            if (suggestionPool.isNotEmpty()) {
+                applySuggestions(visibleSuggestionPool().take(3), animate = false)
+            }
         }
     }
 
@@ -2324,5 +2390,7 @@ class MainActivity : AppCompatActivity() {
         // Max live lean of the trio while the finger drags; the release animation
         // finishes the coin turn from there to 90°.
         const val LIVE_FLIP_DEG = 55f
+        // Swipe distance (dp) on the now-playing row that skips a track.
+        const val MUSIC_SKIP_PX = 48
     }
 }
