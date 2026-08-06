@@ -148,11 +148,12 @@
             android:visibility="gone"
             tools:visibility="visible">
 
+            <!-- No borderless ripple here: its circle paints past the text (offset
+                 left of the row) and looked broken on long-press. -->
             <TextView
                 android:id="@+id/musicInfo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackgroundBorderless"
                 android:fontFamily="monospace"
                 android:maxWidth="200dp"
                 android:singleLine="true"
@@ -169,7 +170,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="6dp"
-                android:text="⏮"
+                android:text="«"
                 android:textSize="16sp" />
 
             <TextView
@@ -179,7 +180,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="6dp"
-                android:text="▶"
+                android:text="►"
                 android:textSize="16sp" />
 
             <TextView
@@ -189,7 +190,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="6dp"
-                android:text="⏭"
+                android:text="»"
                 android:textSize="16sp" />
         </LinearLayout>
 
