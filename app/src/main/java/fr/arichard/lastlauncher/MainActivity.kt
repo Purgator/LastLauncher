@@ -41,6 +41,7 @@ import fr.arichard.lastlauncher.databinding.ActivityMainBinding
 import fr.arichard.lastlauncher.gesture.GestureAction
 import fr.arichard.lastlauncher.gesture.GestureBinding
 import fr.arichard.lastlauncher.lock.LockService
+import fr.arichard.lastlauncher.notify.MediaWatch
 import fr.arichard.lastlauncher.notify.NotifListener
 import fr.arichard.lastlauncher.predict.PredictionEngine
 import fr.arichard.lastlauncher.settings.InsightsActivity
@@ -100,6 +101,7 @@ class MainActivity : AppCompatActivity() {
         setupContextualLongPress()
         setupDragWatcher()
         setupAgenda()
+        setupMusic()
         repo.addListener(repoListener)
         NotifListener.addListener(notifListener)
     }
@@ -147,6 +149,7 @@ class MainActivity : AppCompatActivity() {
         refreshWeather()
         refreshAgenda()
         registerAgendaObserver()
+        MediaWatch.start(this) { renderMusic() }
         updateNewAppSpot()
     }
 
@@ -157,6 +160,7 @@ class MainActivity : AppCompatActivity() {
         stopNewAppSpot()
         unregisterStatusReceiver()
         unregisterAgendaObserver()
+        MediaWatch.stop()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -826,6 +830,7 @@ class MainActivity : AppCompatActivity() {
             binding.suggestionsBlock.visibility = View.VISIBLE
             startHints()
             renderAgenda()
+            renderMusic()
             return
         }
 
@@ -848,6 +853,7 @@ class MainActivity : AppCompatActivity() {
         binding.results.visibility = View.VISIBLE
         binding.suggestionsBlock.visibility = View.INVISIBLE
         binding.agenda.visibility = View.GONE
+        binding.musicRow.visibility = View.GONE
         binding.results.scrollToPosition(0)
         stopHints()
         binding.hintLeft.visibility = View.GONE
@@ -900,6 +906,7 @@ class MainActivity : AppCompatActivity() {
         binding.suggestionsBlock.visibility = View.VISIBLE
         startHints()
         renderAgenda()
+        renderMusic()
         updateNewAppSpot()
         if (prefs.keyboardAlways) {
             focusSearch(show = true)
@@ -1477,14 +1484,14 @@ class MainActivity : AppCompatActivity() {
                 .mapNotNull { repo.byPackage(it) }
             suggestionPool = favs
             suggestionPage = 0
-            applySuggestions(favs.take(3), animate = false)
+            applySuggestions(visibleSuggestionPool().take(3), animate = false)
             return
         }
         PredictionEngine.computeSuggestions(this, SUGGESTION_POOL_SIZE) { ranked, scores ->
             repo.usageBoost = scores
             suggestionPool = ranked.mapNotNull { repo.byPackage(it) }
             suggestionPage = 0
-            applySuggestions(suggestionPool.take(3), animate = true)
+            applySuggestions(visibleSuggestionPool().take(3), animate = true)
         }
     }
 
@@ -1493,7 +1500,8 @@ class MainActivity : AppCompatActivity() {
 
     /** Pages the visible trio through the deeper ranking (wraps around). */
     private fun cycleSuggestions(direction: Int) {
-        val pages = (suggestionPool.size + 2) / 3
+        val pool = visibleSuggestionPool()
+        val pages = (pool.size + 2) / 3
         if (pages <= 1) {
             // Nothing to page to; if a live lean had started, straighten back up.
             if (prefs.animations) {
@@ -1503,7 +1511,7 @@ class MainActivity : AppCompatActivity() {
         }
         haptic(binding.suggestionsBlock)
         suggestionPage = (suggestionPage + direction + pages) % pages
-        val next = suggestionPool.drop(suggestionPage * 3).take(3)
+        val next = pool.drop(suggestionPage * 3).take(3)
         // Page direction is opposite the finger: the coin turns with the finger.
         if (prefs.animations) flipSuggestionsTo(next, -direction)
         else applySuggestions(next, animate = false)
@@ -1657,6 +1665,62 @@ class MainActivity : AppCompatActivity() {
         if (binding.results.visibility == View.VISIBLE) {
             onQueryChanged(binding.searchInput.text.toString())
         }
+    }
+
+    // ------------------------------------------------------------ now playing
+
+    private var lastMusicPkg: String? = null
+
+    private fun setupMusic() {
+        binding.musicPlay.setOnClickListener {
+            haptic(it)
+            MediaWatch.playPause()
+        }
+        binding.musicNext.setOnClickListener {
+            haptic(it)
+            MediaWatch.next()
+        }
+        binding.musicPrev.setOnClickListener {
+            haptic(it)
+            MediaWatch.previous()
+        }
+        binding.musicInfo.setOnClickListener { v ->
+            MediaWatch.current?.let { now ->
+                repo.byPackage(now.pkg)?.let { launchApp(it, v) }
+            }
+        }
+    }
+
+    /** Shows/refreshes the now-playing row; also re-derives the suggestion trio
+     *  so the app the row already controls steps out of it. */
+    private fun renderMusic() {
+        val now = if (prefs.musicWidget) MediaWatch.current else null
+        val visible = now != null && binding.results.visibility != View.VISIBLE
+        binding.musicRow.visibility = if (visible) View.VISIBLE else View.GONE
+        if (now != null) {
+            val label = listOf(now.artist, now.title)
+                .filter { it.isNotBlank() }
+                .joinToString(" — ")
+                .ifBlank { repo.byPackage(now.pkg)?.label ?: now.pkg }
+            binding.musicInfo.text = "♪ $label"
+            binding.musicPlay.text = if (now.playing) "⏸" else "▶"
+            val accent = accentColor()
+            binding.musicPrev.setTextColor(accent)
+            binding.musicPlay.setTextColor(accent)
+            binding.musicNext.setTextColor(accent)
+        }
+        if (lastMusicPkg != now?.pkg) {
+            lastMusicPkg = now?.pkg
+            suggestionPage = 0
+            applySuggestions(visibleSuggestionPool().take(3), animate = false)
+        }
+    }
+
+    /** The ranking minus the app the now-playing row already covers. */
+    private fun visibleSuggestionPool(): List<AppEntry> {
+        val music = if (prefs.musicWidget) MediaWatch.current?.pkg else null
+        return if (music == null) suggestionPool
+        else suggestionPool.filter { it.packageName != music }
     }
 
     // ------------------------------------------- notification badges & ticker
