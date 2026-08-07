@@ -62,10 +62,12 @@ object PredictionEngine {
     private const val MISTAKE_WINDOW_MS = 15_000L
     private const val JUST_USED_WINDOW_MS = 45L * 60_000
 
-    // "Corrected trio" feedback: each recorded miss multiplies the app's score by
-    // this within the same time bucket (capped so one bad day can't bury a habit).
-    private const val MISS_FACTOR = 0.6
-    private const val MISS_CAP = 3
+    // "Corrected trio" feedback, stored as real rows in the DB: a miss counts as a
+    // negative launch (same decay, same context matching) with this weight, and the
+    // app actually opened gets one extra reinforcement row. The correction is thus
+    // a permanent, context-aware rebalance of the same statistics launches feed —
+    // not a temporary side-channel adjustment.
+    private const val W_MISS = 1.5
 
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "predict") }
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -177,6 +179,18 @@ object PredictionEngine {
             if (activeEvent != null && r.ctxEvent == activeEvent) s += W_TRIGGER * w
             scores.merge(r.pkg, s, Double::plus)
         }
+        // Corrections: a suggested-but-swiped-away app counts as a negative launch,
+        // matched and decayed exactly like the positive ones — strongest when the
+        // context repeats, forgotten on the same horizon as everything else.
+        for (r in db(context).missesSince(now - HISTORY_DAYS * DAY_MS)) {
+            val ageDays = (now - r.ts).toDouble() / DAY_MS
+            val w = exp(-ageDays / DECAY_DAYS)
+            var s = w
+            if (circularHourDiff(r.hour, hourNow) <= 1) s += W_HOUR * w
+            if (isWeekend(r.dow) == weekendNow) s += W_DAY_TYPE * w
+            if (activeEvent != null && r.ctxEvent == activeEvent) s += W_TRIGGER * w
+            scores.merge(r.pkg, -W_MISS * s, Double::plus)
+        }
         // An app currently showing notifications is more likely to be wanted next.
         // Empty map without notification access, so this is a no-op until granted.
         for ((pkg, count) in NotifListener.counts) {
@@ -187,33 +201,39 @@ object PredictionEngine {
         for (pkg in Prefs(context).boostedApps) {
             scores[pkg] = (scores[pkg] ?: 0.0) * BOOST_FACTOR + BOOST_BASE
         }
-        // "I swiped past this trio and opened something else": what was shown gets
-        // quieter in this time bucket for a couple of weeks.
-        val misses = MissLog.penalties(
-            Prefs(context).suggestionMissLog, MissLog.bucketOf(hourNow), now
-        )
-        for ((pkg, count) in misses) {
-            val existing = scores[pkg] ?: continue
-            scores[pkg] = existing *
-                Math.pow(MISS_FACTOR, minOf(count, MISS_CAP).toDouble())
-        }
         return scores
     }
 
     /**
      * Records the corrected-trio feedback: the shown [shownPkgs] were swiped away
-     * and a different app launched within seconds. Play-swipes (no launch after)
-     * must NOT be reported — the host enforces the timing rule.
+     * and [launchedPkg] opened within seconds. Each shown app takes a context-
+     * stamped miss row, and the launched app gets one extra reinforcement row —
+     * reaching past the proposal is stronger evidence than an ordinary launch.
+     * Play-swipes (no launch after) must NOT be reported — the host enforces the
+     * timing rule.
      */
-    fun logSuggestionMiss(context: Context, shownPkgs: Collection<String>) {
+    fun logTrioCorrection(context: Context, shownPkgs: Collection<String>, launchedPkg: String) {
         val appContext = context.applicationContext
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val now = System.currentTimeMillis()
+        val cal = Calendar.getInstance()
+        val hour = cal.get(Calendar.HOUR_OF_DAY)
+        val dow = cal.get(Calendar.DAY_OF_WEEK)
+        val event = ContextSignals.activeEvent(now)
         executor.execute {
-            val prefs = Prefs(appContext)
-            prefs.suggestionMissLog = MissLog.record(
-                prefs.suggestionMissLog, shownPkgs,
-                MissLog.bucketOf(hour), System.currentTimeMillis(),
-            )
+            try {
+                val database = db(appContext)
+                for (pkg in shownPkgs) {
+                    if (pkg == launchedPkg) continue
+                    database.insertMiss(
+                        UsageDb.Row(pkg, now, hour, dow, prevPkg = null, ctxEvent = event)
+                    )
+                }
+                database.insertLaunch(
+                    UsageDb.Row(launchedPkg, now, hour, dow, prevPkg = null, ctxEvent = event)
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not log trio correction", e)
+            }
         }
     }
 
@@ -273,6 +293,7 @@ object PredictionEngine {
         val topScores: List<Pair<String, Double>>,
         val boosted: Set<String>,
         val notifying: Map<String, Int>,
+        val totalMisses: Int = 0,
     )
 
     /** Builds a live view of the engine's data and current ranking, off the UI thread. */
@@ -303,6 +324,7 @@ object PredictionEngine {
                         .map { it.key to it.value },
                     boosted = Prefs(appContext).boostedApps,
                     notifying = NotifListener.counts.filterValues { it > 0 },
+                    totalMisses = database.totalMissCount(),
                 )
             } catch (e: Exception) {
                 Log.w(TAG, "Snapshot failed", e)
@@ -319,6 +341,7 @@ object PredictionEngine {
         "transition" to W_TRANSITION,
         "trigger" to W_TRIGGER,
         "notification" to W_NOTIFICATION,
+        "miss" to W_MISS,
         "boost_factor" to BOOST_FACTOR,
     )
 

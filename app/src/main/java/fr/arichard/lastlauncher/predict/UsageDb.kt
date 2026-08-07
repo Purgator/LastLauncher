@@ -7,11 +7,13 @@ import android.database.sqlite.SQLiteOpenHelper
 
 /**
  * The launcher's memory: one row per app launch, with the context it happened in
- * (hour, day of week, previous app, active trigger event). Kept small by pruning,
- * never leaves the device.
+ * (hour, day of week, previous app, active trigger event) — plus one row per
+ * "miss" (an app that was suggested and explicitly swiped away before launching
+ * something else), stored with the same context so corrections weigh on the same
+ * statistics launches feed. Kept small by pruning, never leaves the device.
  */
 class UsageDb(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "usage.db", null, 1) {
+    SQLiteOpenHelper(context.applicationContext, "usage.db", null, 2) {
 
     data class Row(
         val pkg: String,
@@ -34,9 +36,25 @@ class UsageDb(context: Context) :
                 ctx_event TEXT)"""
         )
         db.execSQL("CREATE INDEX idx_launches_ts ON launches(ts)")
+        createMisses(db)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) createMisses(db)
+    }
+
+    private fun createMisses(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS misses(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pkg TEXT NOT NULL,
+                ts INTEGER NOT NULL,
+                hour INTEGER NOT NULL,
+                dow INTEGER NOT NULL,
+                ctx_event TEXT)"""
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_misses_ts ON misses(ts)")
+    }
 
     fun insertLaunch(row: Row) {
         writableDatabase.insert("launches", null, ContentValues().apply {
@@ -92,19 +110,65 @@ class UsageDb(context: Context) :
         }
     }
 
-    /** Caps the table so it can never grow unbounded. */
+    /** Caps the tables so they can never grow unbounded. */
     fun prune() {
         writableDatabase.execSQL(
             """DELETE FROM launches WHERE id NOT IN
                (SELECT id FROM launches ORDER BY ts DESC LIMIT $MAX_ROWS)"""
         )
+        writableDatabase.execSQL(
+            """DELETE FROM misses WHERE id NOT IN
+               (SELECT id FROM misses ORDER BY ts DESC LIMIT $MAX_MISS_ROWS)"""
+        )
     }
 
     fun clearAll() {
         writableDatabase.delete("launches", null, null)
+        writableDatabase.delete("misses", null, null)
+    }
+
+    // ---------------------------------------------------------------- misses
+
+    fun insertMiss(row: Row) {
+        writableDatabase.insert("misses", null, ContentValues().apply {
+            put("pkg", row.pkg)
+            put("ts", row.ts)
+            put("hour", row.hour)
+            put("dow", row.dow)
+            put("ctx_event", row.ctxEvent)
+        })
+    }
+
+    fun missesSince(sinceTs: Long): List<Row> {
+        val rows = ArrayList<Row>(64)
+        readableDatabase.rawQuery(
+            "SELECT pkg, ts, hour, dow, ctx_event FROM misses WHERE ts >= ? ORDER BY ts",
+            arrayOf(sinceTs.toString())
+        ).use { c ->
+            while (c.moveToNext()) {
+                rows.add(
+                    Row(
+                        pkg = c.getString(0),
+                        ts = c.getLong(1),
+                        hour = c.getInt(2),
+                        dow = c.getInt(3),
+                        prevPkg = null,
+                        ctxEvent = if (c.isNull(4)) null else c.getString(4),
+                    )
+                )
+            }
+        }
+        return rows
+    }
+
+    fun totalMissCount(): Int {
+        readableDatabase.rawQuery("SELECT COUNT(*) FROM misses", null).use { c ->
+            return if (c.moveToFirst()) c.getInt(0) else 0
+        }
     }
 
     private companion object {
         const val MAX_ROWS = 5000
+        const val MAX_MISS_ROWS = 1500
     }
 }

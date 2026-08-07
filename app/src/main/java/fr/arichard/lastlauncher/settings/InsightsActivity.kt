@@ -105,6 +105,7 @@ class InsightsActivity : AppCompatActivity() {
                 "transition" -> getString(R.string.insights_w_transition)
                 "trigger" -> getString(R.string.insights_w_trigger)
                 "notification" -> getString(R.string.insights_w_notification)
+                "miss" -> getString(R.string.insights_w_miss)
                 else -> getString(R.string.insights_w_boost)
             }
             sb.append("  %-11s %s\n".format(java.util.Locale.US, "×$value", name))
@@ -117,7 +118,8 @@ class InsightsActivity : AppCompatActivity() {
         sb.append("  ").append(
             getString(R.string.insights_db, StatusLine.formatBytes(s.dbBytes))
         ).append("\n")
-        sb.append("  ").append(getString(R.string.insights_today, s.launchesToday)).append("\n\n")
+        sb.append("  ").append(getString(R.string.insights_today, s.launchesToday)).append("\n")
+        sb.append("  ").append(getString(R.string.insights_misses, s.totalMisses)).append("\n\n")
 
         sb.append("§ ").append(getString(R.string.insights_context_title)).append("\n")
         sb.append("  ").append(

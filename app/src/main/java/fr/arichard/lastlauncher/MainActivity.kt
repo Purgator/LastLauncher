@@ -1012,7 +1012,7 @@ class MainActivity : AppCompatActivity() {
                 System.currentTimeMillis() - lastTrioSwipeTs < TRIO_MISS_WINDOW_MS &&
                 preSwipeTrio.isNotEmpty() && entry.packageName !in preSwipeTrio
             ) {
-                PredictionEngine.logSuggestionMiss(this, preSwipeTrio)
+                PredictionEngine.logTrioCorrection(this, preSwipeTrio, entry.packageName)
             }
             lastTrioSwipeTs = 0
         }
