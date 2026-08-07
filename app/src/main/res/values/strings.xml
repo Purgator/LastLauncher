@@ -219,6 +219,9 @@
     <string name="pref_ssid_signal">Wi-Fi network as a place signal</string>
     <string name="pref_ssid_signal_summary">Tell home from office by network. Needs precise location; only a salted hash of the network name is stored — never the name itself.</string>
     <string name="ssid_needs_location">Precise location is needed to read the Wi-Fi name</string>
+    <string name="pref_export_data">Export the brain\'s data</string>
+    <string name="pref_export_data_summary">A JSON file with the full learning history and current ranking — share it wherever you like for inspection or analysis</string>
+    <string name="export_failed">Export failed</string>
     <string name="insights_misses">corrections recorded: %d</string>
     <string name="cmd_launcher_settings">Launcher settings</string>
     <string name="pref_music_widget">Now-playing controls</string>

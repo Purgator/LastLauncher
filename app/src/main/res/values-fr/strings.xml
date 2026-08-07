@@ -219,6 +219,9 @@
     <string name="pref_ssid_signal">Réseau Wi-Fi comme signal de lieu</string>
     <string name="pref_ssid_signal_summary">Distinguer maison et bureau par le réseau. Nécessite la localisation précise ; seul un condensé salé du nom du réseau est stocké — jamais le nom lui-même.</string>
     <string name="ssid_needs_location">La localisation précise est nécessaire pour lire le nom du Wi-Fi</string>
+    <string name="pref_export_data">Exporter les données du cerveau</string>
+    <string name="pref_export_data_summary">Un fichier JSON avec tout l\'historique d\'apprentissage et le classement actuel — à partager où vous voulez pour inspection ou analyse</string>
+    <string name="export_failed">Échec de l\'export</string>
     <string name="insights_misses">corrections enregistrées : %d</string>
     <string name="cmd_launcher_settings">Réglages du lanceur</string>
     <string name="pref_music_widget">Lecture en cours</string>

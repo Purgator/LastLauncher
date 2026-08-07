@@ -328,6 +328,35 @@ class SettingsActivity : AppCompatActivity(),
                 true
             }
 
+            findPreference<Preference>("export_data")?.setOnPreferenceClickListener { pref ->
+                pref.isEnabled = false
+                PredictionEngine.exportData(requireContext()) { file ->
+                    if (!isAdded) return@exportData
+                    pref.isEnabled = true
+                    if (file == null) {
+                        Toast.makeText(
+                            requireContext(), R.string.export_failed, Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            requireContext(),
+                            requireContext().packageName + ".fileprovider",
+                            file,
+                        )
+                        startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND)
+                                    .setType("application/json")
+                                    .putExtra(Intent.EXTRA_STREAM, uri)
+                                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                                getString(R.string.pref_export_data),
+                            )
+                        )
+                    }
+                }
+                true
+            }
+
             findPreference<Preference>("reset_learning")?.setOnPreferenceClickListener {
                 MaterialAlertDialogBuilder(requireContext())
                     .setTitle(R.string.pref_reset_learning)
