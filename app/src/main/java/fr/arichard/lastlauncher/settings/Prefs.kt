@@ -256,6 +256,11 @@ class Prefs(context: Context) {
         get() = sp.getLong(KEY_LAST_LAUNCHED_TS, 0)
         set(value) = sp.edit().putLong(KEY_LAST_LAUNCHED_TS, value).apply()
 
+    /** Encoded hit-rate calibration state (predict.Calibration); observability only. */
+    var calibration: String?
+        get() = sp.getString(KEY_CALIBRATION, null)
+        set(value) = sp.edit().putString(KEY_CALIBRATION, value).apply()
+
     // ---------------------------------------------------------- new-app spotlight
 
     val newAppSpotEnabled: Boolean get() = sp.getBoolean(KEY_NEW_APP_ENABLED, true)
@@ -414,6 +419,7 @@ class Prefs(context: Context) {
         const val KEY_BT_PERM_ASKED = "bt_permission_asked"
         const val KEY_LAST_LAUNCHED = "last_launched_pkg"
         const val KEY_LAST_LAUNCHED_TS = "last_launched_ts"
+        const val KEY_CALIBRATION = "predict_calibration"
         const val KEY_NEW_APP_ENABLED = "new_app_spot_enabled"
         const val KEY_NEW_APP_SIDE = "new_app_side"
         const val KEY_NEW_APP_HOURS = "new_app_hours"
