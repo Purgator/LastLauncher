@@ -209,11 +209,6 @@ class Prefs(context: Context) {
      */
     val musicWidget: Boolean get() = sp.getBoolean(KEY_MUSIC_WIDGET, true)
 
-    /** Encoded "swiped the trio, then launched something else" corrections. */
-    var suggestionMissLog: String
-        get() = sp.getString(KEY_MISS_LOG, "") ?: ""
-        set(value) = sp.edit().putString(KEY_MISS_LOG, value).apply()
-
     /** Ordered go-to apps: cold-start suggestions and the static mode's content. */
     var favorites: List<String>
         get() = (sp.getString(KEY_FAVORITES, "") ?: "")
@@ -414,7 +409,6 @@ class Prefs(context: Context) {
         const val KEY_PARK_MULTI = "park_multi"
         const val KEY_PARKED = "parked_apps"
         const val MAX_PARKED = 5
-        const val KEY_MISS_LOG = "suggestion_miss_log"
         const val KEY_SEARCH_MODE = "search_mode"
         const val KEY_AGENDA_ENABLED = "agenda_enabled"
         const val KEY_AGENDA_ON_GESTURE = "agenda_on_gesture"
