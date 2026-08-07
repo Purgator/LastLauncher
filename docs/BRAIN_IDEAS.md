@@ -65,10 +65,10 @@ Per-idea verdicts from the data:
   but the only effect that approaches significance).
   **1.6 as specced does NOT work though:** (b) never fires — max observed
   rebound rate is 0.21 (Maps 0.18, UpUpUp 0.21) vs the 0.3 threshold — and the
-  0.4-instead-of-0.05 remedy is a no-op anyway: factors 0.2/0.4 produce rankings
-  byte-identical to 0.05 (a crushed heavy app needs ~full score to re-enter the
-  trio). → Amend 1.6: drop (b), keep the reactive variant (a) with a FULL lift,
-  not a softer factor.
+  0.4-instead-of-0.05 remedy barely acts: factors 0.2/0.4 leave the TRIO
+  identical to 0.05 (a crushed heavy app needs ~full score to re-enter the top
+  3; 0.4 only lifts hit@12, i.e. paging depth). → Amend 1.6: drop (b), keep the
+  reactive variant (a) with a FULL lift, not a softer factor.
 - **Corrected-trio feedback: one event so far** — but the rework was hours old
   at export, so this measures novelty, not adoption. Still, a deliberate
   swipe-then-correct will always be lower-volume than typing past the trio →
@@ -116,7 +116,9 @@ touching 2.3/2.4/2.5/2.6/2.11/2.12 → 2.7 → 2.8.
   prefix). Notification bonus and user boost cannot be replayed (no historical
   snapshots) — zero them and label them excluded in the report. Variant grids share
   state only for mixing-weight variants; decay-τ/kernel variants need own accumulators.
-- Surface: Insights button + can also run on my side against the exported brain JSON.
+- Surface: Insights button + `tools/backtest_brain.py` runs the analyst's version
+  against an exported brain JSON (baselines, ablations, paired z-tests, crush
+  sweep, rebound rates, trigger lifts, signal-health table).
 
 ### 0.2 Hit-rate observability / calibration — impact HIGH, effort S
 - Reliability table in Prefs (~5 coarse bins by predicted top-app share, EMA β=0.02)
