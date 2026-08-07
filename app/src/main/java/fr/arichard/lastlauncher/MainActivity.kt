@@ -1912,10 +1912,13 @@ class MainActivity : AppCompatActivity() {
         tickerHandler.removeCallbacks(tickerRunnable)
     }
 
+    private var lastTickerKey: String? = null
+
     private fun showNextTickerMessage() {
         val messages = NotifListener.messages
         if (messages.isEmpty()) {
             binding.ticker.visibility = View.GONE
+            lastTickerKey = null
             tickerHandler.removeCallbacks(tickerRunnable)
             return
         }
@@ -1924,6 +1927,11 @@ class MainActivity : AppCompatActivity() {
         binding.ticker.setOnClickListener {
             repo.byPackage(msg.pkg)?.let { entry -> launchApp(entry, binding.ticker) }
         }
+        // A single notification "cycles" with itself: same content as last time
+        // means rebind quietly, no fade — the blink was the crossfade to itself.
+        val key = "${msg.pkg}|${msg.title}|${msg.text}"
+        val unchanged = key == lastTickerKey && binding.ticker.visibility == View.VISIBLE
+        lastTickerKey = key
         val bind = {
             val appLabel = repo.byPackage(msg.pkg)?.label ?: msg.pkg
             if (prefs.tickerTwoLines) {
@@ -1935,7 +1943,7 @@ class MainActivity : AppCompatActivity() {
                 binding.tickerText.visibility = View.GONE
             }
         }
-        if (!prefs.animations) {
+        if (!prefs.animations || unchanged) {
             bind()
             binding.ticker.alpha = 0.92f
             binding.ticker.visibility = View.VISIBLE
