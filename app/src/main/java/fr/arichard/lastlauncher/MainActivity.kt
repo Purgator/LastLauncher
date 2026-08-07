@@ -43,6 +43,7 @@ import fr.arichard.lastlauncher.gesture.GestureBinding
 import fr.arichard.lastlauncher.lock.LockService
 import fr.arichard.lastlauncher.notify.MediaWatch
 import fr.arichard.lastlauncher.notify.NotifListener
+import fr.arichard.lastlauncher.predict.Calibration
 import fr.arichard.lastlauncher.predict.PredictionEngine
 import fr.arichard.lastlauncher.settings.InsightsActivity
 import fr.arichard.lastlauncher.settings.Prefs
@@ -1005,6 +1006,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (prefs.predictions) {
+            recordTrioCalibration(entry.packageName)
             PredictionEngine.logLaunch(this, entry.packageName)
             // Swiped the trio away, then launched something it didn't contain,
             // within seconds: the engine's pick was wrong for this moment.
@@ -1018,6 +1020,28 @@ class MainActivity : AppCompatActivity() {
         }
         // Clear the query once we're out of sight so the return feels instant.
         binding.root.postDelayed({ resetToHome() }, 400)
+    }
+
+    /**
+     * Hit-rate observability for the Insights screen: notes whether the engine's
+     * page-0 trio contained the app that just launched (whatever surface it
+     * launched from), plus a confidence-bucketed top-slot reliability table.
+     * Pure bookkeeping in Prefs — never read back into the ranking.
+     */
+    private fun recordTrioCalibration(launchedPkg: String) {
+        val trio = visibleSuggestionPool().take(3).map { it.packageName }
+        if (trio.isEmpty()) return
+        val scores = repo.usageBoost
+        val mass = trio.map { (scores[it] ?: 0.0).coerceAtLeast(0.0) }
+        val sum = mass.sum()
+        val topShare = if (sum > 0.0) mass[0] / sum else -1.0
+        val state = Calibration.record(
+            Calibration.parse(prefs.calibration),
+            topShare,
+            top1Hit = trio.first() == launchedPkg,
+            trioHit = launchedPkg in trio,
+        )
+        prefs.calibration = Calibration.encode(state)
     }
 
     /**
