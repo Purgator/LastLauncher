@@ -101,6 +101,13 @@ touching 2.3/2.4/2.5/2.6/2.11/2.12 → 2.7 → 2.8.
 
 ## TIER 0 — MEASUREMENT (ship first; gatekeeper for everything else)
 
+**STATUS: SHIPPED in v1.14.0** — `predict/ScoreMath.kt` (shared pure formula,
+unit-tested), `predict/Backtester.kt` (walk-forward replay + LRU/MFU baselines,
+auto-runs at the bottom of Insights), `predict/Calibration.kt` (global trio-hit
+EMA β=0.02 + 5-bin top-slot reliability table, recorded in MainActivity.launchApp,
+shown in Insights; observability only, MIN_CONFIDENCE untouched), and
+`tools/backtest_brain.py` for the analyst side.
+
 ### 0.1 Walk-forward backtester — impact HIGH, effort M
 - New `predict/Backtester.kt`, pure Kotlin, unit-testable, no Android deps.
 - Replay usage.db chronologically: skip warmup (~first 20% of rows); for each launch

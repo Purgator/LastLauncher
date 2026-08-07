@@ -5,6 +5,8 @@ import androidx.appcompat.app.AppCompatActivity
 import fr.arichard.lastlauncher.LauncherApp
 import fr.arichard.lastlauncher.R
 import fr.arichard.lastlauncher.databinding.ActivityInsightsBinding
+import fr.arichard.lastlauncher.predict.Backtester
+import fr.arichard.lastlauncher.predict.Calibration
 import fr.arichard.lastlauncher.predict.PredictionEngine
 import fr.arichard.lastlauncher.ui.StatusLine
 
@@ -24,17 +26,53 @@ class InsightsActivity : AppCompatActivity() {
         binding.insightsText.text = getString(R.string.insights_loading)
         PredictionEngine.snapshot(this) { snap ->
             val base = render(snap)
-            binding.insightsText.text = base
+            var alarmBlock = ""
+            var backtestBlock = "\n\n§ " + getString(R.string.insights_backtest_title) +
+                "\n  " + getString(R.string.insights_backtest_running)
+            fun refresh() {
+                if (!isDestroyed) binding.insightsText.text = base + alarmBlock + backtestBlock
+            }
+            refresh()
             // The alarm block reads system sources (binder/provider) — off-thread.
             val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
             executor.execute {
                 val alarm = renderAlarmSources()
-                runOnUiThread {
-                    if (!isDestroyed) binding.insightsText.text = base + alarm
-                }
+                runOnUiThread { alarmBlock = alarm; refresh() }
                 executor.shutdown()
             }
+            // The backtest replays the whole log off-thread; appended when done.
+            PredictionEngine.backtest(this) { report ->
+                backtestBlock = renderBacktest(report)
+                refresh()
+            }
         }
+    }
+
+    /** The walk-forward replay's scoreboard (roadmap Tier 0.1). */
+    private fun renderBacktest(report: Backtester.Report?): String {
+        val sb = StringBuilder()
+        sb.append("\n\n§ ").append(getString(R.string.insights_backtest_title)).append("\n")
+        if (report == null) {
+            sb.append("  ")
+                .append(getString(R.string.insights_backtest_none, Backtester.MIN_ROWS))
+                .append("\n")
+            return sb.toString()
+        }
+        sb.append("  ")
+            .append(getString(R.string.insights_backtest_evaluated, report.evaluated, report.warmup))
+            .append("\n")
+        fun line(label: String, m: Backtester.Metrics) {
+            sb.append(
+                "  %-16s top1 %3.0f%% · trio %3.0f%% · top12 %3.0f%%\n".format(
+                    java.util.Locale.US, label, m.hit1 * 100, m.hit3 * 100, m.hit12 * 100
+                )
+            )
+        }
+        line(getString(R.string.insights_backtest_engine), report.engine)
+        line(getString(R.string.insights_backtest_mfu), report.mfu)
+        line(getString(R.string.insights_backtest_lru), report.lru)
+        sb.append("  ").append(getString(R.string.insights_backtest_excluded)).append("\n")
+        return sb.toString()
     }
 
     /**
@@ -120,6 +158,34 @@ class InsightsActivity : AppCompatActivity() {
         ).append("\n")
         sb.append("  ").append(getString(R.string.insights_today, s.launchesToday)).append("\n")
         sb.append("  ").append(getString(R.string.insights_misses, s.totalMisses)).append("\n\n")
+
+        // Live hit-rate calibration (roadmap Tier 0.2) — observability only.
+        sb.append("§ ").append(getString(R.string.insights_calibration_title)).append("\n")
+        val cal = Calibration.parse(Prefs(this).calibration)
+        if (cal.globalN == 0) {
+            sb.append("  ").append(getString(R.string.insights_no_data)).append("\n\n")
+        } else {
+            sb.append("  ").append(
+                getString(
+                    R.string.insights_calibration_global,
+                    (cal.globalEma * 100).toInt(), cal.globalN
+                )
+            ).append("\n")
+            if (cal.binN.any { it > 0 }) {
+                sb.append("  ").append(getString(R.string.insights_calibration_bins)).append("\n")
+                for (i in 0 until Calibration.BIN_COUNT) {
+                    if (cal.binN[i] > 0) {
+                        sb.append(
+                            "    %-7s %3d%%  n=%d\n".format(
+                                java.util.Locale.US, Calibration.binLabel(i),
+                                (cal.binEma[i] * 100).toInt(), cal.binN[i]
+                            )
+                        )
+                    }
+                }
+            }
+            sb.append("\n")
+        }
 
         sb.append("§ ").append(getString(R.string.insights_context_title)).append("\n")
         sb.append("  ").append(

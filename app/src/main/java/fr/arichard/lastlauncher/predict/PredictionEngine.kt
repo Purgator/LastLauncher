@@ -12,7 +12,6 @@ import fr.arichard.lastlauncher.notify.NotifListener
 import fr.arichard.lastlauncher.settings.Prefs
 import java.util.Calendar
 import java.util.concurrent.Executors
-import kotlin.math.exp
 
 /**
  * Learns when the user opens which app and predicts the next one.
@@ -30,44 +29,20 @@ import kotlin.math.exp
 object PredictionEngine {
 
     private const val TAG = "PredictionEngine"
-    private const val DAY_MS = 24L * 60 * 60 * 1000
-    private const val HISTORY_DAYS = 60L
-    private const val DECAY_DAYS = 20.0
 
-    // Signal weights, tuned so a strong contextual habit beats raw frequency.
-    private const val W_HOUR = 1.2
-    private const val W_DAY_TYPE = 0.3
-    private const val W_TRANSITION = 2.5
-    private const val W_TRIGGER = 3.5
-
-    // A learned candidate only takes a suggestion slot from the user's go-to apps
-    // once its score is at least this (≈ one recent, contextually matching launch).
-    private const val MIN_CONFIDENCE = 1.0
-
-    // Per active notification (capped), so an app demanding attention floats up
-    // without drowning real habits: 4+ notifications ≈ one recent matching launch.
-    private const val W_NOTIFICATION = 0.35
-    private const val NOTIFICATION_CAP = 4
-
-    // User-boosted apps ("Boost in suggestions" in the long-press menu): learned score
-    // is amplified and gets a floor, so a boosted app shows even with little history
-    // yet still yields to genuinely stronger habits.
-    private const val BOOST_FACTOR = 1.35
-    private const val BOOST_BASE = 1.0
-
-    // The app just opened is almost never wanted again right away — crush its score
-    // for a while. Exception: within the first seconds (an accidental exit) it keeps
-    // its full rank so reopening is one tap.
-    private const val JUST_USED_FACTOR = 0.05
-    private const val MISTAKE_WINDOW_MS = 15_000L
-    private const val JUST_USED_WINDOW_MS = 45L * 60_000
-
-    // "Corrected trio" feedback, stored as real rows in the DB: a miss counts as a
-    // negative launch (same decay, same context matching) with this weight, and the
-    // app actually opened gets one extra reinforcement row. The correction is thus
-    // a permanent, context-aware rebalance of the same statistics launches feed —
-    // not a temporary side-channel adjustment.
-    private const val W_MISS = 1.5
+    // All scoring constants and the per-row formula live in ScoreMath (pure,
+    // unit-tested) so the walk-forward Backtester replays the exact same math.
+    private const val DAY_MS = ScoreMath.DAY_MS
+    private const val HISTORY_DAYS = ScoreMath.HISTORY_DAYS
+    private const val MIN_CONFIDENCE = ScoreMath.MIN_CONFIDENCE
+    private const val W_NOTIFICATION = ScoreMath.W_NOTIFICATION
+    private const val NOTIFICATION_CAP = ScoreMath.NOTIFICATION_CAP
+    private const val BOOST_FACTOR = ScoreMath.BOOST_FACTOR
+    private const val BOOST_BASE = ScoreMath.BOOST_BASE
+    private const val JUST_USED_FACTOR = ScoreMath.JUST_USED_FACTOR
+    private const val MISTAKE_WINDOW_MS = ScoreMath.MISTAKE_WINDOW_MS
+    private const val JUST_USED_WINDOW_MS = ScoreMath.JUST_USED_WINDOW_MS
+    private const val W_MISS = ScoreMath.W_MISS
 
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "predict") }
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -170,25 +145,21 @@ object PredictionEngine {
         val rows = db(context).rowsSince(now - HISTORY_DAYS * DAY_MS)
         val scores = HashMap<String, Double>(64)
         for (r in rows) {
-            val ageDays = (now - r.ts).toDouble() / DAY_MS
-            val w = exp(-ageDays / DECAY_DAYS)
-            var s = w
-            if (circularHourDiff(r.hour, hourNow) <= 1) s += W_HOUR * w
-            if (isWeekend(r.dow) == weekendNow) s += W_DAY_TYPE * w
-            if (prev != null && r.prevPkg == prev) s += W_TRANSITION * w
-            if (activeEvent != null && r.ctxEvent == activeEvent) s += W_TRIGGER * w
+            val s = ScoreMath.rowScore(
+                r.ts, r.hour, r.dow, r.prevPkg, r.ctxEvent,
+                now, hourNow, weekendNow, prev, activeEvent,
+            )
             scores.merge(r.pkg, s, Double::plus)
         }
         // Corrections: a suggested-but-swiped-away app counts as a negative launch,
         // matched and decayed exactly like the positive ones — strongest when the
         // context repeats, forgotten on the same horizon as everything else.
+        // (Miss rows carry no prevPkg, so the transition term never fires.)
         for (r in db(context).missesSince(now - HISTORY_DAYS * DAY_MS)) {
-            val ageDays = (now - r.ts).toDouble() / DAY_MS
-            val w = exp(-ageDays / DECAY_DAYS)
-            var s = w
-            if (circularHourDiff(r.hour, hourNow) <= 1) s += W_HOUR * w
-            if (isWeekend(r.dow) == weekendNow) s += W_DAY_TYPE * w
-            if (activeEvent != null && r.ctxEvent == activeEvent) s += W_TRIGGER * w
+            val s = ScoreMath.rowScore(
+                r.ts, r.hour, r.dow, r.prevPkg, r.ctxEvent,
+                now, hourNow, weekendNow, prev, activeEvent,
+            )
             scores.merge(r.pkg, -W_MISS * s, Double::plus)
         }
         // An app currently showing notifications is more likely to be wanted next.
@@ -334,12 +305,38 @@ object PredictionEngine {
         }
     }
 
+    /**
+     * Replays the whole usage log through [Backtester] on the predict executor
+     * and delivers the report (null when history is too short) on main. The
+     * replay uses the exact live scoring math via [ScoreMath]; notification
+     * and boost signals are excluded (no historical snapshots exist).
+     */
+    fun backtest(context: Context, callback: (Backtester.Report?) -> Unit) {
+        val appContext = context.applicationContext
+        executor.execute {
+            val report = try {
+                val database = db(appContext)
+                val prefs = Prefs(appContext)
+                Backtester.run(
+                    launches = database.rowsSince(0),
+                    misses = database.missesSince(0),
+                    favorites = prefs.favorites,
+                    hidden = prefs.hiddenApps,
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Backtest failed", e)
+                null
+            }
+            mainHandler.post { callback(report) }
+        }
+    }
+
     /** The signal weights, exposed for the insights screen. */
     fun weights(): List<Pair<String, Double>> = listOf(
-        "hour" to W_HOUR,
-        "daytype" to W_DAY_TYPE,
-        "transition" to W_TRANSITION,
-        "trigger" to W_TRIGGER,
+        "hour" to ScoreMath.W_HOUR,
+        "daytype" to ScoreMath.W_DAY_TYPE,
+        "transition" to ScoreMath.W_TRANSITION,
+        "trigger" to ScoreMath.W_TRIGGER,
         "notification" to W_NOTIFICATION,
         "miss" to W_MISS,
         "boost_factor" to BOOST_FACTOR,
@@ -435,11 +432,5 @@ object PredictionEngine {
         }
     }
 
-    private fun isWeekend(dow: Int): Boolean =
-        dow == Calendar.SATURDAY || dow == Calendar.SUNDAY
-
-    private fun circularHourDiff(a: Int, b: Int): Int {
-        val d = kotlin.math.abs(a - b)
-        return minOf(d, 24 - d)
-    }
+    private fun isWeekend(dow: Int): Boolean = ScoreMath.isWeekend(dow)
 }
