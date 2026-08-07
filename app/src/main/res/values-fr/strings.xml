@@ -215,6 +215,17 @@
     <string name="insights_no_data">pas encore de données — lancez des applications !</string>
     <string name="insights_footer">◈ = trio actuel · ↑boost = boosté par vous · ✉ = notifications actives\nTout ce qui précède ne quitte jamais ce téléphone.</string>
     <string name="insights_alarm_title">Prochaine alarme — sources système brutes</string>
+    <string name="insights_calibration_title">Taux de réussite en usage réel</string>
+    <string name="insights_calibration_global">le trio contenait l’appli lancée ~%1$d%% du temps (n=%2$d)</string>
+    <string name="insights_calibration_bins">quand la 1ʳᵉ place pèse cette part du score du trio → c’est elle qui part :</string>
+    <string name="insights_backtest_title">Backtest — votre historique rejoué</string>
+    <string name="insights_backtest_running">relecture de l’historique…</string>
+    <string name="insights_backtest_none">pas encore assez d’historique (%1$d lancements requis)</string>
+    <string name="insights_backtest_evaluated">%1$d prédictions testées, après %2$d lancements d’échauffement</string>
+    <string name="insights_backtest_engine">moteur</string>
+    <string name="insights_backtest_mfu">fréquence seule</string>
+    <string name="insights_backtest_lru">récence seule</string>
+    <string name="insights_backtest_excluded">notifications &amp; boosts non rejouables — exclus</string>
     <string name="insights_w_miss">pénalité trio corrigé</string>
     <string name="pref_ssid_signal">Réseau Wi-Fi comme signal de lieu</string>
     <string name="pref_ssid_signal_summary">Distinguer maison et bureau par le réseau. Nécessite la localisation précise ; seul un condensé salé du nom du réseau est stocké — jamais le nom lui-même.</string>

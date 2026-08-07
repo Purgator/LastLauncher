@@ -215,6 +215,17 @@
     <string name="insights_no_data">no data yet — launch some apps!</string>
     <string name="insights_footer">◈ = current trio · ↑boost = boosted by you · ✉ = active notifications\nEverything above lives only on this phone.</string>
     <string name="insights_alarm_title">Next alarm — raw system sources</string>
+    <string name="insights_calibration_title">Hit rate in real use</string>
+    <string name="insights_calibration_global">the trio contained your launch ~%1$d%% of the time (n=%2$d)</string>
+    <string name="insights_calibration_bins">when slot 1 holds this share of the trio’s score → it is the launch:</string>
+    <string name="insights_backtest_title">Backtest — your history replayed</string>
+    <string name="insights_backtest_running">replaying your history…</string>
+    <string name="insights_backtest_none">not enough history yet (%1$d launches needed)</string>
+    <string name="insights_backtest_evaluated">%1$d predictions tested, after %2$d warm-up launches</string>
+    <string name="insights_backtest_engine">engine</string>
+    <string name="insights_backtest_mfu">frequency only</string>
+    <string name="insights_backtest_lru">recency only</string>
+    <string name="insights_backtest_excluded">notifications &amp; boosts can’t be replayed — excluded</string>
     <string name="insights_w_miss">corrected-trio penalty</string>
     <string name="pref_ssid_signal">Wi-Fi network as a place signal</string>
     <string name="pref_ssid_signal_summary">Tell home from office by network. Needs precise location; only a salted hash of the network name is stored — never the name itself.</string>
