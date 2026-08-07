@@ -79,10 +79,9 @@ impractical — prioritize a readable history.
 | `MainActivity.kt` | The home screen: all gestures/touch routing, suggestions trio + swipe-to-cycle, drawers wiring, ticker, weather, status line, new-app spotlight, drag & drop lifecycle. Big by design — it *is* the launcher. |
 | `LauncherApp.kt` | Application: repo bootstrap, package-change receiver (feeds new-app spotlight), context-signal registration. |
 | `apps/AppRepository.kt` | In-memory app catalog + icon cache, loaded/refreshed off-thread; fuzzy search (prefix > word > initials > substring > subsequence > package tokens). UI reads immutable snapshots. |
-| `predict/PredictionEngine.kt` | The "launcher memory". Scores = recency-decayed launches × hour/day-type match + Markov transition + context trigger + notification bonus + user boost − just-used penalty. All weights are named constants at the top. `snapshot()` powers the insights screen. |
-| `predict/UsageDb.kt` | SQLite log of launches (pruned at 5000 rows). Never leaves the device. |
-| `predict/ContextSignals.kt` | Trigger events (5-minute window): Bluetooth/headset/charger receivers, Wi-Fi join/leave + connectivity lost/regained (NetworkCallbacks), "started moving" via the one-shot significant-motion sensor (never the raw accelerometer — battery). |
-| `predict/MissLog.kt` | Pure codec (unit-tested) for corrected-trio feedback: swiped the trio then launched something else within 8 s → shown apps take a decaying penalty in that 3-hour bucket; swipes with no launch record nothing. |
+| `predict/PredictionEngine.kt` | The "launcher memory". Scores = recency-decayed launches × hour/day-type match + Markov transition + context trigger + notification bonus + user boost − context-matched miss rows (corrected trios) − just-used penalty. All weights are named constants at the top. `snapshot()` powers the insights screen; `exportData()` dumps everything to a shareable JSON. |
+| `predict/UsageDb.kt` | SQLite log of launches (pruned at 5000 rows) + misses (corrected-trio rows, pruned at 1500), both context-stamped. Never leaves the device unless the user exports. |
+| `predict/ContextSignals.kt` | Trigger events (5-minute window): Bluetooth/headset/charger receivers, Wi-Fi join/leave + connectivity lost/regained (NetworkCallbacks), "started moving" via the one-shot significant-motion sensor (never the raw accelerometer — battery). With `ssid_signal` + fine location, a join records `wifi:<sha256(salt+ssid)[:12]>` — salt is a per-install random UUID, so tokens are opaque and app-only. |
 | `notify/NotifListener.kt` | NotificationListenerService → badge counts + ticker messages, in-memory only. |
 | `notify/MediaWatch.kt` | Active media sessions via MediaSessionManager (rides the notification-listener grant): the now-playing row's data + transport controls. Registered only while resumed. |
 | `notify/MediaState.kt` | Pure playback-state ranking (unit-tested): which session the row shows. |
@@ -176,8 +175,10 @@ the two `WheelDrawer`s (last = on top).
 - The gesture hints are ROOT-level children centered on the screen — inside the
   middle area the agenda's height dragged them below center.
 - Corrected-trio feedback: cycling the suggestions snapshots the pre-swipe trio;
-  launching an app outside it within 8 s logs a miss (MissLog) that dampens those
-  apps in that time bucket. Cycling with no launch after = play, no signal.
+  launching an app outside it within 8 s writes context-stamped miss rows for the
+  shown apps (scored as negative launches, same decay/matching) plus one extra
+  reinforcement launch row for the opened app. Cycling with no launch after =
+  play, no signal.
 - Hints, spotlight and ticker all yield to drawers/search and stop on pause.
 
 ## Testing
