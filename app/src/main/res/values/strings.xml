@@ -216,6 +216,9 @@
     <string name="insights_footer">◈ = current trio · ↑boost = boosted by you · ✉ = active notifications\nEverything above lives only on this phone.</string>
     <string name="insights_alarm_title">Next alarm — raw system sources</string>
     <string name="insights_w_miss">corrected-trio penalty</string>
+    <string name="pref_ssid_signal">Wi-Fi network as a place signal</string>
+    <string name="pref_ssid_signal_summary">Tell home from office by network. Needs precise location; only a salted hash of the network name is stored — never the name itself.</string>
+    <string name="ssid_needs_location">Precise location is needed to read the Wi-Fi name</string>
     <string name="insights_misses">corrections recorded: %d</string>
     <string name="cmd_launcher_settings">Launcher settings</string>
     <string name="pref_music_widget">Now-playing controls</string>
