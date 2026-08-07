@@ -14,6 +14,9 @@
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <!-- Optional weather chip: coarse last-known location only, never continuous. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Optional per-network place signal: reading the joined Wi-Fi's name requires
+         fine location. Only a salted hash of the name is ever stored. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Bluetooth connection events feed the prediction engine (optional signal). -->
     <uses-permission
         android:name="android.permission.BLUETOOTH"
