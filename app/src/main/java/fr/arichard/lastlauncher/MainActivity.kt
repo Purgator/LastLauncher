@@ -1249,8 +1249,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        // 26sp, optically centered on the digits — 30sp read as a misaligned rival.
-        binding.weather.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, if (wantRow) 26f else 16f)
+        // Beside the clock the chip is a real companion: 32sp, nudged down so its
+        // glyphs sit on the digits' OPTICAL center — geometric box-centering reads
+        // high next to 64sp thin digits (their font metrics pad the top heavily).
+        binding.weather.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, if (wantRow) 32f else 16f)
+        binding.weather.translationY =
+            if (wantRow) 5 * resources.displayMetrics.density else 0f
         binding.weather.typeface = android.graphics.Typeface.create(
             if (wantRow) "sans-serif-light" else "sans-serif", android.graphics.Typeface.NORMAL
         )
