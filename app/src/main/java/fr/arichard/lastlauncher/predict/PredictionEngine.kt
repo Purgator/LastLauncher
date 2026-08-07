@@ -359,6 +359,82 @@ object PredictionEngine {
         }
     }
 
+    /**
+     * Dumps the engine's whole world to a pretty-printed JSON file in the export
+     * cache dir (shared via FileProvider), for the owner to inspect or send off
+     * for analysis: every launch and miss row with its context, the signal
+     * weights, user tuning (boosts, favorites), and the ranking as computed right
+     * now. Nothing is sent anywhere by the app itself — the user shares the file.
+     */
+    fun exportData(context: Context, callback: (java.io.File?) -> Unit) {
+        val appContext = context.applicationContext
+        executor.execute {
+            val file = try {
+                val database = db(appContext)
+                val prefs = Prefs(appContext)
+                fun rowJson(r: UsageDb.Row) = org.json.JSONObject().apply {
+                    put("pkg", r.pkg)
+                    put("ts", r.ts)
+                    put("hour", r.hour)
+                    put("dow", r.dow)
+                    put("prev", r.prevPkg ?: org.json.JSONObject.NULL)
+                    put("ctx", r.ctxEvent ?: org.json.JSONObject.NULL)
+                }
+                val root = org.json.JSONObject()
+                root.put("schema", 1)
+                root.put("app_version", fr.arichard.lastlauncher.BuildConfig.VERSION_NAME)
+                root.put("exported_at", System.currentTimeMillis())
+                root.put("timezone", java.util.TimeZone.getDefault().id)
+                root.put("weights", org.json.JSONObject(weights().toMap()))
+                root.put(
+                    "launches",
+                    org.json.JSONArray().also { arr ->
+                        database.rowsSince(0).forEach { arr.put(rowJson(it)) }
+                    }
+                )
+                root.put(
+                    "misses",
+                    org.json.JSONArray().also { arr ->
+                        database.missesSince(0).forEach { arr.put(rowJson(it)) }
+                    }
+                )
+                root.put("boosted", org.json.JSONArray(prefs.boostedApps.toList()))
+                root.put("favorites", org.json.JSONArray(prefs.favorites))
+                root.put("hidden_count", prefs.hiddenApps.size)
+                root.put(
+                    "settings",
+                    org.json.JSONObject()
+                        .put("predictions", prefs.predictions)
+                        .put("bt_signal", prefs.btSignal)
+                        .put("ssid_signal", prefs.ssidSignal)
+                )
+                root.put(
+                    "current_ranking",
+                    org.json.JSONArray().also { arr ->
+                        score(appContext).entries
+                            .sortedByDescending { it.value }
+                            .take(20)
+                            .forEach {
+                                arr.put(
+                                    org.json.JSONObject()
+                                        .put("pkg", it.key)
+                                        .put("score", it.value)
+                                )
+                            }
+                    }
+                )
+                val dir = java.io.File(appContext.cacheDir, "export").apply { mkdirs() }
+                java.io.File(dir, "lastlauncher-brain.json").apply {
+                    writeText(root.toString(2))
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Export failed", e)
+                null
+            }
+            mainHandler.post { callback(file) }
+        }
+    }
+
     private fun isWeekend(dow: Int): Boolean =
         dow == Calendar.SATURDAY || dow == Calendar.SUNDAY
 
