@@ -15,6 +15,74 @@ Corrected-trio feedback writes miss rows + one reinforcement launch row.
 
 ---
 
+## BACKTEST VERDICTS (owner brain export, run 2026-08-07 — READ FIRST)
+
+Walk-forward replay of the owner's real export: 1534 launches, 27 days, 54 apps,
+20% warmup, 1228 evaluated rows. Engine replicated exactly minus notification
+bonus and boosts (not replayable; boosts were empty anyway). With n=1228,
+differences under ~2pp are noise — paired win/loss tests used throughout.
+
+Scoreboard: current engine hit@1 23.4% / hit@3 44.3% / hit@12 75.4%.
+Decayed-MFU baseline: 23.1 / 43.2 / 73.5. LRU: 12.1 / 30.8 / 67.9.
+**The whole signal blend nets ~1pp over plain decayed frequency**, and hit@3
+equals the top-3 apps' launch share (43.7%) — the trio is effectively
+decayed-MFU today. Cheating oracles put the realistic ceiling at ~48–55%,
+and the strongest oracle (markov+hour, fit on ALL data) collapses to 40.0%
+when honestly walk-forwarded (overfit, z=−3.74). Headroom is a few points, not tens.
+
+Per-idea verdicts from the data:
+
+- **Ablations / 2.8 retune:** removing ANY single term (hour, daytype, markov,
+  trigger) costs ≤0.4pp hit@3; a 256-combo weight grid spans 43.5–44.3% total.
+  There is nothing to retune → **2.8 demoted to last**; revisit only if the
+  in-app backtester on richer data shows spread.
+- **2.3 burst/fast kernel (both forms): FLAT** (W_FAST 0.5/1/2 within ±0.3pp;
+  dual-kernel slightly worse). Not worth a release on current evidence.
+- **2.4 session conditioning: NEGATIVE** — in the roadmap form AND in a fairer
+  markov-×2-in-session-only form (win 3 / loss 10–11 paired). Falcon's finding
+  does not transfer to this usage. Demote below 2.8; needs new evidence.
+- **2.5 trigger lift: FLAT**, and its premise is wrong on-device: started_moving
+  fired 19× in 27 days (not "all day"). Only 10.6% of rows carry any ctx.
+- **2.11 cadence, 2.12 hour-lift, 2.6 diverse trio: FLAT** (2.6 tested in three
+  slot layouts: markov slot, hour slot — all z≈0; the motivating headset scenario
+  occurred once in 27 days).
+- **Just-used crush = the largest measurable lever.** 6.0% of evaluated launches
+  are the crushed app relaunched inside the window. Fully lifting the crush:
+  hit@3 44.3→45.6, hit@12 75.4→80.0 (win 45 / loss 29, z=+1.86 — borderline,
+  but the only effect that approaches significance).
+  **1.6 as specced does NOT work though:** (b) never fires — max observed
+  rebound rate is 0.21 (Maps 0.18, UpUpUp 0.21) vs the 0.3 threshold — and the
+  0.4-instead-of-0.05 remedy is a no-op anyway: factors 0.2/0.4 produce rankings
+  byte-identical to 0.05 (a crushed heavy app needs ~full score to re-enter the
+  trio). → Amend 1.6: drop (b), keep the reactive variant (a) with a FULL lift,
+  not a softer factor.
+- **Corrected-trio feedback: used once ever** (3 miss rows, one event). The whole
+  negative-feedback machinery is untrained in practice → **2.2 (search-past-trio
+  soft misses) is the only realistic volume source of corrections; promote it to
+  the top of Tier 2** (still needs 2.1).
+- **1.1 premise CONFIRMED directionally:** bt_connected pools devices — YMusic
+  lift 8× (earbuds/car) vs Eufy cam 3.7× vs WhatsApp 0.6× under the same token.
+  Identity hashing splits 102 rows across devices, so expect sparsity at first.
+- **NEW FINDING — signal health is invisible:** ssid_signal is ON in the owner's
+  settings, yet the export contains ZERO wifi:<hash> rows (only 5 generic
+  wifi_joined): wifiJoinEvent falls back silently when ACCESS_FINE_LOCATION
+  isn't granted or the SSID reads <unknown ssid>. headset_plugged: 1 row.
+  → Add to Tier 1: an Insights "signal health" block (per signal: rows collected,
+  and why it's degraded — permission missing, pref off). Effort S.
+- Learning curve is non-monotonic (per-quartile hit@3: 38.8 / 45.0 / 49.8 /
+  43.6%) — usage drifts; long-memory features would chase stale patterns.
+
+Caveats: one user, 27 days, notification bonus excluded (real-life trio likely
+does better on messengers than the replay shows), activeEvent at prediction time
+approximated by the launch row's own ctx stamp (slightly flatters trigger terms).
+None of this kills Tier 0/1 engineering items — it re-prices the Tier 2 bets.
+
+Revised order: Tier 0 → Tier 1 (1.1–1.4, 1.7, amended 1.6a, + signal-health
+Insights) → 2.1 → 2.2 → E.2/E.1 → re-run backtest on richer data before
+touching 2.3/2.4/2.5/2.6/2.11/2.12 → 2.7 → 2.8.
+
+---
+
 ## TIER 0 — MEASUREMENT (ship first; gatekeeper for everything else)
 
 ### 0.1 Walk-forward backtester — impact HIGH, effort M
