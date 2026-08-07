@@ -216,6 +216,9 @@
     <string name="insights_footer">◈ = trio actuel · ↑boost = boosté par vous · ✉ = notifications actives\nTout ce qui précède ne quitte jamais ce téléphone.</string>
     <string name="insights_alarm_title">Prochaine alarme — sources système brutes</string>
     <string name="insights_w_miss">pénalité trio corrigé</string>
+    <string name="pref_ssid_signal">Réseau Wi-Fi comme signal de lieu</string>
+    <string name="pref_ssid_signal_summary">Distinguer maison et bureau par le réseau. Nécessite la localisation précise ; seul un condensé salé du nom du réseau est stocké — jamais le nom lui-même.</string>
+    <string name="ssid_needs_location">La localisation précise est nécessaire pour lire le nom du Wi-Fi</string>
     <string name="insights_misses">corrections enregistrées : %d</string>
     <string name="cmd_launcher_settings">Réglages du lanceur</string>
     <string name="pref_music_widget">Lecture en cours</string>

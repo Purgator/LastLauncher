@@ -11,6 +11,12 @@
         android:summary="@string/pref_bt_signal_summary"
         android:defaultValue="true"
         android:dependency="predictions" />
+    <SwitchPreferenceCompat
+        android:key="ssid_signal"
+        android:title="@string/pref_ssid_signal"
+        android:summary="@string/pref_ssid_signal_summary"
+        android:defaultValue="true"
+        android:dependency="predictions" />
     <Preference
         android:key="favorites"
         android:title="@string/pref_favorites"

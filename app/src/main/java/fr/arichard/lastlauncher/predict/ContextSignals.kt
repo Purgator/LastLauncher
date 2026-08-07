@@ -35,6 +35,7 @@ object ContextSignals {
 
     @Volatile private var lastEventType: String? = null
     @Volatile private var lastEventTs: Long = 0
+    @Volatile private var appContext: Context? = null
 
     /** The trigger event currently in effect, or null. */
     fun activeEvent(now: Long = System.currentTimeMillis()): String? =
@@ -57,6 +58,7 @@ object ContextSignals {
      * from the home screen; without it the other signals still work.
      */
     fun register(context: Context) {
+        appContext = context.applicationContext
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 when (intent.action) {
@@ -88,9 +90,12 @@ object ContextSignals {
     }
 
     /**
-     * Wi-Fi joins/leaves stand in for places (home, office, gym) without touching
-     * location; losing or regaining ANY connectivity (metro, parking, elevator)
-     * is context too. Callbacks are push-based — nothing polls.
+     * Wi-Fi joins/leaves stand in for places (home, office, gym); with the
+     * ssid_signal option and precise-location permission, the joined network's
+     * name is HASHED (SHA-256 with a random device-local salt, 12 hex chars) so
+     * the engine can tell places apart while the database never holds a readable
+     * network name — and nothing outside this app can reproduce the hash. Losing
+     * or regaining ANY connectivity is context too. Push-based — nothing polls.
      */
     private fun registerNetworkSignals(context: Context) {
         try {
@@ -100,13 +105,7 @@ object ContextSignals {
                 android.net.NetworkRequest.Builder()
                     .addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI)
                     .build(),
-                object : android.net.ConnectivityManager.NetworkCallback() {
-                    override fun onAvailable(network: android.net.Network) =
-                        recordEventGuarded(EVENT_WIFI_ON)
-
-                    override fun onLost(network: android.net.Network) =
-                        recordEventGuarded(EVENT_WIFI_OFF)
-                }
+                wifiCallback()
             )
             cm.registerDefaultNetworkCallback(
                 object : android.net.ConnectivityManager.NetworkCallback() {
@@ -127,6 +126,86 @@ object ContextSignals {
             Log.w(TAG, "Could not register network signals", e)
         }
     }
+
+    /** The Wi-Fi transport callback; on 31+ it carries WifiInfo for the SSID. */
+    private fun wifiCallback(): android.net.ConnectivityManager.NetworkCallback =
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            object : android.net.ConnectivityManager.NetworkCallback(
+                FLAG_INCLUDE_LOCATION_INFO
+            ) {
+                // The SSID arrives in onCapabilitiesChanged, after onAvailable.
+                @Volatile private var pendingJoin = false
+
+                override fun onAvailable(network: android.net.Network) {
+                    pendingJoin = true
+                }
+
+                override fun onCapabilitiesChanged(
+                    network: android.net.Network,
+                    caps: android.net.NetworkCapabilities,
+                ) {
+                    if (pendingJoin) {
+                        pendingJoin = false
+                        recordEventGuarded(wifiJoinEvent(caps))
+                    }
+                }
+
+                override fun onLost(network: android.net.Network) =
+                    recordEventGuarded(EVENT_WIFI_OFF)
+            }
+        } else {
+            object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) =
+                    recordEventGuarded(wifiJoinEvent(null))
+
+                override fun onLost(network: android.net.Network) =
+                    recordEventGuarded(EVENT_WIFI_OFF)
+            }
+        }
+
+    /**
+     * The event for a Wi-Fi join: "wifi:<hash>" when the network name is
+     * readable (option on + precise location granted), else the generic join.
+     */
+    private fun wifiJoinEvent(caps: android.net.NetworkCapabilities?): String {
+        val ctx = appContext ?: return EVENT_WIFI_ON
+        val prefs = fr.arichard.lastlauncher.settings.Prefs(ctx)
+        if (!prefs.ssidSignal) return EVENT_WIFI_ON
+        if (ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return EVENT_WIFI_ON
+        }
+        val ssid = try {
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                (caps?.transportInfo as? android.net.wifi.WifiInfo)?.ssid
+            } else {
+                @Suppress("DEPRECATION")
+                (ctx.applicationContext.getSystemService(Context.WIFI_SERVICE)
+                    as? android.net.wifi.WifiManager)?.connectionInfo?.ssid
+            }
+        } catch (e: Exception) {
+            null
+        }
+        val name = ssid?.trim('"')?.trim()
+            ?.takeIf { it.isNotEmpty() && !it.contains("unknown ssid", ignoreCase = true) }
+            ?: return EVENT_WIFI_ON
+        return "wifi:" + sha256Prefix(prefs.ssidSalt + name)
+    }
+
+    /** First 12 hex chars of SHA-256 — opaque but stable place token. */
+    private fun sha256Prefix(input: String): String = try {
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(input.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+            .take(12)
+    } catch (e: Exception) {
+        "opaque"
+    }
+
+    // NetworkCallback.FLAG_INCLUDE_LOCATION_INFO, referenced directly to avoid a
+    // hard API-31 symbol on older toolchain paths.
+    private const val FLAG_INCLUDE_LOCATION_INFO = 1
 
     /**
      * "Started moving" via the significant-motion sensor: a hardware one-shot

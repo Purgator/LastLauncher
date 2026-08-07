@@ -11,6 +11,19 @@ class Prefs(context: Context) {
     val keyboardAlways: Boolean get() = sp.getBoolean(KEY_KEYBOARD_ALWAYS, true)
     val predictions: Boolean get() = sp.getBoolean(KEY_PREDICTIONS, true)
     val btSignal: Boolean get() = sp.getBoolean(KEY_BT_SIGNAL, true)
+
+    /** Per-network place signal: hash the joined Wi-Fi's name (needs fine location). */
+    val ssidSignal: Boolean get() = sp.getBoolean(KEY_SSID_SIGNAL, true)
+
+    /** Random device-local salt for hashing Wi-Fi names; created on first use, so
+     *  the hashes are reproducible only by this very install. */
+    val ssidSalt: String
+        get() {
+            sp.getString(KEY_SSID_SALT, null)?.let { return it }
+            val salt = java.util.UUID.randomUUID().toString()
+            sp.edit().putString(KEY_SSID_SALT, salt).apply()
+            return salt
+        }
     val doubleTapLock: Boolean get() = sp.getBoolean(KEY_DOUBLE_TAP_LOCK, true)
     val swipeDownNotifications: Boolean get() = sp.getBoolean(KEY_SWIPE_DOWN, true)
     val showGestureHints: Boolean get() = sp.getBoolean(KEY_GESTURE_HINTS, true)
@@ -346,6 +359,8 @@ class Prefs(context: Context) {
         const val KEY_KEYBOARD_ALWAYS = "keyboard_always"
         const val KEY_PREDICTIONS = "predictions"
         const val KEY_BT_SIGNAL = "bt_signal"
+        const val KEY_SSID_SIGNAL = "ssid_signal"
+        const val KEY_SSID_SALT = "ssid_salt"
         const val KEY_DOUBLE_TAP_LOCK = "double_tap_lock"
         const val KEY_SWIPE_DOWN = "swipe_down_notifications"
         const val KEY_GESTURE_HINTS = "show_gesture_hints"

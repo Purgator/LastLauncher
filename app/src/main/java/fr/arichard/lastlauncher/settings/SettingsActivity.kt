@@ -291,6 +291,23 @@ class SettingsActivity : AppCompatActivity(),
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.prefs_suggestions, rootKey)
 
+            findPreference<SwitchPreferenceCompat>("ssid_signal")
+                ?.setOnPreferenceChangeListener { _, newValue ->
+                    if (newValue == true &&
+                        requireContext().checkSelfPermission(
+                            android.Manifest.permission.ACCESS_FINE_LOCATION
+                        ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        requestPermissions(
+                            arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), 44
+                        )
+                        Toast.makeText(
+                            requireContext(), R.string.ssid_needs_location, Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    true
+                }
+
             findPreference<Preference>("favorites")?.setOnPreferenceClickListener {
                 pickAppsByPackage(getString(R.string.pref_favorites), prefs.favorites) {
                     prefs.favorites = it
