@@ -215,6 +215,8 @@
     <string name="insights_no_data">no data yet — launch some apps!</string>
     <string name="insights_footer">◈ = current trio · ↑boost = boosted by you · ✉ = active notifications\nEverything above lives only on this phone.</string>
     <string name="insights_alarm_title">Next alarm — raw system sources</string>
+    <string name="insights_w_miss">corrected-trio penalty</string>
+    <string name="insights_misses">corrections recorded: %d</string>
     <string name="cmd_launcher_settings">Launcher settings</string>
     <string name="pref_music_widget">Now-playing controls</string>
     <string name="pref_music_widget_summary">A compact player line while music plays or is paused (needs notification access). The playing app steps out of the suggestions — the row already covers it.</string>
