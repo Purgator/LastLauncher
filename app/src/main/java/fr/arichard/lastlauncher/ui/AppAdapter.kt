@@ -68,8 +68,9 @@ class AppAdapter(
             binding.appBadge.visibility = if (count > 0) View.VISIBLE else View.GONE
             if (count > 0) binding.appBadge.text = if (count > 99) "99+" else count.toString()
             binding.root.setOnClickListener { onAppClick(entry, binding.appIcon) }
+            // The icon is the anchor: a drag lifts it, not the whole row.
             binding.root.setOnLongClickListener {
-                onAppLongClick(entry, binding.root)
+                onAppLongClick(entry, binding.appIcon)
                 true
             }
         }

@@ -47,6 +47,8 @@
     <string name="menu_uninstall">Uninstall</string>
     <string name="menu_hide">Hide from list</string>
     <string name="menu_add_to_drawer">Add to a drawer…</string>
+    <string name="drag_remove_from_drawer">⌫ drop here to remove from the drawer</string>
+    <string name="drag_unpin">⌫ drop here to unpin</string>
     <string name="drawer_drop_needs_list">This drawer shows all apps — pick its apps first (Settings → Apps) to give it an order</string>
 
     <!-- New-app spotlight -->

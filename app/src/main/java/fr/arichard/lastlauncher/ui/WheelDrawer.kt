@@ -32,8 +32,15 @@ class WheelDrawer @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null,
 ) : FrameLayout(context, attrs) {
 
-    /** Carried by an app drag; [fromDrawer] is the source drawer index, -1 = external. */
-    data class DragPayload(val componentKey: String, val fromDrawer: Int)
+    /**
+     * Carried by an app drag as the event's local state; [fromDrawer] is the source
+     * drawer index (-1 = not a drawer), [fromPark] marks a pick-up from the pin slot.
+     */
+    data class DragPayload(
+        val componentKey: String,
+        val fromDrawer: Int,
+        val fromPark: Boolean = false,
+    )
 
     /** Enlarged drag shadow so the app visibly "lifts" under the finger. */
     class IconShadow(view: View, private val scale: Float = 1.7f) :
@@ -126,6 +133,19 @@ class WheelDrawer @JvmOverloads constructor(
                 else -> true
             }
         }
+    }
+
+    /**
+     * A drop the host caught over this drawer's bounds — a drawer opened mid-drag
+     * was GONE when the drag started and so never receives the system's events.
+     * [windowY] is the drop point in window coordinates.
+     */
+    fun acceptForwardedDrop(payload: DragPayload, windowY: Float): Boolean {
+        val loc = IntArray(2)
+        getLocationInWindow(loc)
+        return onAppDropped(
+            payload.componentKey, payload.fromDrawer, boundIndex, dropSlot(windowY - loc[1])
+        )
     }
 
     /** Entrance pop for the just-dropped item at [position]. */
@@ -257,9 +277,8 @@ class WheelDrawer @JvmOverloads constructor(
             item.root.setOnLongClickListener { view ->
                 onLongClick(entry, item.wheelIcon)
                 onItemDragStarted(entry, view)
-                val data = android.content.ClipData.newPlainText("app", entry.componentKey)
                 view.startDragAndDrop(
-                    data, IconShadow(item.wheelIcon),
+                    appClipData(entry.componentKey), IconShadow(item.wheelIcon),
                     DragPayload(entry.componentKey, boundIndex), 0
                 )
                 true
@@ -510,12 +529,21 @@ class WheelDrawer @JvmOverloads constructor(
         super.onDetachedFromWindow()
     }
 
-    private companion object {
-        const val ARC_SPAN = 180f     // degrees covered by the visible half-circle
-        const val HALF_SPAN = 90f
-        const val FADE_LIMIT = 100f   // icons fade out between 90° and here
-        const val ROLL_IN_DEG = 150f  // open/close rolls the wheel in from the bottom
-        const val ROLL_MS = 260L
-        const val MAX_VISIBLE = 13    // fixed spacing once the arc is this full
+    companion object {
+        /** Private MIME type for app drags — nothing in the system claims it. */
+        const val APP_MIME = "application/x-lastlauncher-app"
+
+        /** Same drag, never text/plain: the command bar must not take an app as typed text. */
+        fun appClipData(componentKey: String): android.content.ClipData = android.content.ClipData(
+            android.content.ClipDescription("app", arrayOf(APP_MIME)),
+            android.content.ClipData.Item(componentKey),
+        )
+
+        private const val ARC_SPAN = 180f     // degrees covered by the visible half-circle
+        private const val HALF_SPAN = 90f
+        private const val FADE_LIMIT = 100f   // icons fade out between 90° and here
+        private const val ROLL_IN_DEG = 150f  // open/close rolls the wheel in from the bottom
+        private const val ROLL_MS = 260L
+        private const val MAX_VISIBLE = 13    // fixed spacing once the arc is this full
     }
 }

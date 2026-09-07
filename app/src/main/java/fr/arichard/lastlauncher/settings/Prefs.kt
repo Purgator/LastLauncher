@@ -332,6 +332,11 @@ class Prefs(context: Context) {
         writeParked((kept + (componentKey to now)).takeLast(MAX_PARKED))
     }
 
+    /** Unpins one app (dragged out of the slot to a remove band). */
+    fun removeParkedApp(componentKey: String) {
+        writeParked(readParked().filter { it.first != componentKey })
+    }
+
     /** Manual selection from settings: all entries restart their window now. */
     fun setParkedApps(keys: List<String>, now: Long = System.currentTimeMillis()) {
         writeParked(keys.distinct().takeLast(MAX_PARKED).map { it to now })
