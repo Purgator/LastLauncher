@@ -24,6 +24,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -581,9 +582,14 @@ class MainActivity : AppCompatActivity() {
     private fun setupDrawer() {
         for (drawer in listOf(binding.leftDrawer to -1, binding.rightDrawer to 1)) {
             val view = drawer.first
-            view.onAppDropped = { key, from, to, position -> handleAppDrop(key, from, to, position) }
+            view.onAppDropped = { key, from, to, position ->
+                // Set back down where it was lifted: a long-press, not a reorder —
+                // accept without touching the list; onDragEnded shows the menu.
+                if (from == to && dragIsInPlace()) true
+                else handleAppDrop(key, from, to, position)
+            }
             view.onItemDragStarted = { entry, v -> onAppDragStarted(entry, v) }
-            view.onDragMoved = { x, y -> dragLastX = x; dragLastY = y }
+            view.onDragMoved = { x, y -> trackDrag(x, y) }
             // Swipes the drawer doesn't own (inward, or multi-finger) still run their
             // bound action: `>>` from the left must work while the left drawer is out.
             view.onSwipe = { dx, dy, dtMs, fingers ->
@@ -704,7 +710,7 @@ class MainActivity : AppCompatActivity() {
         adapter = AppAdapter(
             repo,
             onAppClick = { entry, view -> launchApp(entry, view) },
-            onAppLongClick = { entry, view -> showAppMenu(entry, view) },
+            onAppLongClick = { entry, view -> startAppDrag(entry, view, fromDrawer = -1) },
             onCommand = { command -> runCommand(command) },
             badgeCount = { pkg -> badgeFor(pkg) },
         )
@@ -775,11 +781,11 @@ class MainActivity : AppCompatActivity() {
         binding.suggestMain.setOnClickListener { v -> suggestionAt(0)?.let { launchApp(it, v) } }
         binding.suggestLeft.setOnClickListener { v -> suggestionAt(1)?.let { launchApp(it, v) } }
         binding.suggestRight.setOnClickListener { v -> suggestionAt(2)?.let { launchApp(it, v) } }
-        // Long-press: menu normally; with a drawer open, start a drag into it instead.
+        // Long-press lifts the app: move it to drop somewhere, or let go in place
+        // for the menu (onDragEnded tells the two apart by travel).
         fun longPress(rank: Int, v: View): Boolean {
             val entry = suggestionAt(rank) ?: return true
-            if (anyDrawerOpen) startAppDrag(entry, v, fromDrawer = -1)
-            else showAppMenu(entry, v)
+            startAppDrag(entry, v, fromDrawer = -1)
             return true
         }
         binding.suggestMain.setOnLongClickListener { v -> longPress(0, v) }
@@ -787,14 +793,21 @@ class MainActivity : AppCompatActivity() {
         binding.suggestRight.setOnLongClickListener { v -> longPress(2, v) }
     }
 
-    /** Starts a system drag carrying the app; open drawers accept the drop. */
-    private fun startAppDrag(entry: AppEntry, sourceView: View, fromDrawer: Int) {
+    /**
+     * Lifts an app into a system drag from any surface (trio, results, spotlight,
+     * pin slot). Drop targets: open drawers, a drawer that opens as the finger
+     * nears its edge, the pin slot, and — for drawer/pinned apps — the remove
+     * bands at the top and bottom. Released where it was lifted = the app menu.
+     */
+    private fun startAppDrag(
+        entry: AppEntry, sourceView: View, fromDrawer: Int, fromPark: Boolean = false,
+    ) {
         haptic(sourceView)
         onAppDragStarted(entry, sourceView)
-        val data = android.content.ClipData.newPlainText("app", entry.componentKey)
         sourceView.startDragAndDrop(
-            data, WheelDrawer.IconShadow(sourceView, 1.4f),
-            WheelDrawer.DragPayload(entry.componentKey, fromDrawer), 0
+            WheelDrawer.appClipData(entry.componentKey),
+            WheelDrawer.IconShadow(sourceView, 1.4f),
+            WheelDrawer.DragPayload(entry.componentKey, fromDrawer, fromPark), 0
         )
     }
 
@@ -802,48 +815,256 @@ class MainActivity : AppCompatActivity() {
 
     // The lifted app dims at its origin; a rejected drop flies the icon back home.
     private var dragSourceView: View? = null
+    private var dragEntry: AppEntry? = null
     private var dragIcon: android.graphics.drawable.Drawable? = null
     private var dragLastX = 0f
     private var dragLastY = 0f
+    private var dragStartX = 0f
+    private var dragStartY = 0f
+    private var dragMaxTravel = 0f       // px; below the menu threshold = a long-press
+    private var dragRemovable = false    // the payload came from a drawer list or the pin slot
+    private var dragOpenedLeft = false   // a drawer already auto-opened on that side this drag
+    private var dragOpenedRight = false
+    private var dragRejectedOverride = false // a consumed-but-refused drop (command bar)
 
     private fun onAppDragStarted(entry: AppEntry, sourceView: View) {
         dragSourceView = sourceView
+        dragEntry = entry
         dragIcon = repo.icon(entry)
+        dragMaxTravel = 0f
         sourceView.animate().alpha(0.25f).setDuration(150).start()
     }
+
+    private fun dragMenuThresholdPx(): Float = DRAG_MENU_DP * resources.displayMetrics.density
+
+    /** True while the finger has not really left the lift point. */
+    private fun dragIsInPlace(): Boolean = dragMaxTravel < dragMenuThresholdPx()
 
     /** Root-level drag watcher: tracks the finger and settles the ending. */
     private fun setupDragWatcher() {
         binding.root.setOnDragListener { _, event ->
             when (event.action) {
                 android.view.DragEvent.ACTION_DRAG_STARTED -> {
-                    // Any app drag reveals the park slot's drop circle.
                     dragInFlight = true
+                    dragStartX = event.x
+                    dragStartY = event.y
+                    dragLastX = event.x
+                    dragLastY = event.y
+                    dragOpenedLeft = false
+                    dragOpenedRight = false
+                    dragRejectedOverride = false
+                    showRemoveBands(event.localState as? WheelDrawer.DragPayload)
+                    // Any app drag reveals the park slot's drop circle.
                     updateParkSpot()
                     true
                 }
                 android.view.DragEvent.ACTION_DRAG_LOCATION -> {
-                    dragLastX = event.x
-                    dragLastY = event.y
-                    parkAttract(event.x, event.y)
+                    trackDrag(event.x, event.y)
                     true
+                }
+                android.view.DragEvent.ACTION_DROP -> {
+                    val payload = event.localState as? WheelDrawer.DragPayload
+                    payload != null && handleLooseDrop(payload, event.x, event.y)
                 }
                 android.view.DragEvent.ACTION_DRAG_ENDED -> {
                     dragInFlight = false
                     binding.parkSpot.scaleX = 1f
                     binding.parkSpot.scaleY = 1f
+                    hideRemoveBands()
                     updateParkSpot()
-                    onDragEnded(event.result)
+                    onDragEnded(event.result && !dragRejectedOverride)
                     true
+                }
+                else -> true
+            }
+        }
+        // The command bar is an EditText: left alone it would take any drop as
+        // typed text. It joins the drag as a plain patch of home instead.
+        binding.searchInput.setOnDragListener { v, event ->
+            when (event.action) {
+                android.view.DragEvent.ACTION_DRAG_LOCATION -> {
+                    val (x, y) = toRootCoords(v, event.x, event.y)
+                    trackDrag(x, y)
+                    true
+                }
+                android.view.DragEvent.ACTION_DROP -> {
+                    val payload = event.localState as? WheelDrawer.DragPayload
+                    val (x, y) = toRootCoords(v, event.x, event.y)
+                    if (payload == null || !handleLooseDrop(payload, x, y)) {
+                        dragRejectedOverride = true
+                    }
+                    true // never let the text field see it
                 }
                 else -> true
             }
         }
     }
 
+    private fun toRootCoords(v: View, x: Float, y: Float): Pair<Float, Float> {
+        val loc = IntArray(2)
+        v.getLocationInWindow(loc)
+        val rootLoc = IntArray(2)
+        binding.root.getLocationInWindow(rootLoc)
+        return (loc[0] - rootLoc[0] + x) to (loc[1] - rootLoc[1] + y)
+    }
+
+    /** Every finger position during a drag funnels here (root, drawers, command bar). */
+    private fun trackDrag(x: Float, y: Float) {
+        dragLastX = x
+        dragLastY = y
+        dragMaxTravel = maxOf(
+            dragMaxTravel,
+            kotlin.math.hypot((x - dragStartX).toDouble(), (y - dragStartY).toDouble()).toFloat(),
+        )
+        parkAttract(x, y)
+        removeAttract(y)
+        autoOpenDrawerNear(x)
+    }
+
+    /**
+     * Nearing a screen edge opens that side's drawer so the app can be dropped
+     * into it — a closed drawer is otherwise an invisible target. Once per side
+     * per drag, and only after the finger has actually travelled (a long-press
+     * lifted next to an edge must not fling a drawer open).
+     */
+    private fun autoOpenDrawerNear(x: Float) {
+        if (dragIsInPlace()) return
+        val zone = DRAG_EDGE_OPEN_DP * resources.displayMetrics.density
+        val side = when {
+            x < zone -> -1
+            x > binding.root.width - zone -> 1
+            else -> return
+        }
+        if (side < 0 && dragOpenedLeft || side > 0 && dragOpenedRight) return
+        if (drawerForSide(side).isVisibleAtAll) return
+        val index = if (side < 0) edgeDrawerIndex(Prefs.KEY_GESTURE_LR_1, Prefs.KEY_GESTURE_LR_2)
+        else edgeDrawerIndex(Prefs.KEY_GESTURE_RL_1, Prefs.KEY_GESTURE_RL_2)
+        index ?: return
+        if (side < 0) dragOpenedLeft = true else dragOpenedRight = true
+        openDrawer(side, index, animate = true)
+    }
+
+    /**
+     * A drop that no live target claimed, in root coordinates: the remove bands,
+     * or a drawer that opened during this drag (GONE at drag start, so the system
+     * never offers it the drop — the root forwards it). False = fly back home.
+     */
+    private fun handleLooseDrop(payload: WheelDrawer.DragPayload, x: Float, y: Float): Boolean {
+        if (dragIsInPlace()) return false // set back down: onDragEnded shows the menu
+        if (dragRemovable && inRemoveZone(y)) {
+            removeDragged(payload)
+            return true
+        }
+        for (drawer in listOf(binding.leftDrawer, binding.rightDrawer)) {
+            if (drawer.isVisibleAtAll &&
+                x >= drawer.left && x <= drawer.right && y >= drawer.top && y <= drawer.bottom
+            ) {
+                val rootLoc = IntArray(2)
+                binding.root.getLocationInWindow(rootLoc)
+                return drawer.acceptForwardedDrop(payload, y + rootLoc[1])
+            }
+        }
+        return false
+    }
+
+    /** Takes the dragged app out of where it was lifted from. */
+    private fun removeDragged(payload: WheelDrawer.DragPayload) {
+        if (payload.fromPark) {
+            prefs.removeParkedApp(payload.componentKey)
+            updateParkSpot()
+            // The unpinned app may return to the trio.
+            if (suggestionPool.isNotEmpty()) {
+                suggestionPage = 0
+                applySuggestions(visibleSuggestionPool().take(3), animate = false)
+            }
+        } else if (payload.fromDrawer >= 0) {
+            val source = prefs.drawer(payload.fromDrawer)
+            if (source.apps.isNotEmpty()) {
+                prefs.saveDrawer(source.index, source.name, source.apps - payload.componentKey)
+            }
+            refreshOpenDrawers()
+        }
+        haptic(binding.root)
+    }
+
+    // -------------------------------------------------------- remove bands
+
+    private fun removeBands() = listOf(binding.removeTop, binding.removeBottom)
+
+    private fun removeZonePx(): Float = REMOVE_ZONE_DP * resources.displayMetrics.density
+
+    private fun inRemoveZone(y: Float): Boolean =
+        y <= removeZonePx() || y >= binding.root.height - removeZonePx()
+
+    /** Bands exist only for apps that have somewhere to be removed from. */
+    private fun showRemoveBands(payload: WheelDrawer.DragPayload?) {
+        dragRemovable = payload != null && (
+            payload.fromPark ||
+                (payload.fromDrawer >= 0 && prefs.drawer(payload.fromDrawer).apps.isNotEmpty())
+            )
+        if (!dragRemovable) return
+        val text = getString(
+            if (payload!!.fromPark) R.string.drag_unpin else R.string.drag_remove_from_drawer
+        )
+        for (band in removeBands()) {
+            band.text = text
+            band.background = removeBandDrawable(accentColor())
+            band.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+            band.alpha = 0f
+            band.scaleX = 1f
+            band.scaleY = 1f
+            band.visibility = View.VISIBLE
+        }
+    }
+
+    private fun hideRemoveBands() {
+        dragRemovable = false
+        for (band in removeBands()) band.visibility = View.GONE
+    }
+
+    /** The bands surface as the finger approaches an edge; inside the zone they light up. */
+    private fun removeAttract(y: Float) {
+        if (!dragRemovable) return
+        val zone = removeZonePx()
+        val reach = REMOVE_REACH_DP * resources.displayMetrics.density
+        val secondary = ContextCompat.getColor(this, R.color.text_secondary)
+        val accent = accentColor()
+        fun style(band: View, distance: Float) {
+            val pull = (1f - (distance - zone) / (reach - zone)).coerceIn(0f, 1f)
+            val engaged = distance <= zone
+            band.alpha = pull
+            val scale = if (engaged) 1.08f else 1f
+            band.scaleX = scale
+            band.scaleY = scale
+            (band as android.widget.TextView).setTextColor(if (engaged) accent else secondary)
+        }
+        style(binding.removeTop, y)
+        style(binding.removeBottom, binding.root.height - y)
+    }
+
+    /** Dashed accent pill, the remove-band sibling of the pin slot's ring. */
+    private fun removeBandDrawable(color: Int): GradientDrawable = GradientDrawable().apply {
+        val density = resources.displayMetrics.density
+        cornerRadius = 18 * density
+        setColor(ColorUtils.setAlphaComponent(color, 0x22))
+        setStroke(
+            (1.5f * density).toInt().coerceAtLeast(2),
+            ColorUtils.setAlphaComponent(color, 0xAA),
+            6 * density, 5 * density,
+        )
+    }
+
     private fun onDragEnded(success: Boolean) {
         val source = dragSourceView ?: return
+        val entry = dragEntry
         dragSourceView = null
+        dragEntry = null
+        // Lifted and set straight back down: that was a long-press — the menu.
+        if (entry != null && dragIsInPlace()) {
+            source.animate().alpha(1f).setDuration(120).start()
+            showAppMenu(entry, source)
+            return
+        }
         // A rejected drop deserves feedback too — the accepted path buzzes in
         // handleAppDrop, so without this a failed drop just feels dead.
         if (!success) haptic(binding.root)
@@ -2406,14 +2627,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Applies the shared floating-slot geometry: bottom-anchored by the trio,
-     *  pulled in from the screen border. */
-    private fun placeSlot(spot: View, left: Boolean) {
+     *  pulled in from the screen border — or, with [pastDrawer], in past the
+     *  drawer band on its side so it stays reachable while that drawer is out. */
+    private fun placeSlot(spot: View, left: Boolean, pastDrawer: Boolean = false) {
         val lp = spot.layoutParams as android.widget.FrameLayout.LayoutParams
         lp.gravity = android.view.Gravity.BOTTOM or
             (if (left) android.view.Gravity.START else android.view.Gravity.END)
         lp.bottomMargin = spotBottomMargin()
         lp.topMargin = 0
-        val inset = (22 * resources.displayMetrics.density).toInt()
+        var inset = (22 * resources.displayMetrics.density).toInt()
+        if (pastDrawer) inset += drawerForSide(if (left) -1 else 1).layoutParams.width
         lp.leftMargin = inset
         lp.rightMargin = inset
         spot.layoutParams = lp
@@ -2471,7 +2694,7 @@ class MainActivity : AppCompatActivity() {
             updateNewAppSpot()
         }
         binding.newAppSpot.setOnLongClickListener {
-            showAppMenu(entry, binding.newAppIcon)
+            startAppDrag(entry, binding.newAppIcon, fromDrawer = -1)
             true
         }
     }
@@ -2535,6 +2758,11 @@ class MainActivity : AppCompatActivity() {
                     if (binding.parkSpot.alpha < 0.5f) return@setOnDragListener false
                     val payload = event.localState as? WheelDrawer.DragPayload
                         ?: return@setOnDragListener false
+                    // The pinned app lifted and set back down: menu, not a re-pin.
+                    if (payload.fromPark && dragIsInPlace()) {
+                        parkHover(engaged = false)
+                        return@setOnDragListener true
+                    }
                     haptic(binding.parkSpot)
                     prefs.addParkedApp(payload.componentKey)
                     parkHover(engaged = false)
@@ -2584,7 +2812,9 @@ class MainActivity : AppCompatActivity() {
         val parked =
             if (prefs.parkEnabled) prefs.parkedApps().mapNotNull { repo.byComponentKey(it) }
             else emptyList()
-        val show = prefs.parkEnabled && !drawerOnSide &&
+        // At rest the slot yields to a drawer on its side; during a drag it stays
+        // available and simply moves in past the drawer band.
+        val show = prefs.parkEnabled && (!drawerOnSide || dragInFlight) &&
             binding.results.visibility != View.VISIBLE &&
             (parked.isNotEmpty() || dragInFlight)
         // Views that are GONE when a drag starts never receive that drag's events,
@@ -2601,7 +2831,7 @@ class MainActivity : AppCompatActivity() {
             refreshSlotBubbles()
             return
         }
-        placeSlot(binding.parkSpot, left)
+        placeSlot(binding.parkSpot, left, pastDrawer = drawerOnSide)
         val accent = accentColor()
         binding.parkGlow.setImageDrawable(glowDrawable(accent, 42f))
         binding.parkGlow.alpha = if (dragInFlight) 1f else 0.55f
@@ -2669,7 +2899,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.parkSpot.setOnClickListener { launchApp(entry, binding.parkIcon) }
         binding.parkSpot.setOnLongClickListener {
-            showAppMenu(entry, binding.parkIcon)
+            startAppDrag(entry, binding.parkIcon, fromDrawer = -1, fromPark = true)
             true
         }
     }
@@ -2777,6 +3007,10 @@ class MainActivity : AppCompatActivity() {
         const val MUSIC_SKIP_PX = 48
         // Radius (dp) inside which a drag makes the park slot lean toward the finger.
         const val PARK_ATTRACT_DP = 120
+        const val DRAG_MENU_DP = 18        // lift travel below this = long-press → menu
+        const val DRAG_EDGE_OPEN_DP = 48   // finger this close to an edge opens its drawer
+        const val REMOVE_ZONE_DP = 120     // top/bottom depth where a drop removes
+        const val REMOVE_REACH_DP = 260    // the bands start surfacing from this far
         // A launch this soon after cycling the trio counts as "the trio was wrong".
         const val TRIO_MISS_WINDOW_MS = 8_000L
     }

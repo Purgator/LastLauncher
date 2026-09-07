@@ -32,7 +32,13 @@ before touching code.
 
 ## Environment
 
-- Windows 11, Git Bash for shell commands. JDK 17 on PATH.
+- Windows 11, Git Bash for shell commands. Gradle 8.7 needs JDK 17–21 to RUN:
+  check `java -version` before the first build — the machine PATH has drifted to
+  a 32-bit Oracle Java 8 (`java8path`, "Could not reserve enough space for
+  2097152KB object heap") and the JetBrains runtimes (Rider, Android Studio
+  `jbr`) are Java 25, which Gradle 8.7 cannot parse. Use the Temurin 17 kept
+  beside the SDK: `export JAVA_HOME="C:/dev/Perso/AdBlocker4Android/.tools/jdk-17.0.20.1+1"`
+  before every `./gradlew` call (shell state does not persist between commands).
 - Android SDK lives in the **sibling repo**: `local.properties` →
   `sdk.dir=C:/dev/Perso/AdBlocker4Android/.tools/android-sdk` (platform 34,
   build-tools 34.0.0). Gradle 8.7 / AGP 8.5.2 / Kotlin 1.9.24 via wrapper.
@@ -126,8 +132,8 @@ the two `WheelDrawer`s (last = on top).
   Live feedback: glow under the finger, particle sparkles (`ui/SparkleView`), the
   trio leans into its coin flip as the swipe builds; release completes or cancels
   the turn. Long-press-for-Settings is disabled inside the band. Long-press on the
-  trio = menu, or drag into an open drawer. The just-launched app is excluded-ish
-  for 45 min (15 s grace).
+  trio lifts the app (see Drag & drop below; release in place = menu). The
+  just-launched app is excluded-ish for 45 min (15 s grace).
 - Opening a different drawer on a side that already shows one plays close-then-open
   (`WheelDrawer.swapTo`); an explicit close cancels the pending swap. One-finger
   swipes matching the close direction close the drawer; two-finger swipes always
@@ -169,9 +175,27 @@ the two `WheelDrawer`s (last = on top).
   rising soda bubbles (shared slotBubbles runnable). Park specifics: any app drag
   reveals its dashed drop circle (kept VISIBLE at alpha 0 otherwise — GONE views
   never join a drag), attraction scaling within 120 dp, drop pins for park_hours,
-  park_multi rotates several. Tap launches, long-press = app menu. Apps shown in
+  park_multi rotates several. Tap launches. Apps shown in
   either slot (and the now-playing app) are excluded from the suggestion trio
-  (visibleSuggestionPool).
+  (visibleSuggestionPool). At rest the park slot yields to a drawer on its side;
+  during a drag it stays live and moves in past the drawer band (placeSlot
+  pastDrawer) so a drop is always possible.
+- Drag & drop, one model everywhere (trio, results rows, spotlight, park slot,
+  drawer items): long-press LIFTS the app into a system drag; releasing it within
+  DRAG_MENU_DP (18 dp) of the lift point is a long-press → app menu (onDragEnded
+  decides by dragMaxTravel; in-place drops on a drawer/the park slot are accepted
+  as no-ops so the menu still follows). The ClipData carries a private MIME type
+  and the command bar has its own drag listener that swallows drops (an EditText
+  otherwise inserts any dropped ClipData as text — even non-text MIME). Drop
+  targets: open drawers; a CLOSED drawer whose edge the finger nears (within
+  DRAG_EDGE_OPEN_DP = 48 dp, once per side per drag, only after real travel)
+  opens itself — but a view GONE at drag start never receives the system's drop,
+  so the ROOT catches drops over a mid-drag-opened drawer and forwards them
+  (WheelDrawer.acceptForwardedDrop); the park slot; and, for apps lifted from a
+  drawer list or the park slot only, the remove bands (removeTop/removeBottom,
+  REMOVE_ZONE_DP = 120 deep, fading in from REMOVE_REACH_DP = 260) — dropping
+  there removes from the source drawer / unpins. Anything else flies back home.
+  Every finger position (root, drawers, command bar) funnels through trackDrag.
 - The gesture hints are ROOT-level children centered on the screen — inside the
   middle area the agenda's height dragged them below center.
 - Corrected-trio feedback: cycling the suggestions snapshots the pre-swipe trio;
