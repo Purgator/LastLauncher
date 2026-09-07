@@ -47,6 +47,8 @@
     <string name="menu_uninstall">Désinstaller</string>
     <string name="menu_hide">Masquer de la liste</string>
     <string name="menu_add_to_drawer">Ajouter à un tiroir…</string>
+    <string name="drag_remove_from_drawer">⌫ déposer ici pour retirer du tiroir</string>
+    <string name="drag_unpin">⌫ déposer ici pour dépingler</string>
     <string name="drawer_drop_needs_list">Ce tiroir affiche toutes les applications — choisissez d’abord ses applications (Réglages → Applications) pour lui donner un ordre</string>
 
     <!-- Projecteur nouvelle application -->

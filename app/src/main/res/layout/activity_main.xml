@@ -544,6 +544,40 @@
         android:importantForAccessibility="no"
         android:visibility="gone" />
 
+    <!-- Remove bands: fade in at the top and bottom while a drawer or pinned app is
+         being dragged; dropping on one takes the app out of where it came from. -->
+    <TextView
+        android:id="@+id/removeTop"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="14dp"
+        android:fontFamily="monospace"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="6dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        android:importantForAccessibility="no"
+        android:visibility="gone"
+        tools:text="⌫ drop here to remove from the drawer"
+        tools:visibility="visible" />
+
+    <TextView
+        android:id="@+id/removeBottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="74dp"
+        android:fontFamily="monospace"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="6dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        android:importantForAccessibility="no"
+        android:visibility="gone"
+        tools:text="⌫ drop here to remove from the drawer"
+        tools:visibility="visible" />
+
     <!-- New-app spotlight: a freshly installed app shines on one edge for a while.
          Side and vertical offset are applied at runtime. -->
     <FrameLayout
