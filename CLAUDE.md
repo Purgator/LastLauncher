@@ -32,16 +32,28 @@ before touching code.
 
 ## Environment
 
-- Windows 11, Git Bash for shell commands. Gradle 8.7 needs JDK 17–21 to RUN:
-  check `java -version` before the first build — the machine PATH has drifted to
-  a 32-bit Oracle Java 8 (`java8path`, "Could not reserve enough space for
-  2097152KB object heap") and the JetBrains runtimes (Rider, Android Studio
-  `jbr`) are Java 25, which Gradle 8.7 cannot parse. Use the Temurin 17 kept
-  beside the SDK: `export JAVA_HOME="C:/dev/Perso/AdBlocker4Android/.tools/jdk-17.0.20.1+1"`
-  before every `./gradlew` call (shell state does not persist between commands).
+- Windows 11, Git Bash for shell commands. **JDK: Temurin 25 LTS at
+  `C:/dev/tools/jdk-25`**, set as the user-scope `JAVA_HOME` and prepended to the
+  user PATH, so `./gradlew` needs no override in a fresh shell. A shell started
+  BEFORE that was set keeps the old environment — then export it by hand:
+  `export JAVA_HOME="C:/dev/tools/jdk-25"`.
+  Do NOT move the build to a newer JVM: an Oracle JDK 26 is installed and sits
+  first on the **machine** PATH (so interactive `java -version` reports 26), but
+  no Gradle/AGP/Kotlin release supports 26 yet — the build stays on 25. A 32-bit
+  Oracle Java 8 also lingers further down that PATH; if a build ever dies with
+  "Could not reserve enough space for 2097152KB object heap", that is the one
+  that answered, and JAVA_HOME was not set.
 - Android SDK lives in the **sibling repo**: `local.properties` →
-  `sdk.dir=C:/dev/Perso/AdBlocker4Android/.tools/android-sdk` (platform 34,
-  build-tools 34.0.0). Gradle 8.7 / AGP 8.5.2 / Kotlin 1.9.24 via wrapper.
+  `sdk.dir=C\:/dev/Perso/AdBlocker4Android/.tools/android-sdk` — the drive colon
+  MUST be escaped (`C\:`) or AGP lint fails the gate with PropertyEscape
+  (platform 34, build-tools 34.0.0). Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21
+  via wrapper. BOTH upper bounds are deliberate. Gradle is pinned to 9.5.x: 9.6 removed the internal
+  `InternalProblems` API that AGP 8.x relies on, so Gradle 9.6+ demands AGP 9.x,
+  which in turn wants compileSdk 36 and newer build-tools — a separate migration,
+  not a wrapper bump. Kotlin is pinned to 2.2.x because the R8 bundled with AGP
+  8.13 cannot parse newer Kotlin metadata (2.4.20 emitted 16 "error parsing
+  kotlin metadata" warnings while shrinking the release build); raise Kotlin only
+  together with AGP.
 - **Signing**: `release.keystore` + `keystore.properties` at repo root, both
   gitignored (copied from the AdBlocker4Android sibling repo, alias `adblocker`).
   Never commit them, never print their contents. `assembleRelease` signs
