@@ -68,7 +68,10 @@ echo "sdk.dir=/path/to/android-sdk" > local.properties
 ./gradlew lintDebug            # lint
 ```
 
-Requirements: JDK 17, Android SDK platform 34 + build-tools 34.0.0. Gradle 8.7 / AGP 8.5.2 / Kotlin 1.9.24 come via the wrapper.
+Requirements: JDK 21 or 25 (25 LTS is what CI-less local builds use here; JDK 26 is not yet
+supported by the Android toolchain), Android SDK platform 34 + build-tools 34.0.0. Gradle
+9.5.1 / AGP 8.13.2 / Kotlin 2.2.21 come via the wrapper. On Windows, escape the drive colon
+in `local.properties` (`sdk.dir=C\:/path/to/android-sdk`) or lint fails with PropertyEscape.
 
 ### Release signing
 
