@@ -232,3 +232,11 @@ compensate with careful reasoning and honest caveats to the owner.
 - Release notes: short, user-language (the owner reads them on the phone), grouped
   Improved/New/Fixed, always ending with the auto-update reminder line.
 - This file: update when conventions or architecture change.
+- `docs/PROJECT_STATUS.md`: **read this first in every new conversation** —
+  it's the running history/current-state doc (what shipped, when, why, and
+  what's still open) so a fresh session doesn't have to reconstruct context
+  from `git log`. Add or update a bullet there after any significant piece of
+  work (a shipped feature, a fixed bug, an infra change) — before the
+  conversation ends, not "eventually." Keep entries factual and condensed;
+  this is a status doc, not a diary — don't restate what `git log` already
+  says clearly, just synthesize the why and the current implication.
