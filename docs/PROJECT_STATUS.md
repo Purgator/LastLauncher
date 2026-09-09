@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~2 months
-(first commit 2026-07-11), 111 commits, currently at **v1.16.1**. Owner tests
+(first commit 2026-07-11), 114 commits, currently at **v1.17.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -84,8 +84,20 @@ in a later message.
   lists every calendar on the device with per-calendar checkboxes) is now
   the sole source of truth for what shows, default unchanged (empty
   exclusion = show every calendar).
+- **v1.17.0 (2026-09-09)**: two-finger swipe down now opens quick settings
+  (falls back to the notification shade if the accessibility service can't
+  reach it directly) — the vertical swipe branch in `handleSwipe()` used to
+  ignore finger count entirely, so one and two fingers both just opened the
+  shade. Also replaced the plain cross-fade the park (pinned-app) slot and
+  new-app spotlight used when rotating between several apps with the same
+  coin-flip turn (`rotationY`) the suggestion trio already uses, via a new
+  shared `coinFlipIcon()` helper — reviewed the rotation logic itself while
+  investigating an owner report that it "didn't work" and found it
+  structurally sound (same pattern as the park slot); the much more visible
+  flip should make actual rotation obvious, but this is unconfirmed on-device
+  — revisit if the owner still sees it stuck on one app.
 
-## Current state (as of v1.16.1)
+## Current state (as of v1.17.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
@@ -93,7 +105,7 @@ in a later message.
   moving AGP — see `CLAUDE.md` for exactly why both ceilings exist.
 - **APK size**: at the ~2 MB ceiling (rule #1 in `CLAUDE.md`: no third-party
   runtime deps, by design). Size-audit before adding anything non-trivial.
-  v1.16.0's release APK is ~2,000,128 bytes.
+  v1.17.0's release APK is ~2,000,084 bytes.
 - **Prediction engine**: Tier 0 of the roadmap is shipped and self-grading in
   Settings → Insights (live hit-rate + backtest scoreboard vs. frequency/
   recency baselines). Tier 2 priorities were re-ordered based on real-data
@@ -117,6 +129,17 @@ in a later message.
   stock clock app, another app (sleep tracker, bedtime schedule, wearable
   companion) owns the alarm slot and we need to filter or pick differently.
   This has not been followed up on since v1.9.4 shipped.
+- **New-app spotlight rotation**: owner suspected multiple recently-installed
+  apps weren't rotating through the spotlight slot. Code review (v1.17.0)
+  found `showNextSpotApp()` structurally identical to the park slot's
+  (stable index into a timestamp-sorted list, self-rescheduling `Runnable`
+  every `SPOT_ROTATE_MS`) — no logic bug found. Shipped the coin-flip swap
+  (much more visible than the old cross-fade) on the theory the rotation was
+  actually firing but easy to miss; **unconfirmed** — if the owner still
+  sees it stuck on one app with 2+ new installs pending, the next step is
+  checking whether some other call to `updateNewAppSpot()` is firing more
+  often than expected and resetting `spotIndex` before `SPOT_ROTATE_MS`
+  (4.5 s) elapses.
 
 ## Environment quick facts (full detail in `CLAUDE.md`)
 
