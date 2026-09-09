@@ -516,13 +516,19 @@ class MainActivity : AppCompatActivity() {
             // A left→right swipe pulls the drawer from the left, and vice versa.
             runGesture(GestureBinding.decode(prefs.gestureBinding(key)), drawerSide = if (dx > 0) -1 else 1)
         } else if (abs(dy) > abs(dx) && abs(dy) > minDist) {
-            // Vertical stays fixed: up = all apps, down = notifications.
+            // Vertical stays fixed: up = all apps, down = notifications (one finger)
+            // or quick settings (two fingers) — same as pulling the shade down with
+            // one vs. two fingers in the system status bar.
             if (dy < 0) {
                 haptic(binding.root)
                 openAllApps()
             } else if (prefs.swipeDownNotifications) {
                 haptic(binding.root)
-                LockService.openNotificationShade(this)
+                if (fingers >= 2) {
+                    if (!LockService.openQuickSettings()) LockService.openNotificationShade(this)
+                } else {
+                    LockService.openNotificationShade(this)
+                }
             }
         }
     }
@@ -2680,11 +2686,8 @@ class MainActivity : AppCompatActivity() {
         val entry = apps[spotIndex % apps.size]
         spotIndex++
         val bindIcon = { binding.newAppIcon.setImageDrawable(repo.icon(entry)) }
-        if (prefs.animations && apps.size > 1) {
-            binding.newAppIcon.animate().alpha(0f).setDuration(220).withEndAction {
-                bindIcon()
-                binding.newAppIcon.animate().alpha(1f).setDuration(220).start()
-            }.start()
+        if (prefs.animations && apps.size > 1 && binding.newAppIcon.drawable != null) {
+            coinFlipIcon(binding.newAppIcon, bindIcon)
         } else {
             bindIcon()
         }
@@ -2880,6 +2883,25 @@ class MainActivity : AppCompatActivity() {
         parkPulse = null
     }
 
+    /**
+     * Coin-flip swap for a single floating-slot icon: turns away on the vertical
+     * axis, swaps the drawable at the midpoint, and turns back in — the same
+     * motion as the suggestion trio's page flip ([flipSuggestionsTo]), just on
+     * one icon instead of three.
+     */
+    private fun coinFlipIcon(icon: View, bind: () -> Unit) {
+        icon.cameraDistance = 9000 * resources.displayMetrics.density
+        icon.animate().rotationY(90f).setDuration(130)
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                bind()
+                icon.rotationY = -90f
+                icon.animate().rotationY(0f).setDuration(190)
+                    .setInterpolator(android.view.animation.DecelerateInterpolator())
+                    .start()
+            }.start()
+    }
+
     private fun showNextParked() {
         val parked = prefs.parkedApps().mapNotNull { repo.byComponentKey(it) }
         if (parked.isEmpty()) {
@@ -2890,10 +2912,7 @@ class MainActivity : AppCompatActivity() {
         parkIndex++
         val bindIcon = { binding.parkIcon.setImageDrawable(repo.icon(entry)) }
         if (prefs.animations && parked.size > 1 && binding.parkIcon.drawable != null) {
-            binding.parkIcon.animate().alpha(0f).setDuration(220).withEndAction {
-                bindIcon()
-                binding.parkIcon.animate().alpha(1f).setDuration(220).start()
-            }.start()
+            coinFlipIcon(binding.parkIcon, bindIcon)
         } else {
             bindIcon()
         }
