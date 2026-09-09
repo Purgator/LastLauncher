@@ -117,7 +117,7 @@
     <string name="pref_double_tap_lock">Double appui pour verrouiller</string>
     <string name="pref_double_tap_lock_summary">Double appui sur une zone vide de l’accueil pour verrouiller le téléphone</string>
     <string name="pref_swipe_down">Glisser vers le bas : notifications</string>
-    <string name="pref_swipe_down_summary">Glissez vers le bas sur l’accueil pour ouvrir le volet des notifications</string>
+    <string name="pref_swipe_down_summary">Glissez vers le bas sur l’accueil pour ouvrir le volet des notifications (deux doigts pour les réglages rapides)</string>
     <string name="pref_gesture_lr_1">Glisser → (un doigt, gauche vers droite)</string>
     <string name="pref_gesture_lr_2">Glisser →→ (deux doigts, gauche vers droite)</string>
     <string name="pref_gesture_rl_1">Glisser ← (un doigt, droite vers gauche)</string>
