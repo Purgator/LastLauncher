@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~2 months
-(first commit 2026-07-11), 108 commits, currently at **v1.16.0**. Owner tests
+(first commit 2026-07-11), 111 commits, currently at **v1.16.1**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -74,8 +74,18 @@ in a later message.
   v1.15.0's before publishing, since auto-update depends on that. Full
   rationale and gotchas are in the `build-jdk-location` memory and in
   `CLAUDE.md`.
+- **v1.16.1 (2026-09-09)**: fixed the agenda stream only showing the owner's
+  main calendar. `CalendarFeed.query()` was hard-filtering on the provider's
+  `Instances.VISIBLE` column on top of our own `agendaExcludedCalendars`
+  picker (Settings → Agenda → Calendars); some account types sync
+  secondary/imported calendars' events without ever setting that flag, so
+  they never reached the stream even with nothing excluded in our settings.
+  The picker (already present since the agenda feature's original commit,
+  lists every calendar on the device with per-calendar checkboxes) is now
+  the sole source of truth for what shows, default unchanged (empty
+  exclusion = show every calendar).
 
-## Current state (as of v1.16.0)
+## Current state (as of v1.16.1)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
