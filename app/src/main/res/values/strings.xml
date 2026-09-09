@@ -117,7 +117,7 @@
     <string name="pref_double_tap_lock">Double tap to lock</string>
     <string name="pref_double_tap_lock_summary">Double-tap an empty area of the home screen to lock the phone</string>
     <string name="pref_swipe_down">Swipe down for notifications</string>
-    <string name="pref_swipe_down_summary">Swipe down on the home screen to open the notification shade</string>
+    <string name="pref_swipe_down_summary">Swipe down on the home screen to open the notification shade (two fingers for quick settings)</string>
     <string name="pref_gesture_lr_1">Swipe → (one finger, left to right)</string>
     <string name="pref_gesture_lr_2">Swipe →→ (two fingers, left to right)</string>
     <string name="pref_gesture_rl_1">Swipe ← (one finger, right to left)</string>
