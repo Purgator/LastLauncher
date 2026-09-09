@@ -14,8 +14,8 @@ android {
         applicationId = "fr.arichard.lastlauncher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 36
-        versionName = "1.16.1"
+        versionCode = 37
+        versionName = "1.17.0"
     }
 
     // Optional release signing: reads keystore.properties at the repo root when present.
