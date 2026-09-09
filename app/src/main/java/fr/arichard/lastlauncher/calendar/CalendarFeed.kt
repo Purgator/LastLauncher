@@ -66,14 +66,17 @@ object CalendarFeed {
             CalendarContract.Instances.CALENDAR_ID,
             CalendarContract.Instances.STATUS,
             CalendarContract.Instances.SELF_ATTENDEE_STATUS,
-            CalendarContract.Instances.VISIBLE,
         )
         val list = ArrayList<Agenda.EventInstance>()
         context.contentResolver.query(
             builder.build(), projection, null, null, CalendarContract.Instances.BEGIN
         )?.use { cursor ->
             while (cursor.moveToNext()) {
-                if (cursor.getInt(9) != 1) continue // hidden calendar
+                // Calendar-level visibility is controlled entirely by our own
+                // agendaExcludedCalendars picker (Settings > Agenda > Calendars), not by
+                // the provider's VISIBLE column: some accounts (secondary/imported
+                // calendars) sync events without ever flipping that flag to 1, which
+                // silently hid them here even though the user never excluded them.
                 if (cursor.getInt(7) == CalendarContract.Events.STATUS_CANCELED) continue
                 if (cursor.getInt(8) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) {
                     continue
