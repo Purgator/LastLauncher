@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~2 months
-(first commit 2026-07-11), 114 commits, currently at **v1.17.0**. Owner tests
+(first commit 2026-07-11), 117 commits, currently at **v1.18.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -96,8 +96,21 @@ in a later message.
   structurally sound (same pattern as the park slot); the much more visible
   flip should make actual rotation obvious, but this is unconfirmed on-device
   — revisit if the owner still sees it stuck on one app.
+- **v1.18.0 (2026-09-10)**: fixed a real gap the owner spotted — a same-day
+  birthday/holiday (all-day event) could sit unhighlighted while a later
+  timed event that day took the agenda's single "next" arrow, easy to miss.
+  `Agenda.rows()` (`nextEvent = live.firstOrNull { !it.allDay } ?: live.first()`)
+  always favored the first timed event. Presented three fix options and the
+  owner asked for all three as a user-facing choice with a strong default,
+  so it shipped as `Agenda.AllDayHighlight` (BOTH / DISTINCT / SMART) behind
+  Settings → Agenda → "Highlight today's all-day events", default **BOTH**
+  (today's all-day event(s) and the next timed event both get the
+  arrow/accent). DISTINCT gives all-day its own `●` marker independent of
+  the timed "next" arrow; SMART keeps one highlight but lets all-day win it
+  when the next timed event is 3+ hours off. All pure logic in `Agenda.kt`,
+  5 new unit tests.
 
-## Current state (as of v1.17.0)
+## Current state (as of v1.18.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
@@ -105,7 +118,8 @@ in a later message.
   moving AGP — see `CLAUDE.md` for exactly why both ceilings exist.
 - **APK size**: at the ~2 MB ceiling (rule #1 in `CLAUDE.md`: no third-party
   runtime deps, by design). Size-audit before adding anything non-trivial.
-  v1.17.0's release APK is ~2,000,084 bytes.
+  v1.18.0's release APK is ~2,003,256 bytes — just over 2 MB now; watch this
+  closely on the next feature.
 - **Prediction engine**: Tier 0 of the roadmap is shipped and self-grading in
   Settings → Insights (live hit-rate + backtest scoreboard vs. frequency/
   recency baselines). Tier 2 priorities were re-ordered based on real-data
