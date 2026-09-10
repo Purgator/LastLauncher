@@ -27,6 +27,13 @@ class AgendaTest {
 
     private fun events(rows: List<Agenda.Row>) = rows.filterIsInstance<Agenda.Row.Event>()
 
+    /** UTC midnight of 2026-07-[day] — how the provider stores all-day instances. */
+    private fun utcMidnight(day: Int): Long =
+        Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+            clear()
+            set(2026, Calendar.JULY, day, 0, 0)
+        }.timeInMillis
+
     @Test
     fun endedEventsAreDroppedAndNextIsFlagged() {
         val now = at(10, 0)
@@ -76,10 +83,7 @@ class AgendaTest {
     fun allDayEventsAreNormalizedFromUtcAndSortFirst() {
         val now = at(8)
         // The provider stores all-day instances as UTC midnight of the date.
-        val utcMidnightTomorrow = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-            clear()
-            set(2026, Calendar.JULY, 15, 0, 0)
-        }.timeInMillis
+        val utcMidnightTomorrow = utcMidnight(15)
         val rows = Agenda.rows(
             listOf(
                 event(at(9, dayOffset = 1), title = "timed"),
@@ -93,18 +97,13 @@ class AgendaTest {
         // One header (tomorrow), then the all-day event before the timed one.
         assertEquals(Agenda.DayKind.TOMORROW, (rows[0] as Agenda.Row.DayHeader).kind)
         assertEquals(listOf("birthday", "timed"), events(rows).map { it.event.title })
-        // The timed event carries the "next" flag, not the all-day one.
+        // Tomorrow's all-day event isn't today's, so only the timed event is "next".
         assertEquals(listOf(false, true), events(rows).map { it.next })
     }
 
     @Test
     fun todayAllDayEventIsStillShownAndPastAllDayIsNot() {
         val now = at(13)
-        fun utcMidnight(day: Int): Long =
-            Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-                clear()
-                set(2026, Calendar.JULY, day, 0, 0)
-            }.timeInMillis
         val rows = Agenda.rows(
             listOf(
                 event(utcMidnight(13), title = "yesterday", allDay = true),
@@ -113,6 +112,63 @@ class AgendaTest {
             now, zone
         )
         assertEquals(listOf("today"), events(rows).map { it.event.title })
+    }
+
+    @Test
+    fun bothModeHighlightsTodaysAllDayAlongsideNextTimed() {
+        val now = at(8)
+        val rows = Agenda.rows(
+            listOf(
+                event(utcMidnight(14), title = "birthday", allDay = true),
+                event(at(14), title = "meeting"),
+            ),
+            now, zone, allDayHighlight = Agenda.AllDayHighlight.BOTH,
+        )
+        assertEquals(listOf("birthday", "meeting"), events(rows).map { it.event.title })
+        assertEquals(listOf(true, true), events(rows).map { it.next })
+    }
+
+    @Test
+    fun distinctModeMarksAllDayFeaturedSeparatelyFromNext() {
+        val now = at(8)
+        val rows = Agenda.rows(
+            listOf(
+                event(utcMidnight(14), title = "birthday", allDay = true),
+                event(at(14), title = "meeting"),
+            ),
+            now, zone, allDayHighlight = Agenda.AllDayHighlight.DISTINCT,
+        )
+        val (birthday, meeting) = events(rows)
+        assertTrue(birthday.allDayFeatured)
+        assertEquals(false, birthday.next)
+        assertTrue(meeting.next)
+        assertEquals(false, meeting.allDayFeatured)
+    }
+
+    @Test
+    fun smartModeLetsAllDayWinWhenTimedEventIsFarOff() {
+        val now = at(8)
+        val rows = Agenda.rows(
+            listOf(
+                event(utcMidnight(14), title = "birthday", allDay = true),
+                event(at(20), title = "dinner"), // 12h away
+            ),
+            now, zone, allDayHighlight = Agenda.AllDayHighlight.SMART,
+        )
+        assertEquals(listOf(true, false), events(rows).map { it.next })
+    }
+
+    @Test
+    fun smartModeLetsTimedWinWhenItIsSoon() {
+        val now = at(8)
+        val rows = Agenda.rows(
+            listOf(
+                event(utcMidnight(14), title = "birthday", allDay = true),
+                event(at(9), title = "standup"), // 1h away
+            ),
+            now, zone, allDayHighlight = Agenda.AllDayHighlight.SMART,
+        )
+        assertEquals(listOf(false, true), events(rows).map { it.next })
     }
 
     @Test

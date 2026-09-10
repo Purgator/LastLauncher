@@ -284,6 +284,10 @@
     <string name="agenda_text_large">Large</string>
     <string name="pref_agenda_all_day">All-day events</string>
     <string name="pref_agenda_all_day_summary">Show birthdays, holidays and other day-long entries</string>
+    <string name="pref_agenda_all_day_highlight">Highlight today\'s all-day events</string>
+    <string name="agenda_all_day_highlight_both">Highlight both (recommended)</string>
+    <string name="agenda_all_day_highlight_distinct">Distinct marker for all-day</string>
+    <string name="agenda_all_day_highlight_smart">Smart: whichever is soonest</string>
     <string name="pref_agenda_countdown">Countdown to the next event</string>
     <string name="pref_agenda_countdown_summary">"in 25 min" next to the highlighted event, updated every minute</string>
     <string name="pref_agenda_on_gesture">Show only on gesture</string>

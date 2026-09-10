@@ -55,6 +55,14 @@
         android:summary="@string/pref_agenda_all_day_summary"
         android:defaultValue="true"
         android:dependency="agenda_enabled" />
+    <ListPreference
+        android:key="agenda_all_day_highlight"
+        android:title="@string/pref_agenda_all_day_highlight"
+        android:entries="@array/agenda_all_day_highlight_entries"
+        android:entryValues="@array/agenda_all_day_highlight_values"
+        android:defaultValue="both"
+        android:dependency="agenda_all_day"
+        app:useSimpleSummaryProvider="true" />
     <SwitchPreferenceCompat
         android:key="agenda_countdown"
         android:title="@string/pref_agenda_countdown"
