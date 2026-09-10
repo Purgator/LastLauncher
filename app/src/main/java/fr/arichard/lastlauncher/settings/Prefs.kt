@@ -2,6 +2,7 @@ package fr.arichard.lastlauncher.settings
 
 import android.content.Context
 import androidx.preference.PreferenceManager
+import fr.arichard.lastlauncher.calendar.Agenda
 
 /** Typed access to the app's settings. All defaults live here. */
 class Prefs(context: Context) {
@@ -194,6 +195,14 @@ class Prefs(context: Context) {
 
     /** Include all-day events (birthdays, holidays…) in the stream. */
     val agendaShowAllDay: Boolean get() = sp.getBoolean(KEY_AGENDA_ALL_DAY, true)
+
+    /** How today's all-day events share the spotlight with the next timed event. */
+    val agendaAllDayHighlight: Agenda.AllDayHighlight
+        get() = when (sp.getString(KEY_AGENDA_ALL_DAY_HIGHLIGHT, "both")) {
+            "distinct" -> Agenda.AllDayHighlight.DISTINCT
+            "smart" -> Agenda.AllDayHighlight.SMART
+            else -> Agenda.AllDayHighlight.BOTH
+        }
 
     /** Live countdown next to the highlighted event. */
     val agendaShowCountdown: Boolean get() = sp.getBoolean(KEY_AGENDA_COUNTDOWN, true)
@@ -441,6 +450,7 @@ class Prefs(context: Context) {
         const val KEY_AGENDA_LINES = "agenda_lines"
         const val KEY_AGENDA_TEXT_SIZE = "agenda_text_size"
         const val KEY_AGENDA_ALL_DAY = "agenda_all_day"
+        const val KEY_AGENDA_ALL_DAY_HIGHLIGHT = "agenda_all_day_highlight"
         const val KEY_AGENDA_COUNTDOWN = "agenda_countdown"
         const val KEY_AGENDA_DAYS = "agenda_days"
         const val KEY_AGENDA_TAP = "agenda_tap"
