@@ -30,28 +30,46 @@ object Agenda {
 
     enum class DayKind { TOMORROW, LATER }
 
+    /**
+     * How today's all-day events (birthdays, holidays…) get highlighted next to
+     * the next timed event, so a same-day timed event never quietly outranks one:
+     * [BOTH] flags both the same way (the default), [DISTINCT] gives all-day-today
+     * its own marker so it never competes with the "next timed" one, and [SMART]
+     * keeps a single highlight, letting all-day win it only while the next timed
+     * event is still comfortably far off.
+     */
+    enum class AllDayHighlight { BOTH, DISTINCT, SMART }
+
     sealed class Row {
         /** Separator before the first event of a non-today day. */
         data class DayHeader(val kind: DayKind, val dayStart: Long) : Row()
 
         /**
-         * An event line. [next] marks the single highlighted upcoming event;
-         * [ongoing] means it has started but not ended.
+         * An event line. [next] marks the highlighted upcoming event(s) — under
+         * [AllDayHighlight.SMART] at most one row across the whole stream, under
+         * [AllDayHighlight.BOTH] possibly two (the next timed event and today's
+         * all-day event(s)). [allDayFeatured] is [AllDayHighlight.DISTINCT]'s own
+         * marker for today's all-day events, independent of [next]. [ongoing]
+         * means the event has started but not ended.
          */
         data class Event(
-            val event: EventInstance, val next: Boolean, val ongoing: Boolean,
+            val event: EventInstance,
+            val next: Boolean,
+            val ongoing: Boolean,
+            val allDayFeatured: Boolean = false,
         ) : Row()
     }
 
     /**
      * Builds the stream: ended events dropped, remaining sorted (all-day first
-     * within each day), day separators inserted, the first timed event that hasn't
-     * ended flagged as [Row.Event.next] (falling back to the first row at all).
+     * within each day), day separators inserted, and the upcoming event(s)
+     * flagged per [allDayHighlight] (see [AllDayHighlight]).
      */
     fun rows(
         events: List<EventInstance>,
         now: Long,
         zone: TimeZone = TimeZone.getDefault(),
+        allDayHighlight: AllDayHighlight = AllDayHighlight.BOTH,
     ): List<Row> {
         val live = events
             .map {
@@ -63,8 +81,18 @@ object Agenda {
             .sortedWith(compareBy({ dayStart(it.begin, zone) }, { !it.allDay }, { it.begin }))
         if (live.isEmpty()) return emptyList()
 
-        val nextEvent = live.firstOrNull { !it.allDay } ?: live.first()
         val todayStart = dayStart(now, zone)
+        val nextTimed = live.firstOrNull { !it.allDay }
+        val allDayToday = live.filter { it.allDay && dayStart(it.begin, zone) == todayStart }
+        // Safety net: if there's neither a timed event nor a today all-day one to
+        // feature, fall back to the very first upcoming row so something is always
+        // highlighted (e.g. only a future, non-today all-day event is left).
+        val fallback = if (nextTimed == null && allDayToday.isEmpty()) live.first() else null
+        val smartAllDayWins = allDayHighlight == AllDayHighlight.SMART &&
+            allDayToday.isNotEmpty() &&
+            (nextTimed == null || nextTimed.begin - now >= SMART_TIMED_THRESHOLD_MS)
+        val smartWinner = if (smartAllDayWins) allDayToday.first() else (nextTimed ?: fallback)
+
         val tomorrowStart = plusDays(todayStart, 1, zone)
         val result = ArrayList<Row>(live.size + 4)
         var lastDay = todayStart
@@ -75,11 +103,19 @@ object Agenda {
                 result.add(Row.DayHeader(kind, day))
                 lastDay = day
             }
+            val next = when (allDayHighlight) {
+                AllDayHighlight.BOTH -> event === nextTimed || event === fallback ||
+                    event in allDayToday
+                AllDayHighlight.DISTINCT -> event === nextTimed || event === fallback
+                AllDayHighlight.SMART -> event === smartWinner
+            }
             result.add(
                 Row.Event(
                     event,
-                    next = event === nextEvent,
+                    next = next,
                     ongoing = !event.allDay && event.begin <= now,
+                    allDayFeatured = allDayHighlight == AllDayHighlight.DISTINCT &&
+                        event in allDayToday,
                 )
             )
         }
@@ -129,4 +165,7 @@ object Agenda {
     }
 
     private const val MINUTE_MS = 60_000L
+
+    /** [AllDayHighlight.SMART]: all-day only outranks a timed event this far off. */
+    private const val SMART_TIMED_THRESHOLD_MS = 3 * 60 * 60_000L
 }

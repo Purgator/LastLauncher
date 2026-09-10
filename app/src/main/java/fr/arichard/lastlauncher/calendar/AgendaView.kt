@@ -139,9 +139,10 @@ class AgendaView @JvmOverloads constructor(
             row.ongoing -> " · " + context.getString(R.string.agenda_now)
             else -> " · " + countdown(Agenda.minutesUntil(e.begin, now))
         }
-        text = "${if (row.next) "▸" else " "} $time ${e.title}$suffix"
+        val marker = if (row.next) "▸" else if (row.allDayFeatured) "●" else " "
+        text = "$marker $time ${e.title}$suffix"
         setTextColor(
-            if (row.next) accent
+            if (row.next || row.allDayFeatured) accent
             else ColorUtils.setAlphaComponent(context.getColor(R.color.text_secondary), 0xD0)
         )
         setOnClickListener { view ->

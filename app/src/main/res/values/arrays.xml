@@ -71,6 +71,16 @@
         <item>inline</item>
         <item>app</item>
     </string-array>
+    <string-array name="agenda_all_day_highlight_entries">
+        <item>@string/agenda_all_day_highlight_both</item>
+        <item>@string/agenda_all_day_highlight_distinct</item>
+        <item>@string/agenda_all_day_highlight_smart</item>
+    </string-array>
+    <string-array name="agenda_all_day_highlight_values">
+        <item>both</item>
+        <item>distinct</item>
+        <item>smart</item>
+    </string-array>
 
     <string-array name="weather_units_entries">
         <item>Celsius (°C)</item>
