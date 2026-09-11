@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~2 months
-(first commit 2026-07-11), 117 commits, currently at **v1.18.0**. Owner tests
+(first commit 2026-07-11), 120 commits, currently at **v1.19.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -109,8 +109,28 @@ in a later message.
   the timed "next" arrow; SMART keeps one highlight but lets all-day win it
   when the next timed event is 3+ hours off. All pure logic in `Agenda.kt`,
   5 new unit tests.
+- **v1.19.0 (2026-09-11)**: settings export/import, for moving to a new phone.
+  New `backup/ConfigBackup.kt` (pure, unit-tested — `PORTABLE_KEYS` allowlist +
+  `buildPayload`/`resolveImport`) and `backup/ConfigBackupIO.kt` (the Android
+  side: JSON file in the cache dir, shared via the same FileProvider as the
+  brain export; read back via `ActivityResultContracts.OpenDocument()`).
+  Settings → General → *Export/Import settings*. Deliberately an **allowlist**
+  of portable keys, not a denylist, so a forgotten future setting silently
+  isn't exported rather than leaking device-local state — excludes caches,
+  "have we asked" permission flags, the Wi-Fi hashing salt, timestamps, and
+  the prediction engine's own signals (that has its own separate export
+  already). The one setting stored as a device-local id — calendar exclusions,
+  a `CalendarContract` row id — travels as display names and gets re-matched
+  against the destination device's calendars on import; unmatched ones are
+  reported to the owner, not silently dropped. No Google Drive SDK or any new
+  dependency: export uses the normal Android share sheet (Drive already
+  appears there as a target, like any file-sharing app), import uses the
+  system document picker (browses into Drive/Downloads/etc. the same way).
+  Schema-versioned (`"schema": 1` in the file) but no migration machinery
+  built yet — nothing has needed one; the flat allowlisted-key-map shape is
+  naturally forward/backward compatible for additions on its own.
 
-## Current state (as of v1.18.0)
+## Current state (as of v1.19.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17

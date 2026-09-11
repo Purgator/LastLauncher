@@ -77,6 +77,15 @@
     <string name="pref_keyboard_always_summary">Open the keyboard on the home screen so you can type instantly. When off, swipe up to search.</string>
     <string name="pref_haptics">Haptic feedback</string>
     <string name="pref_haptics_summary">Vibrate lightly on launches and gestures</string>
+    <string name="cat_backup">Backup &amp; restore</string>
+    <string name="pref_backup_export">Export settings</string>
+    <string name="pref_backup_export_summary">Save a file with your gestures, drawers, appearance and other settings — share it to Drive, email, or wherever you like</string>
+    <string name="pref_backup_import">Import settings</string>
+    <string name="pref_backup_import_summary">Restore settings from a previously exported file — handy when setting up a new phone</string>
+    <string name="backup_export_failed">Couldn\'t create the backup file</string>
+    <string name="backup_import_failed">Couldn\'t read that file — is it a LastLauncher backup?</string>
+    <string name="backup_import_done">Settings restored — reopen the home screen to see everything applied</string>
+    <string name="backup_import_calendars_note">%d calendar exclusion(s) couldn\'t be matched on this device and were skipped</string>
     <string name="pref_clock_tap">Clock tap opens</string>
     <string name="clock_tap_default">Clock (system default)</string>
 

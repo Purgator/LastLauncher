@@ -374,6 +374,30 @@ class Prefs(context: Context) {
         hiddenApps = hiddenApps - pkg
     }
 
+    // ------------------------------------------------------------ config backup
+
+    /** Every stored preference, verbatim — used only by [fr.arichard.lastlauncher.backup.ConfigBackup]
+     *  to build the exported file. Values are whatever [android.content.SharedPreferences.getAll]
+     *  returns: Boolean, Int, Long, Float, String, or Set<String>. */
+    fun rawAll(): Map<String, Any?> = sp.all
+
+    /** Bulk-writes raw preference values in the same shapes [rawAll] returns —
+     *  used only by [fr.arichard.lastlauncher.backup.ConfigBackup] to apply a restored backup. */
+    fun rawRestore(values: Map<String, Any?>) {
+        val editor = sp.edit()
+        for ((key, value) in values) {
+            when (value) {
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                is Long -> editor.putLong(key, value)
+                is Float -> editor.putFloat(key, value)
+                is String -> editor.putString(key, value)
+                is Set<*> -> editor.putStringSet(key, value.filterIsInstance<String>().toSet())
+            }
+        }
+        editor.apply()
+    }
+
     companion object {
         const val KEY_KEYBOARD_ALWAYS = "keyboard_always"
         const val KEY_PREDICTIONS = "predictions"
