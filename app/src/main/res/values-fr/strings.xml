@@ -77,6 +77,15 @@
     <string name="pref_keyboard_always_summary">Ouvre le clavier sur l’écran d’accueil pour taper immédiatement. Désactivé : glissez vers le haut pour chercher.</string>
     <string name="pref_haptics">Retour haptique</string>
     <string name="pref_haptics_summary">Légère vibration aux lancements et gestes</string>
+    <string name="cat_backup">Sauvegarde et restauration</string>
+    <string name="pref_backup_export">Exporter les réglages</string>
+    <string name="pref_backup_export_summary">Enregistrer un fichier avec vos gestes, tiroirs, apparence et autres réglages — partagez-le vers Drive, par e-mail, ou où vous voulez</string>
+    <string name="pref_backup_import">Importer les réglages</string>
+    <string name="pref_backup_import_summary">Restaurer les réglages depuis un fichier précédemment exporté — pratique lors de la configuration d\'un nouveau téléphone</string>
+    <string name="backup_export_failed">Impossible de créer le fichier de sauvegarde</string>
+    <string name="backup_import_failed">Impossible de lire ce fichier — est-ce bien une sauvegarde LastLauncher ?</string>
+    <string name="backup_import_done">Réglages restaurés — rouvrez l\'écran d\'accueil pour tout appliquer</string>
+    <string name="backup_import_calendars_note">%d exclusion(s) de calendrier n\'ont pas pu être retrouvées sur cet appareil et ont été ignorées</string>
     <string name="pref_clock_tap">Un appui sur l’horloge ouvre</string>
     <string name="clock_tap_default">Horloge (application système)</string>
 
