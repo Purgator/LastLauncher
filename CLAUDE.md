@@ -96,6 +96,7 @@ impractical — prioritize a readable history.
 |---|---|
 | `MainActivity.kt` | The home screen: all gestures/touch routing, suggestions trio + swipe-to-cycle, drawers wiring, ticker, weather, status line, new-app spotlight, drag & drop lifecycle. Big by design — it *is* the launcher. |
 | `LauncherApp.kt` | Application: repo bootstrap, package-change receiver (feeds new-app spotlight), context-signal registration. |
+| `apps/PinShortcutActivity.kt` | Toast-and-finish handler for `CONFIRM_PIN_SHORTCUT`. Exists so `ShortcutManager.isRequestPinShortcutSupported()` is true while we're the home app — Chrome checks that before offering to install a PWA at all. We don't render pinned shortcuts (installed PWAs are WebAPKs = normal apps); don't remove it. |
 | `apps/AppRepository.kt` | In-memory app catalog + icon cache, loaded/refreshed off-thread; fuzzy search (prefix > word > initials > substring > subsequence > package tokens). UI reads immutable snapshots. |
 | `predict/PredictionEngine.kt` | The "launcher memory". Scores = recency-decayed launches × hour/day-type match + Markov transition + context trigger + notification bonus + user boost − context-matched miss rows (corrected trios) − just-used penalty. All weights are named constants at the top. `snapshot()` powers the insights screen; `exportData()` dumps everything to a shareable JSON. |
 | `predict/UsageDb.kt` | SQLite log of launches (pruned at 5000 rows) + misses (corrected-trio rows, pruned at 1500), both context-stamped. Never leaves the device unless the user exports. |
@@ -189,7 +190,8 @@ the two `WheelDrawer`s (last = on top).
   rising soda bubbles (shared slotBubbles runnable). Park specifics: any app drag
   reveals its dashed drop circle (kept VISIBLE at alpha 0 otherwise — GONE views
   never join a drag), attraction scaling within 120 dp, drop pins for park_hours,
-  park_multi rotates several. Tap launches. Apps shown in
+  park_multi rotates several. Tap launches — and does NOT dismiss the spotlight:
+  it lives for `new_app_hours` (tap-to-dismiss made new apps "vanish"). Apps shown in
   either slot (and the now-playing app) are excluded from the suggestion trio
   (visibleSuggestionPool). At rest the park slot yields to a drawer on its side;
   during a drag it stays live and moves in past the drawer band (placeSlot

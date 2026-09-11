@@ -2694,11 +2694,9 @@ class MainActivity : AppCompatActivity() {
         } else {
             bindIcon()
         }
-        binding.newAppSpot.setOnClickListener {
-            prefs.removeNewApp(entry.packageName)
-            launchApp(entry, binding.newAppIcon)
-            updateNewAppSpot()
-        }
+        // Launching does NOT dismiss: the spotlight lasts its configured hours
+        // ("Hours it stays"), otherwise the first tap made the app vanish.
+        binding.newAppSpot.setOnClickListener { launchApp(entry, binding.newAppIcon) }
         binding.newAppSpot.setOnLongClickListener {
             startAppDrag(entry, binding.newAppIcon, fromDrawer = -1)
             true
