@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~2 months
-(first commit 2026-07-11), 120 commits, currently at **v1.19.0**. Owner tests
+(first commit 2026-07-11), 123 commits, currently at **v1.20.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -129,8 +129,22 @@ in a later message.
   Schema-versioned (`"schema": 1` in the file) but no migration machinery
   built yet — nothing has needed one; the flat allowlisted-key-map shape is
   naturally forward/backward compatible for additions on its own.
+- **v1.20.0 (2026-09-11)**: PWAs installable with LastLauncher as home. Owner's
+  test: Chrome offered "Install app" for https://purgator.github.io/Momen2m/
+  only while Microsoft Launcher was default; switching back, the installed
+  WebAPK launched and even hit the new-app spotlight. Root cause: Chrome gates
+  the install/add-to-home menu on `ShortcutManager.isRequestPinShortcutSupported()`,
+  which Android answers by looking for an activity handling
+  `android.content.pm.action.CONFIRM_PIN_SHORTCUT` in the default launcher's
+  package — we had none. New `apps/PinShortcutActivity` (translucent, toasts
+  "we don't keep shortcuts", finishes without `accept()`): its presence flips
+  the gate; installable PWAs become WebAPKs = real packages, caught by the
+  existing catalog + spotlight. Deliberately no pinned-shortcut rendering
+  (owner: "no need to pin it"). Also fixed the spotlight tap-dismiss (see
+  Open threads). **Unverified on-device**: owner to re-test "Install app" on
+  a fresh site with LastLauncher as default.
 
-## Current state (as of v1.19.0)
+## Current state (as of v1.20.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
@@ -138,7 +152,7 @@ in a later message.
   moving AGP — see `CLAUDE.md` for exactly why both ceilings exist.
 - **APK size**: at the ~2 MB ceiling (rule #1 in `CLAUDE.md`: no third-party
   runtime deps, by design). Size-audit before adding anything non-trivial.
-  v1.19.0's release APK is ~2,012,092 bytes — just over 2 MB now; watch this
+  v1.20.0's release APK is ~2,012,880 bytes — just over 2 MB now; watch this
   closely on the next feature.
 - **Prediction engine**: Tier 0 of the roadmap is shipped and self-grading in
   Settings → Insights (live hit-rate + backtest scoreboard vs. frequency/
@@ -163,17 +177,12 @@ in a later message.
   stock clock app, another app (sleep tracker, bedtime schedule, wearable
   companion) owns the alarm slot and we need to filter or pick differently.
   This has not been followed up on since v1.9.4 shipped.
-- **New-app spotlight rotation**: owner suspected multiple recently-installed
-  apps weren't rotating through the spotlight slot. Code review (v1.17.0)
-  found `showNextSpotApp()` structurally identical to the park slot's
-  (stable index into a timestamp-sorted list, self-rescheduling `Runnable`
-  every `SPOT_ROTATE_MS`) — no logic bug found. Shipped the coin-flip swap
-  (much more visible than the old cross-fade) on the theory the rotation was
-  actually firing but easy to miss; **unconfirmed** — if the owner still
-  sees it stuck on one app with 2+ new installs pending, the next step is
-  checking whether some other call to `updateNewAppSpot()` is firing more
-  often than expected and resetting `spotIndex` before `SPOT_ROTATE_MS`
-  (4.5 s) elapses.
+- **New-app spotlight "vanishing" — resolved in v1.20.0.** The v1.17.0
+  rotation investigation was chasing the wrong thing: the owner's "apps
+  disappear from the spotlight quickly" was the tap handler calling
+  `prefs.removeNewApp()` — launching from the spot dismissed it, contradicting
+  the "Hours it stays" setting. Removed; the spotlight now only expires by
+  time. If rotation still looks off after this, re-open the v1.17.0 note.
 
 ## Environment quick facts (full detail in `CLAUDE.md`)
 

@@ -294,10 +294,6 @@ class Prefs(context: Context) {
         writeNewApps((kept + (pkg to now)).takeLast(MAX_NEW_APPS))
     }
 
-    fun removeNewApp(pkg: String) {
-        writeNewApps(readNewApps().filter { it.first != pkg })
-    }
-
     private fun readNewApps(): List<Pair<String, Long>> =
         (sp.getString(KEY_NEW_APPS, "") ?: "")
             .split(',')

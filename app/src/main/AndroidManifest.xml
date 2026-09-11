@@ -53,6 +53,20 @@
             </intent-filter>
         </activity>
 
+        <!-- Declaring a CONFIRM_PIN_SHORTCUT handler is what makes
+             ShortcutManager.isRequestPinShortcutSupported() true for this launcher,
+             which Chrome requires before offering to install a PWA. See the class. -->
+        <activity
+            android:name=".apps.PinShortcutActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:autoRemoveFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".settings.SettingsActivity"
             android:exported="false"
