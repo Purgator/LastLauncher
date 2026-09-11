@@ -57,6 +57,7 @@
     <string name="pref_new_app_spot_summary">A just-installed app glows on the screen edge for a while, so you remember it. Several new apps take turns.</string>
     <string name="pref_new_app_side">Spotlight side</string>
     <string name="pref_new_app_hours">Hours it stays</string>
+    <string name="pin_shortcut_unsupported">LastLauncher doesn\'t keep home screen shortcuts — installed apps show up on their own</string>
     <string name="side_left">Left</string>
     <string name="side_right">Right</string>
 

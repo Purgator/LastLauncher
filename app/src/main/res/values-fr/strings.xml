@@ -57,6 +57,7 @@
     <string name="pref_new_app_spot_summary">Une application fraîchement installée brille au bord de l’écran pendant un moment, pour ne pas l’oublier. Plusieurs nouveautés se relaient.</string>
     <string name="pref_new_app_side">Côté du projecteur</string>
     <string name="pref_new_app_hours">Durée (heures)</string>
+    <string name="pin_shortcut_unsupported">LastLauncher ne garde pas de raccourcis d\'écran d\'accueil — les applications installées apparaissent toutes seules</string>
     <string name="side_left">Gauche</string>
     <string name="side_right">Droite</string>
 
