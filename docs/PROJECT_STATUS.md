@@ -138,7 +138,7 @@ in a later message.
   moving AGP — see `CLAUDE.md` for exactly why both ceilings exist.
 - **APK size**: at the ~2 MB ceiling (rule #1 in `CLAUDE.md`: no third-party
   runtime deps, by design). Size-audit before adding anything non-trivial.
-  v1.18.0's release APK is ~2,003,256 bytes — just over 2 MB now; watch this
+  v1.19.0's release APK is ~2,012,092 bytes — just over 2 MB now; watch this
   closely on the next feature.
 - **Prediction engine**: Tier 0 of the roadmap is shipped and self-grading in
   Settings → Insights (live hit-rate + backtest scoreboard vs. frequency/
