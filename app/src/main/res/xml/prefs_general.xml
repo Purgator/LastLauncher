@@ -14,4 +14,14 @@
         android:title="@string/pref_haptics"
         android:summary="@string/pref_haptics_summary"
         android:defaultValue="true" />
+    <PreferenceCategory android:title="@string/cat_backup">
+        <Preference
+            android:key="backup_export"
+            android:title="@string/pref_backup_export"
+            android:summary="@string/pref_backup_export_summary" />
+        <Preference
+            android:key="backup_import"
+            android:title="@string/pref_backup_import"
+            android:summary="@string/pref_backup_import_summary" />
+    </PreferenceCategory>
 </PreferenceScreen>

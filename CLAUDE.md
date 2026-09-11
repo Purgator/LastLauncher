@@ -115,6 +115,8 @@ impractical — prioritize a readable history.
 | `update/UpdateManager.kt` + `ApkInstaller.kt` | GitHub-releases self-update (daily, Wi-Fi download, PackageInstaller session). |
 | `settings/SettingsActivity.kt` | Root list + one fragment per domain. **Navigation maps preference keys to constructors — never reinstate reflective `pref.fragment` instantiation (R8).** `SettingsActivity.open(context, SCREEN_X)` deep-links (used by contextual long-press). |
 | `settings/Prefs.kt` | Every setting, typed, with defaults. Add new keys here + constant. |
+| `backup/ConfigBackup.kt` | Pure logic (unit-tested) for the settings export/import file: the `PORTABLE_KEYS` allowlist (excludes device-local/transient state — caches, "have we asked" flags, the Wi-Fi salt, timestamps), `buildPayload`/`resolveImport`. **New user-facing setting → add its key here or it silently isn't backed up.** |
+| `backup/ConfigBackupIO.kt` | The Android side: writes/reads the JSON file (cache dir, shared via the same FileProvider as the brain export), re-matches calendar exclusions by display name against the destination device's calendars (their provider row ids never travel). Settings → General → *Export/Import settings*. |
 | `settings/InsightsActivity.kt` | "How suggestions work": live engine report. |
 
 Layout: one file, `res/layout/activity_main.xml` — ordered scrim → content column

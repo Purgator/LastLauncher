@@ -165,11 +165,77 @@ class SettingsActivity : AppCompatActivity(),
             }
         }
 
+        private val importRequest = registerForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+        ) { uri -> if (uri != null) runImport(uri) }
+
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.prefs_general, rootKey)
             findPreference<Preference>("default_launcher")?.setOnPreferenceClickListener {
                 requestDefaultLauncher()
                 true
+            }
+            findPreference<Preference>("backup_export")?.setOnPreferenceClickListener { pref ->
+                pref.isEnabled = false
+                fr.arichard.lastlauncher.backup.ConfigBackupIO.export(requireContext()) { file ->
+                    if (!isAdded) return@export
+                    pref.isEnabled = true
+                    if (file == null) {
+                        Toast.makeText(
+                            requireContext(), R.string.backup_export_failed, Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            requireContext(),
+                            requireContext().packageName + ".fileprovider",
+                            file,
+                        )
+                        startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND)
+                                    .setType("application/json")
+                                    .putExtra(Intent.EXTRA_STREAM, uri)
+                                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                                getString(R.string.pref_backup_export),
+                            )
+                        )
+                    }
+                }
+                true
+            }
+            findPreference<Preference>("backup_import")?.setOnPreferenceClickListener {
+                importRequest.launch(arrayOf("application/json"))
+                true
+            }
+        }
+
+        private fun runImport(uri: android.net.Uri) {
+            val pref = findPreference<Preference>("backup_import")
+            pref?.isEnabled = false
+            fr.arichard.lastlauncher.backup.ConfigBackupIO.import(requireContext(), uri) { outcome ->
+                if (!isAdded) return@import
+                pref?.isEnabled = true
+                when (outcome) {
+                    is fr.arichard.lastlauncher.backup.ConfigBackupIO.ImportOutcome.Failed ->
+                        Toast.makeText(
+                            requireContext(), R.string.backup_import_failed, Toast.LENGTH_SHORT
+                        ).show()
+                    is fr.arichard.lastlauncher.backup.ConfigBackupIO.ImportOutcome.Success -> {
+                        Toast.makeText(
+                            requireContext(), R.string.backup_import_done, Toast.LENGTH_LONG
+                        ).show()
+                        if (outcome.result.unmatchedCalendarCount > 0) {
+                            Toast.makeText(
+                                requireContext(),
+                                getString(
+                                    R.string.backup_import_calendars_note,
+                                    outcome.result.unmatchedCalendarCount,
+                                ),
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }
+                }
             }
         }
 
