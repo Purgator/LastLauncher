@@ -86,6 +86,7 @@ class MainActivity : AppCompatActivity() {
         repo = (application as LauncherApp).repo
 
         setupInsets()
+        setupColumn()
         setupGestures()
         setupSearch()
         setupSuggestionClicks()
@@ -216,11 +217,105 @@ class MainActivity : AppCompatActivity() {
             if (nowVisible && !imeVisible && anyDrawerOpen) closeDrawers(animate = true)
             val changed = nowVisible != imeVisible
             imeVisible = nowVisible
-            // The floating slots anchor to the trio, which the keyboard shifts:
-            // re-place them once the insets settle (fixes the stuck-high slots).
-            if (changed) binding.root.post { updateNewAppSpot() }
+            if (changed) {
+                // Same layout pass as the padding change: the clock makes room
+                // before the column is measured, not a frame later.
+                applyClockCompaction()
+                // The floating slots and hints anchor to the trio, which the
+                // keyboard shifts: re-place them once the insets settle.
+                binding.root.post {
+                    updateNewAppSpot()
+                    placeHints()
+                }
+            }
             insets
         }
+    }
+
+    /**
+     * Keyboard-up geometry. The column loses about half the screen to the IME, so:
+     * the agenda yields height to the trio inside the column's own measure pass
+     * (HomeColumn); the results panel clips its rows itself (its parents disable
+     * clipChildren for the trio glow, so a long list painted past the panel over
+     * the status line); and whenever the middle area moves — keyboard up or down,
+     * agenda growing or shrinking — the hints and floating slots re-anchor to
+     * the trio. That live re-anchoring is also what keeps the slots from freezing
+     * a keyboard shift into their margin.
+     */
+    private fun setupColumn() {
+        binding.results.clipToOutline = true
+        binding.content.flex = binding.middle
+        binding.content.yielder = binding.agenda
+        binding.content.flexMin = {
+            val block = binding.suggestionsBlock
+            block.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+            val lp = block.layoutParams as android.view.ViewGroup.MarginLayoutParams
+            block.measuredHeight + lp.bottomMargin + (8 * resources.displayMetrics.density).toInt()
+        }
+        binding.middle.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
+            if (l != ol || t != ot || r != or || b != ob) {
+                // Posted: layout params must not change mid-layout.
+                binding.root.post {
+                    placeHints()
+                    repositionSlots()
+                }
+            }
+        }
+    }
+
+    /**
+     * The gesture hints center on the SCREEN — except with the keyboard up, when
+     * the screen center is exactly where the trio's labels land. They then sit on
+     * the trio's icon line, width-capped to the free margin beside the trio, so
+     * they read as its flanking labels instead of colliding with it.
+     */
+    private fun placeHints() {
+        val root = binding.root
+        if (root.height == 0) return
+        val density = resources.displayMetrics.density
+        var shift = 0f
+        var maxWidth = (HINT_MAX_WIDTH_DP * density).toInt()
+        if (imeVisible && binding.suggestLeft.height > 0) {
+            val loc = IntArray(2)
+            binding.suggestLeft.getLocationInWindow(loc)
+            val rootLoc = IntArray(2)
+            root.getLocationInWindow(rootLoc)
+            // Icon circle center: 60 dp frame at the top of the side column.
+            val iconCenter = loc[1] - rootLoc[1] + 30 * density
+            shift = iconCenter - root.height / 2f
+            val blockWidth = binding.suggestionsBlock.width
+            if (blockWidth > 0) {
+                val free = ((root.width - blockWidth) / 2 - 8 * density).toInt()
+                maxWidth = maxWidth.coerceAtMost(free.coerceAtLeast((60 * density).toInt()))
+            }
+        }
+        for (hint in listOf(binding.hintLeft, binding.hintRight)) {
+            hint.translationY = shift
+            if (hint.maxWidth != maxWidth) hint.maxWidth = maxWidth // setter relayouts unconditionally
+        }
+    }
+
+    /** True while the keyboard is up and the setting asks the clock line to make room. */
+    private fun clockCompact(): Boolean = imeVisible && prefs.clockCompactWithKeyboard
+
+    /**
+     * Shrinks the clock line while typing (setting, on by default): the 64 sp
+     * digits drop to 44 sp and lose most of their top margin, and the weather
+     * chip beside them keeps its half-of-the-clock proportion. Static styling —
+     * the IME's own slide covers the change.
+     */
+    private fun applyClockCompaction() {
+        val compact = clockCompact()
+        binding.clock.setTextSize(
+            TypedValue.COMPLEX_UNIT_SP, if (compact) CLOCK_SP_COMPACT else CLOCK_SP
+        )
+        val lp = binding.clockRow.layoutParams as android.widget.LinearLayout.LayoutParams
+        val wantTop = ((if (compact) 10 else 28) * resources.displayMetrics.density).toInt()
+        if (lp.topMargin != wantTop) {
+            lp.topMargin = wantTop
+            binding.clockRow.layoutParams = lp
+        }
+        sizeWeatherChip()
     }
 
     // Manual swipe tracking so we know the finger count, which GestureDetector hides.
@@ -1500,14 +1595,24 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        // Beside the clock the chip is a real companion: 32sp, nudged down so its
-        // glyphs sit on the digits' OPTICAL center — geometric box-centering reads
-        // high next to 64sp thin digits (their font metrics pad the top heavily).
-        binding.weather.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, if (wantRow) 32f else 16f)
+        sizeWeatherChip()
+    }
+
+    /**
+     * Beside the clock the chip is a real companion: half the digits' size (32 sp,
+     * or 22 sp while the clock is compact), nudged down so its glyphs sit on the
+     * digits' OPTICAL center — geometric box-centering reads high next to thin
+     * digits (their font metrics pad the top heavily). Under the date: 16 sp.
+     */
+    private fun sizeWeatherChip() {
+        val inRow = binding.weather.parent === binding.clockRow
+        val compact = clockCompact()
+        val sp = if (!inRow) 16f else if (compact) CLOCK_SP_COMPACT / 2 else CLOCK_SP / 2
+        binding.weather.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
         binding.weather.translationY =
-            if (wantRow) 5 * resources.displayMetrics.density else 0f
+            if (inRow) (if (compact) 3f else 5f) * resources.displayMetrics.density else 0f
         binding.weather.typeface = android.graphics.Typeface.create(
-            if (wantRow) "sans-serif-light" else "sans-serif", android.graphics.Typeface.NORMAL
+            if (inRow) "sans-serif-light" else "sans-serif", android.graphics.Typeface.NORMAL
         )
     }
 
@@ -2615,10 +2720,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Bottom margin placing the floating slots just above the suggestion trio.
-     * Measured against the ROOT bottom (inset-independent): measuring against the
-     * live block position froze the keyboard's shift into the margin whenever the
-     * search closed before the IME insets settled, sending both slots up.
+     * Bottom margin placing the floating slots just above the suggestion trio,
+     * measured against the ROOT bottom (inset-independent) from the block's live
+     * position — keyboard up included, so the slots ride above the IME instead
+     * of hiding behind it. A stale snapshot can't stick: the middle area's layout
+     * listener re-places the slots whenever the keyboard shifts the trio
+     * (that shift used to freeze into the margin when the search closed before
+     * the IME insets settled).
      */
     private fun spotBottomMargin(): Int {
         val loc = IntArray(2)
@@ -2626,10 +2734,10 @@ class MainActivity : AppCompatActivity() {
         val rootLoc = IntArray(2)
         binding.root.getLocationInWindow(rootLoc)
         val blockTop = loc[1] - rootLoc[1]
-        return if (blockTop > 0 && !imeVisible) {
+        return if (blockTop > 0) {
             binding.root.height - blockTop + (18 * resources.displayMetrics.density).toInt()
         } else {
-            // Keyboard up or pre-layout: roughly above where the trio rests.
+            // Pre-layout: roughly above where the trio rests.
             (binding.root.height * 0.24f).toInt()
                 .coerceAtLeast((170 * resources.displayMetrics.density).toInt())
         }
@@ -2640,15 +2748,34 @@ class MainActivity : AppCompatActivity() {
      *  drawer band on its side so it stays reachable while that drawer is out. */
     private fun placeSlot(spot: View, left: Boolean, pastDrawer: Boolean = false) {
         val lp = spot.layoutParams as android.widget.FrameLayout.LayoutParams
-        lp.gravity = android.view.Gravity.BOTTOM or
+        val gravity = android.view.Gravity.BOTTOM or
             (if (left) android.view.Gravity.START else android.view.Gravity.END)
-        lp.bottomMargin = spotBottomMargin()
-        lp.topMargin = 0
+        val bottom = spotBottomMargin()
         var inset = (22 * resources.displayMetrics.density).toInt()
         if (pastDrawer) inset += drawerForSide(if (left) -1 else 1).layoutParams.width
+        // Only touch the params when something moved: assigning them always
+        // requests a layout, and this runs from a layout-change listener.
+        if (lp.gravity == gravity && lp.bottomMargin == bottom && lp.topMargin == 0 &&
+            lp.leftMargin == inset && lp.rightMargin == inset
+        ) return
+        lp.gravity = gravity
+        lp.bottomMargin = bottom
+        lp.topMargin = 0
         lp.leftMargin = inset
         lp.rightMargin = inset
         spot.layoutParams = lp
+    }
+
+    /** Re-anchors the slots currently shown after the middle area moved (keyboard, agenda). */
+    private fun repositionSlots() {
+        val left = prefs.newAppSide == "left"
+        if (binding.newAppSpot.visibility == View.VISIBLE) placeSlot(binding.newAppSpot, left)
+        if (binding.parkSpot.visibility == View.VISIBLE && binding.parkSpot.alpha > 0f) {
+            val parkLeft = !left
+            val drawerOnSide =
+                if (parkLeft) binding.leftDrawer.isVisibleAtAll else binding.rightDrawer.isVisibleAtAll
+            placeSlot(binding.parkSpot, parkLeft, pastDrawer = drawerOnSide)
+        }
     }
 
     private fun updateNewAppSpot() {
@@ -2953,6 +3080,7 @@ class MainActivity : AppCompatActivity() {
         val visible = if (prefs.showClock) View.VISIBLE else View.GONE
         binding.clock.visibility = visible
         binding.date.visibility = visible
+        applyClockCompaction()
 
         val accent = accentColor()
         binding.mainGlow.setImageDrawable(glowDrawable(accent, 60f))
@@ -3020,6 +3148,11 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val SUGGESTION_POOL_SIZE = 12
         const val SPOT_ROTATE_MS = 4500L
+        /** Clock digits, and their size while the keyboard compacts the line. */
+        const val CLOCK_SP = 64f
+        const val CLOCK_SP_COMPACT = 44f
+        /** Gesture hint width at rest (keyboard down); tighter beside the trio. */
+        const val HINT_MAX_WIDTH_DP = 150
         // Max live lean of the trio while the finger drags; the release animation
         // finishes the coin turn from there to 90°.
         const val LIVE_FLIP_DEG = 55f

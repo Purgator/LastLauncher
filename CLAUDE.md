@@ -110,6 +110,7 @@ impractical — prioritize a readable history.
 | `ui/WheelDrawer.kt` | Custom view: the arc/wheel edge drawer. Angular layout, roll/fling physics, swipe-to-close, drag & drop target. Feel constants in its companion. |
 | `ui/SparkleView.kt` | Canvas particle overlay: firework powder around the finger during the suggestion swipe. Self-stopping frame loop — animates only while particles are alive. |
 | `ui/StatusLine.kt` | Pure formatter for the terminal status line (unit-tested) + next-alarm reconciliation helpers; MainActivity adds per-token ClickableSpans. |
+| `ui/HomeColumn.kt` | The home content column (a LinearLayout) with one extra rule: if the weighted middle area comes out shorter than the trio needs (keyboard up), the agenda gets a tighter height budget (≥ 2 lines) and the column re-measures — inside one measure pass, no second frame. |
 | `ui/AppAdapter.kt`, `ui/AppPickerDialog.kt` | Results list rows; icon-row dialogs used for all menus/pickers. |
 | `command/CommandProcessor.kt` | Command-bar smarts: quick actions, settings jump, calculator, URL, assistant routing. Modes in `command/SearchMode.kt`. |
 | `weather/WeatherProvider.kt` | Open-Meteo (key-less), last-known coarse location, 1 h cache. |
@@ -121,9 +122,12 @@ impractical — prioritize a readable history.
 | `settings/InsightsActivity.kt` | "How suggestions work": live engine report. |
 
 Layout: one file, `res/layout/activity_main.xml` — ordered scrim → content column
-(clock row, date, weather, status line, ticker, pills, middle area with suggestions/
-hints/results, command bar) → overlay views (swipe glow, drag ghost, spotlight) →
-the two `WheelDrawer`s (last = on top).
+(`HomeColumn`: clock row, date, weather, status line, agenda, ticker, music, pills,
+middle area with suggestions/results, command bar) → overlay views (hints, swipe
+glow, drag ghost, spotlight, park slot) → the two `WheelDrawer`s (last = on top).
+The column and the middle area run with `clipChildren=false` (trio glow, badges),
+so nothing upstream clips a child that overflows: the agenda clips itself in
+dispatchDraw and the results panel uses `clipToOutline` — keep both.
 
 ## Interaction contracts (don't break these)
 
@@ -185,8 +189,10 @@ the two `WheelDrawer`s (last = on top).
   EXTRA_EVENT_ALL_DAY or calendar apps fall back to their slow main view.
 - The floating slots (new-app spotlight + park slot) are visual siblings: same
   geometry (placeSlot — bottom-anchored above the trio, 22 dp in from the border,
-  margin computed only while the IME is hidden; insets changes re-place them, or
-  a closed keyboard's shift freezes into the position), same glow breath, same
+  margin from the trio's live position, keyboard up included; the middle area's
+  layout listener re-places them (repositionSlots) whenever the trio moves, so a
+  keyboard shift can't freeze into the margin — placeSlot only assigns params
+  that actually changed, or that listener would loop), same glow breath, same
   rising soda bubbles (shared slotBubbles runnable). Park specifics: any app drag
   reveals its dashed drop circle (kept VISIBLE at alpha 0 otherwise — GONE views
   never join a drag), attraction scaling within 120 dp, drop pins for park_hours,
@@ -213,7 +219,17 @@ the two `WheelDrawer`s (last = on top).
   there removes from the source drawer / unpins. Anything else flies back home.
   Every finger position (root, drawers, command bar) funnels through trackDrag.
 - The gesture hints are ROOT-level children centered on the screen — inside the
-  middle area the agenda's height dragged them below center.
+  middle area the agenda's height dragged them below center. Keyboard up, the
+  screen center IS the trio's label line, so placeHints re-anchors them to the
+  trio's icon line (translationY) and caps their width to the free margin beside
+  the trio; keyboard down restores center + 150 dp.
+- Keyboard-up geometry (keyboard_always users live here): the clock line
+  compacts — 64 → 44 sp, top margin 28 → 10 dp, the beside-clock weather chip
+  stays half the digits' size — per `clock_compact_keyboard` (default on; the
+  weather chip alone can't free height, the row is as tall as the digits); the
+  agenda is the only row that yields height to the trio (HomeColumn); the trio,
+  music row and ticker keep their natural size. applyClockCompaction runs inside
+  the insets callback so the same layout pass sees the smaller clock.
 - Corrected-trio feedback: cycling the suggestions snapshots the pre-swipe trio;
   launching an app outside it within 8 s writes context-stamped miss rows for the
   shown apps (scored as negative launches, same decay/matching) plus one extra

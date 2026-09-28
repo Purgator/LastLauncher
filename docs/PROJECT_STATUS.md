@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~2 months
-(first commit 2026-07-11), 123 commits, currently at **v1.20.0**. Owner tests
+(first commit 2026-07-11), 125 commits, currently at **v1.21.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -143,8 +143,26 @@ in a later message.
   (owner: "no need to pin it"). Also fixed the spotlight tap-dismiss (see
   Open threads). **Unverified on-device**: owner to re-test "Install app" on
   a fresh site with LastLauncher as default.
+- **v1.21.0 (2026-09-28)**: keyboard-up layout fixed. Owner's screenshots
+  (keyboard_always + agenda + music row): the trio overflowed up into the
+  music row, the gesture hints (screen-centered) sat on the trio labels, and
+  a 6-row search result list painted past its panel over the status line.
+  Three root causes, three fixes: (1) `ui/HomeColumn` — the content column
+  now lets the agenda yield height to the trio inside one measure pass (min
+  2 lines; `AgendaView.heightBudget`); (2) `placeHints` re-anchors the hints
+  to the trio's icon line while the IME is up, width-capped to the free
+  margin, and `repositionSlots` (middle-area layout listener) keeps the
+  floating slots above the trio — which also means they now show above the
+  keyboard instead of hiding behind it (spotBottomMargin used a fixed 24 %
+  fallback whenever the IME was up); (3) `results.clipToOutline = true` —
+  the column/middle run clipChildren=false for the trio glow, so the
+  RecyclerView's render node never clipped to its own bounds. Plus the
+  owner's space ask: the clock line compacts while typing (64 → 44 sp,
+  weather chip beside it 32 → 22 sp; setting `clock_compact_keyboard`,
+  default on, backed up). **Unverified on-device**: the whole thing is
+  layout math — owner to confirm on the Pixel with keyboard_always + agenda.
 
-## Current state (as of v1.20.0)
+## Current state (as of v1.21.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
@@ -152,7 +170,7 @@ in a later message.
   moving AGP — see `CLAUDE.md` for exactly why both ceilings exist.
 - **APK size**: at the ~2 MB ceiling (rule #1 in `CLAUDE.md`: no third-party
   runtime deps, by design). Size-audit before adding anything non-trivial.
-  v1.20.0's release APK is ~2,012,880 bytes — just over 2 MB now; watch this
+  v1.21.0's release APK is 2,015,332 bytes — just over 2 MB now; watch this
   closely on the next feature.
 - **Prediction engine**: Tier 0 of the roadmap is shipped and self-grading in
   Settings → Insights (live hit-rate + backtest scoreboard vs. frequency/

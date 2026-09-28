@@ -57,6 +57,18 @@ class AgendaView @JvmOverloads constructor(
     private var maxLines = 6
     private var showCountdown = true
 
+    /**
+     * Ceiling the home column imposes when the trio would otherwise be squeezed
+     * (keyboard up): px, [Int.MAX_VALUE] = none. Clamped to [minHeightPx], so the
+     * stream never collapses below two lines — it scrolls instead.
+     */
+    var heightBudget: Int = Int.MAX_VALUE
+
+    private fun lineHeightPx(): Float = textSizeSp * 1.75f * density // text + leading + row padding
+
+    /** The least the stream shrinks to when the column is short on room. */
+    fun minHeightPx(): Int = (MIN_LINES * lineHeightPx()).toInt()
+
     /** Applies the user's sizing/content options; call before [submit]. */
     fun configure(textSp: Float, lines: Int, countdown: Boolean) {
         textSizeSp = textSp
@@ -216,14 +228,13 @@ class AgendaView @JvmOverloads constructor(
         else -> context.getString(R.string.agenda_in_hours, minutes / 60, minutes % 60)
     }
 
-    /** Height budget in px: the configured lines, never past 30% of the screen. */
-    private fun heightCap(): Int {
-        val lineH = textSizeSp * 1.75f * density // text + leading + row padding
-        return minOf(
-            (maxLines * lineH).toInt(),
-            (resources.displayMetrics.heightPixels * 0.30f).toInt(),
-        )
-    }
+    /** Height cap in px: the configured lines, never past 30% of the screen, and
+     *  never past the column's live budget (see HomeColumn). */
+    private fun heightCap(): Int = minOf(
+        (maxLines * lineHeightPx()).toInt(),
+        (resources.displayMetrics.heightPixels * 0.30f).toInt(),
+        heightBudget.coerceAtLeast(minHeightPx()),
+    )
 
     // The stream shows at most the configured number of lines — the launcher below
     // must stay usable; deeper days scroll instead. The post-measure clamp is the
@@ -354,5 +365,10 @@ class AgendaView @JvmOverloads constructor(
             return true
         }
         return super.onTouchEvent(ev)
+    }
+
+    private companion object {
+        /** Lines the stream keeps even when the keyboard leaves the column short. */
+        const val MIN_LINES = 2
     }
 }
