@@ -193,6 +193,8 @@
     <string name="screen_updates_summary">Automatic updates, version</string>
 
     <!-- Clock & weather extras -->
+    <string name="pref_clock_compact_keyboard">Smaller clock while typing</string>
+    <string name="pref_clock_compact_keyboard_summary">With the keyboard up, the clock (and the weather beside it) shrink so the agenda and your apps keep their room</string>
     <string name="pref_weather_beside_clock">Weather beside the clock</string>
     <string name="pref_weather_beside_clock_summary">Show the chip on the clock line instead of under the date</string>
     <string name="pref_weather_clock_style">Living clock</string>

@@ -35,6 +35,9 @@ class Prefs(context: Context) {
     val haptics: Boolean get() = sp.getBoolean(KEY_HAPTICS, true)
     val animations: Boolean get() = sp.getBoolean(KEY_ANIMATIONS, true)
     val showClock: Boolean get() = sp.getBoolean(KEY_SHOW_CLOCK, true)
+
+    /** Shrink the clock line while the keyboard is up, so the agenda and the trio keep their room. */
+    val clockCompactWithKeyboard: Boolean get() = sp.getBoolean(KEY_CLOCK_COMPACT_KEYBOARD, true)
     val showStatusLine: Boolean get() = sp.getBoolean(KEY_SHOW_STATUS_LINE, true)
 
     /** Which status-line tokens are enabled (battery/network/alarm/launches/storage). */
@@ -428,6 +431,7 @@ class Prefs(context: Context) {
         const val KEY_UPDATE_DEFERRED = "update_deferred"
         const val KEY_HIDDEN_APPS = "hidden_apps"
         const val KEY_CLOCK_TAP = "clock_tap_app"
+        const val KEY_CLOCK_COMPACT_KEYBOARD = "clock_compact_keyboard"
         const val KEY_WEATHER_ENABLED = "weather_enabled"
         const val KEY_WEATHER_UNITS = "weather_units"
         const val KEY_WEATHER_STYLE = "weather_style"
