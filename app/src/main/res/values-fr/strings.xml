@@ -193,6 +193,8 @@
     <string name="screen_updates_summary">Mises à jour automatiques, version</string>
 
     <!-- Horloge & météo -->
+    <string name="pref_clock_compact_keyboard">Horloge réduite avec le clavier</string>
+    <string name="pref_clock_compact_keyboard_summary">Clavier ouvert, l’horloge (et la météo à côté) rétrécissent pour laisser leur place à l’agenda et aux applications</string>
     <string name="pref_weather_beside_clock">Météo à côté de l’horloge</string>
     <string name="pref_weather_beside_clock_summary">Affiche la puce sur la ligne de l’horloge plutôt que sous la date</string>
     <string name="pref_weather_clock_style">Horloge vivante</string>

@@ -10,6 +10,12 @@
         android:title="@string/pref_clock_tap"
         android:dependency="show_clock" />
     <SwitchPreferenceCompat
+        android:key="clock_compact_keyboard"
+        android:title="@string/pref_clock_compact_keyboard"
+        android:summary="@string/pref_clock_compact_keyboard_summary"
+        android:defaultValue="true"
+        android:dependency="show_clock" />
+    <SwitchPreferenceCompat
         android:key="weather_enabled"
         android:title="@string/pref_weather_enabled"
         android:summary="@string/pref_weather_enabled_summary"
