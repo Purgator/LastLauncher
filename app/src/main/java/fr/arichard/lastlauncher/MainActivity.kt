@@ -2630,7 +2630,7 @@ class MainActivity : AppCompatActivity() {
             if (prefs.agendaShowAllDay) agendaEvents else agendaEvents.filter { !it.allDay }
         val rows = Agenda.rows(
             source, System.currentTimeMillis(),
-            allDayHighlight = prefs.agendaAllDayHighlight,
+            allDayHighlight = prefs.agendaAllDayHighlight, horizonDays = prefs.agendaDays,
         )
         binding.agenda.tapOpensApp = prefs.agendaTapOpensApp
         binding.agenda.configure(

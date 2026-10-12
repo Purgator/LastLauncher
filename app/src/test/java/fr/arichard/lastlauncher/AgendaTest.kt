@@ -184,4 +184,86 @@ class AgendaTest {
     fun emptyInputYieldsNoRows() {
         assertTrue(Agenda.rows(emptyList(), at(10), zone).isEmpty())
     }
+
+    // ------------------------------------------------------------ multi-day
+
+    @Test
+    fun multiDayAllDayEventAppearsOnEveryDayItCovers() {
+        // 14–16 July inclusive: the provider's end is the UTC midnight after the last day.
+        val now = at(10)
+        val rows = Agenda.rows(
+            listOf(event(utcMidnight(14), end = utcMidnight(17), title = "trip", allDay = true)),
+            now, zone
+        )
+        val shown = events(rows)
+        assertEquals(listOf("trip", "trip", "trip"), shown.map { it.event.title })
+        assertEquals(listOf(0, 1, 2), shown.map { it.dayIndex })
+        assertEquals(listOf(3, 3, 3), shown.map { it.dayCount })
+        // Today's slice is featured as a today all-day event; later days are not.
+        assertEquals(listOf(true, false, false), shown.map { it.next })
+        // One header per further day: tomorrow, then Thu 16.
+        val headers = rows.filterIsInstance<Agenda.Row.DayHeader>()
+        assertEquals(listOf(Agenda.DayKind.TOMORROW, Agenda.DayKind.LATER), headers.map { it.kind })
+        assertEquals(listOf(at(0, dayOffset = 1), at(0, dayOffset = 2)), headers.map { it.dayStart })
+    }
+
+    @Test
+    fun multiDayAllDayEventStillShowsOnItsLaterDays() {
+        // Day 2 of the same trip: yesterday's slice is gone, today's is featured.
+        val now = at(10, dayOffset = 1)
+        val rows = Agenda.rows(
+            listOf(event(utcMidnight(14), end = utcMidnight(17), title = "trip", allDay = true)),
+            now, zone
+        )
+        val shown = events(rows)
+        assertEquals(listOf(1, 2), shown.map { it.dayIndex })
+        assertEquals(listOf(true, false), shown.map { it.next })
+        assertTrue(rows.first() is Agenda.Row.Event) // today: no header
+    }
+
+    @Test
+    fun multiDayTimedEventContinuesUnderTheNextDayAndIsOngoingOnlyToday() {
+        // Fri-style overnight: 14 July 18:00 → 16 July 10:00.
+        val now = at(20)
+        val rows = Agenda.rows(
+            listOf(
+                event(at(18), end = at(10, dayOffset = 2), title = "festival"),
+                event(at(9, dayOffset = 1), title = "standup"),
+            ),
+            now, zone
+        )
+        val shown = events(rows)
+        assertEquals(listOf("festival", "festival", "standup", "festival"), shown.map { it.event.title })
+        assertEquals(listOf(0, 1, 0, 2), shown.map { it.dayIndex })
+        // Only the slice containing now is ongoing; the first slice is the "next" one.
+        assertEquals(listOf(true, false, false, false), shown.map { it.ongoing })
+        assertEquals(listOf(true, false, false, false), shown.map { it.next })
+        // The instance itself is untouched on every row (view intents need it).
+        assertTrue(shown.filter { it.event.title == "festival" }.all { it.event.begin == at(18) && it.event.end == at(10, dayOffset = 2) })
+    }
+
+    @Test
+    fun timedEventEndingAtMidnightDoesNotSpillIntoTheNextDay() {
+        val now = at(10)
+        val rows = Agenda.rows(
+            listOf(event(at(22), end = at(0, dayOffset = 1), title = "late")), now, zone
+        )
+        assertEquals(1, events(rows).size)
+        assertEquals(1, events(rows).single().dayCount)
+    }
+
+    @Test
+    fun continuationDaysAreCutAtTheHorizonButTheFirstDayNeverIs() {
+        val now = at(10)
+        val rows = Agenda.rows(
+            listOf(
+                event(utcMidnight(14), end = utcMidnight(24), title = "long", allDay = true),
+                event(at(9, dayOffset = 5), title = "far"), // past the horizon, but a first day
+            ),
+            now, zone, horizonDays = 3
+        )
+        val shown = events(rows)
+        assertEquals(listOf("long", "long", "long", "far"), shown.map { it.event.title })
+        assertEquals(10, shown.first().dayCount) // the span itself is still known
+    }
 }
