@@ -51,39 +51,65 @@ object Agenda {
          * all-day event(s)). [allDayFeatured] is [AllDayHighlight.DISTINCT]'s own
          * marker for today's all-day events, independent of [next]. [ongoing]
          * means the event has started but not ended.
+         *
+         * An event spanning several days yields one row per day it covers:
+         * [dayIndex] (0-based) of [dayCount]. [event] is the untouched instance
+         * on every one of them — view intents need its real begin/end.
          */
         data class Event(
             val event: EventInstance,
             val next: Boolean,
             val ongoing: Boolean,
             val allDayFeatured: Boolean = false,
+            val dayIndex: Int = 0,
+            val dayCount: Int = 1,
         ) : Row()
     }
+
+    /** One calendar day of an instance: its slice of the stream. */
+    private class Segment(
+        val event: EventInstance,
+        val day: Long,
+        val begin: Long,
+        val end: Long,
+        val index: Int,
+        val count: Int,
+    )
 
     /**
      * Builds the stream: ended events dropped, remaining sorted (all-day first
      * within each day), day separators inserted, and the upcoming event(s)
      * flagged per [allDayHighlight] (see [AllDayHighlight]).
+     *
+     * A multi-day event (a trip, a three-day all-day conference) appears on every
+     * day it covers — the days already over are dropped, continuation days
+     * carried past [horizonDays] from today are cut (an event's FIRST day is
+     * never cut: the feed decided it belongs). A continuation row sorts first
+     * among that day's timed events: it started before any of them.
      */
     fun rows(
         events: List<EventInstance>,
         now: Long,
         zone: TimeZone = TimeZone.getDefault(),
         allDayHighlight: AllDayHighlight = AllDayHighlight.BOTH,
+        horizonDays: Int = Int.MAX_VALUE,
     ): List<Row> {
+        val todayStart = dayStart(now, zone)
+        val horizonEnd =
+            if (horizonDays == Int.MAX_VALUE) Long.MAX_VALUE else plusDays(todayStart, horizonDays, zone)
         val live = events
             .map {
                 if (it.allDay) {
                     it.copy(begin = allDayToLocal(it.begin, zone), providerBegin = it.begin)
                 } else it
             }
-            .filter { eventEnd(it, zone) > now }
-            .sortedWith(compareBy({ dayStart(it.begin, zone) }, { !it.allDay }, { it.begin }))
+            .flatMap { segments(it, zone) }
+            .filter { it.end > now && (it.index == 0 || it.day < horizonEnd) }
+            .sortedWith(compareBy({ it.day }, { !it.event.allDay }, { it.begin }))
         if (live.isEmpty()) return emptyList()
 
-        val todayStart = dayStart(now, zone)
-        val nextTimed = live.firstOrNull { !it.allDay }
-        val allDayToday = live.filter { it.allDay && dayStart(it.begin, zone) == todayStart }
+        val nextTimed = live.firstOrNull { !it.event.allDay }
+        val allDayToday = live.filter { it.event.allDay && it.day == todayStart }
         // Safety net: if there's neither a timed event nor a today all-day one to
         // feature, fall back to the very first upcoming row so something is always
         // highlighted (e.g. only a future, non-today all-day event is left).
@@ -96,30 +122,59 @@ object Agenda {
         val tomorrowStart = plusDays(todayStart, 1, zone)
         val result = ArrayList<Row>(live.size + 4)
         var lastDay = todayStart
-        for (event in live) {
-            val day = dayStart(event.begin, zone)
+        for (segment in live) {
+            val day = segment.day
             if (day != lastDay) {
                 val kind = if (day == tomorrowStart) DayKind.TOMORROW else DayKind.LATER
                 result.add(Row.DayHeader(kind, day))
                 lastDay = day
             }
             val next = when (allDayHighlight) {
-                AllDayHighlight.BOTH -> event === nextTimed || event === fallback ||
-                    event in allDayToday
-                AllDayHighlight.DISTINCT -> event === nextTimed || event === fallback
-                AllDayHighlight.SMART -> event === smartWinner
+                AllDayHighlight.BOTH -> segment === nextTimed || segment === fallback ||
+                    segment in allDayToday
+                AllDayHighlight.DISTINCT -> segment === nextTimed || segment === fallback
+                AllDayHighlight.SMART -> segment === smartWinner
             }
             result.add(
                 Row.Event(
-                    event,
+                    segment.event,
                     next = next,
-                    ongoing = !event.allDay && event.begin <= now,
+                    ongoing = !segment.event.allDay && segment.begin <= now,
                     allDayFeatured = allDayHighlight == AllDayHighlight.DISTINCT &&
-                        event in allDayToday,
+                        segment in allDayToday,
+                    dayIndex = segment.index,
+                    dayCount = segment.count,
                 )
             )
         }
         return result
+    }
+
+    /**
+     * Splits an instance (all-day ones already local-anchored) into its days.
+     * All-day: the provider's end is the UTC midnight AFTER the last day. Timed:
+     * an event ending exactly at midnight ends on the previous day.
+     */
+    private fun segments(event: EventInstance, zone: TimeZone): List<Segment> {
+        val firstDay = dayStart(event.begin, zone)
+        val end = if (event.allDay) allDayToLocal(event.end, zone) else event.end
+        val lastDay = if (end > event.begin) dayStart(end - 1, zone) else firstDay
+        val days = ArrayList<Long>()
+        var day = firstDay
+        while (day <= lastDay && days.size < MAX_SEGMENT_DAYS) {
+            days.add(day)
+            day = plusDays(day, 1, zone)
+        }
+        val count = days.size
+        return days.mapIndexed { index, d ->
+            val dayEnd = plusDays(d, 1, zone)
+            Segment(
+                event, d,
+                begin = if (index == 0) event.begin else d,
+                end = if (index == count - 1 && !event.allDay) end else dayEnd,
+                index = index, count = count,
+            )
+        }
     }
 
     /** Minutes from [now] until [begin], rounded up; never negative. */
@@ -141,10 +196,6 @@ object Agenda {
         return local.timeInMillis
     }
 
-    /** An all-day event "ends" at its local day's end; timed events at their end. */
-    private fun eventEnd(event: EventInstance, zone: TimeZone): Long =
-        if (event.allDay) plusDays(dayStart(event.begin, zone), 1, zone) else event.end
-
     /** Local midnight of the day containing [time]. */
     private fun dayStart(time: Long, zone: TimeZone): Long {
         val cal = Calendar.getInstance(zone)
@@ -165,6 +216,9 @@ object Agenda {
     }
 
     private const val MINUTE_MS = 60_000L
+
+    /** Hard stop for runaway spans (a years-long "event" must not flood the stream). */
+    private const val MAX_SEGMENT_DAYS = 62
 
     /** [AllDayHighlight.SMART]: all-day only outranks a timed event this far off. */
     private const val SMART_TIMED_THRESHOLD_MS = 3 * 60 * 60_000L

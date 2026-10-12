@@ -270,6 +270,7 @@
     <string name="agenda_tap_app">Ouvrir l\'application agenda</string>
     <string name="agenda_tomorrow">demain</string>
     <string name="agenda_all_day">journée</string>
+    <string name="agenda_day_of">jour %1$d/%2$d</string>
     <string name="agenda_now">maintenant</string>
     <string name="agenda_in_min">dans %d min</string>
     <string name="agenda_in_hours">dans %1$d h %2$02d</string>

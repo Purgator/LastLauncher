@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~2 months
-(first commit 2026-07-11), 125 commits, currently at **v1.21.0**. Owner tests
+(first commit 2026-07-11), 127 commits, currently at **v1.22.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -161,8 +161,24 @@ in a later message.
   weather chip beside it 32 → 22 sp; setting `clock_compact_keyboard`,
   default on, backed up). **Unverified on-device**: the whole thing is
   layout math — owner to confirm on the Pixel with keyboard_always + agenda.
+- **v1.22.0 (2026-10-12)**: multi-day events on every day they cover. Owner:
+  "an event during several days is displayed only the first day." Cause:
+  `Agenda.rows` treated an instance as one row on `dayStart(begin)`, and an
+  all-day instance as ended after its first day (`eventEnd` = begin's day
+  end), so a 5-day all-day trip vanished from day 2 on. Now each instance is
+  split into per-day segments (pure logic, 5 new tests): past days dropped,
+  continuation days cut at `agenda_days` (first day never), continuation
+  sorts first among the day's timed events, today's slice of an all-day span
+  counts as a "today all-day" for highlighting, only the slice containing now
+  is `ongoing`. Rows carry `dayIndex/dayCount`; the instance stays untouched
+  (view intents). AgendaView: "day 2/5" for all-day spans, "⋯" / "→10:00"
+  for a timed event's later days, fold key includes the day. Safety cap of
+  62 days per span. **Unverified on-device**: rendering of the new time
+  column, and that Google Calendar's "+1 day" all-day end convention matches
+  (the provider stores end as the UTC midnight after the last day — the
+  code assumes that; if a trip shows one day too many, that assumption is off).
 
-## Current state (as of v1.21.0)
+## Current state (as of v1.22.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
@@ -170,7 +186,7 @@ in a later message.
   moving AGP — see `CLAUDE.md` for exactly why both ceilings exist.
 - **APK size**: at the ~2 MB ceiling (rule #1 in `CLAUDE.md`: no third-party
   runtime deps, by design). Size-audit before adding anything non-trivial.
-  v1.21.0's release APK is 2,015,332 bytes — just over 2 MB now; watch this
+  v1.22.0's release APK is 2,016,776 bytes — just over 2 MB now; watch this
   closely on the next feature.
 - **Prediction engine**: Tier 0 of the roadmap is shipped and self-grading in
   Settings → Insights (live hit-rate + backtest scoreboard vs. frequency/

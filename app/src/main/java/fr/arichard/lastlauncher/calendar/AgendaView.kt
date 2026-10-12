@@ -48,7 +48,7 @@ class AgendaView @JvmOverloads constructor(
     private val list = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     private var accent = 0xFF00E5FF.toInt()
     private var rows: List<Agenda.Row> = emptyList()
-    private var expandedKey: Pair<Long, Long>? = null
+    private var expandedKey: Triple<Long, Long, Int>? = null
     private val density = resources.displayMetrics.density
     private val timeFormat = android.text.format.DateFormat.getTimeFormat(context)
     private val indicatorPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
@@ -98,13 +98,14 @@ class AgendaView @JvmOverloads constructor(
     fun submit(rows: List<Agenda.Row>) {
         this.rows = rows
         // Drop the fold state if its event left the window.
-        if (expandedKey != null && rows.none { it is Agenda.Row.Event && key(it.event) == expandedKey }) {
+        if (expandedKey != null && rows.none { it is Agenda.Row.Event && key(it) == expandedKey }) {
             expandedKey = null
         }
         render()
     }
 
-    private fun key(e: Agenda.EventInstance) = e.eventId to e.begin
+    /** Fold identity: the instance AND its day — a multi-day event has one row per day. */
+    private fun key(row: Agenda.Row.Event) = Triple(row.event.eventId, row.event.begin, row.dayIndex)
 
     private fun render() {
         val scroll = scrollY
@@ -114,7 +115,7 @@ class AgendaView @JvmOverloads constructor(
             when (row) {
                 is Agenda.Row.DayHeader -> list.addView(dayHeaderView(row))
                 is Agenda.Row.Event ->
-                    if (key(row.event) == expandedKey) list.addView(expandedView(row))
+                    if (key(row) == expandedKey) list.addView(expandedView(row))
                     else list.addView(collapsedView(row, now))
             }
         }
@@ -144,8 +145,16 @@ class AgendaView @JvmOverloads constructor(
 
     private fun collapsedView(row: Agenda.Row.Event, now: Long): TextView = line().apply {
         val e = row.event
-        val time = if (e.allDay) context.getString(R.string.agenda_all_day)
-        else timeFormat.format(Date(e.begin))
+        // Multi-day: all-day rows count their day ("day 2/5"); a timed event's
+        // continuation days show "⋯", its last day the hour it ends ("→10:00").
+        val time = when {
+            e.allDay && row.dayCount > 1 ->
+                context.getString(R.string.agenda_day_of, row.dayIndex + 1, row.dayCount)
+            e.allDay -> context.getString(R.string.agenda_all_day)
+            row.dayIndex == 0 -> timeFormat.format(Date(e.begin))
+            row.dayIndex == row.dayCount - 1 -> "→" + timeFormat.format(Date(e.end))
+            else -> "⋯"
+        }
         val suffix = when {
             !showCountdown || !row.next || e.allDay -> ""
             row.ongoing -> " · " + context.getString(R.string.agenda_now)
@@ -162,7 +171,7 @@ class AgendaView @JvmOverloads constructor(
             if (tapOpensApp) {
                 onOpenEvent(e)
             } else {
-                expandedKey = key(e)
+                expandedKey = key(row)
                 render()
             }
         }
@@ -190,8 +199,20 @@ class AgendaView @JvmOverloads constructor(
             addView(block, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         }
 
-        val range = if (e.allDay) context.getString(R.string.agenda_all_day)
-        else "${timeFormat.format(Date(e.begin))}–${timeFormat.format(Date(e.end))}"
+        val range = when {
+            // Spanning days: name the days, not just the hours.
+            row.dayCount > 1 && e.allDay -> {
+                val day = java.text.SimpleDateFormat("EEE d", Locale.getDefault())
+                "${day.format(Date(e.begin))}–${day.format(Date(e.end - 1))}"
+            }
+            row.dayCount > 1 -> {
+                val stamp = java.text.SimpleDateFormat("EEE d", Locale.getDefault())
+                "${stamp.format(Date(e.begin))} ${timeFormat.format(Date(e.begin))}–" +
+                    "${stamp.format(Date(e.end))} ${timeFormat.format(Date(e.end))}"
+            }
+            e.allDay -> context.getString(R.string.agenda_all_day)
+            else -> "${timeFormat.format(Date(e.begin))}–${timeFormat.format(Date(e.end))}"
+        }
         block.addView(line().apply {
             text = "$range ${e.title}"
             setTextColor(context.getColor(R.color.text_primary))

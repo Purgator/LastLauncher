@@ -270,6 +270,7 @@
     <string name="agenda_tap_app">Open the calendar app</string>
     <string name="agenda_tomorrow">tomorrow</string>
     <string name="agenda_all_day">all day</string>
+    <string name="agenda_day_of">day %1$d/%2$d</string>
     <string name="agenda_now">now</string>
     <string name="agenda_in_min">in %d min</string>
     <string name="agenda_in_hours">in %1$d h %2$02d</string>

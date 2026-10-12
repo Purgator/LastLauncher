@@ -171,6 +171,13 @@ dispatchDraw and the results panel uses `clipToOutline` — keep both.
   toggles it; back or resetToHome dismisses. Options: lines, text size, all-day
   on/off, countdown on/off, days, tap behavior, calendars. Refresh: on resume +
   ContentObserver while resumed + the minute tick for the countdown. Never polls.
+  Multi-day events: `Agenda.rows` splits an instance into one row per local day
+  it covers (`Row.Event.dayIndex/dayCount`; the `event` stays the untouched
+  instance on every row — view intents need its real begin/end). Past days drop,
+  continuation days beyond `agenda_days` are cut (a first day never is), a
+  continuation sorts first among its day's timed events. The view renders
+  "day 2/5" for all-day spans, "⋯" / "→10:00" for a timed event's later days,
+  and folds by (instance, day).
 - The now-playing row (music_widget, on by default) sits under the ticker, only when
   a media session is playing/paused and no search results are shown: `♪ artist —
   title` (tap = open the app) + ⏮ ⏯ ⏭ transport controls (glyphs carry U+FE0E —
