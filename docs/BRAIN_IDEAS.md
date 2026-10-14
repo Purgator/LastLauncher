@@ -99,6 +99,58 @@ touching 2.3/2.4/2.5/2.6/2.11/2.12 → 2.7 → 2.8.
 
 ---
 
+## 2026-10-14 ANALYSIS — "once-a-day apps" & rare night apps (owner export, 86 days)
+
+Owner's ask: (1) an app usually opened once a day (gym app `myone`, after
+`wifi_left` → camera app) keeps being proposed later that day; (2) rare apps
+without a trigger (NewPipe, "not long before bed") sit too deep in the list.
+Replayed on the 2026-10-14 export (5361 launches / 912 misses / 86 days / 71
+apps; walk-forward, incremental accumulators, same math). Scratch scripts only —
+numbers below are the record.
+
+- **Dedup first:** 316 launch rows are `logTrioCorrection` reinforcement rows
+  (same pkg < 5 s after the real launch). Any per-day or inter-launch statistic
+  must skip them — counted naively, myone looked like a 2×/day app on 47% of days
+  (real: 3 of 38 days).
+- **Generic "already launched today → damp" is NEGATIVE** (hit@3 45.0 → 42.9,
+  paired win 79 / loss 167, z −5.6). 53% of trio slots show an app already
+  opened > 45 min earlier that day, at precision 0.14 ≈ the average slot: being
+  launched today is not a signal by itself.
+- **A once-a-day CLASS is real and free.** repeatRate = share of (deduped)
+  launches followed by the same app 45 min–12 h later. ≤ 0.2 on this phone: myone
+  0.05, Play Store 0.09, Slack 0.14, Bitwarden 0.12, dialer 0.11, calendar 0.18
+  (NewPipe 0.20 borderline; messengers 0.29–0.43; Discord/browser 0.60). Rule
+  "repeatRate ≤ 0.2, n ≥ 10, 45 min < elapsed < 12 h → score × 0.25" changes 3 of
+  4289 replay trios, all myone, never the launched app; hit@3 identical, hit@12
+  within noise (z −1.0). It is a perceived-relevance fix the metric cannot
+  reward (the user then taps WhatsApp, which was in the trio anyway). Rolling
+  12 h, not calendar day: the owner's nights cross midnight. Factor 0.1 gives
+  the same trios — 0.25 already clears the wifi_left trigger bonus.
+- **NewPipe is under-timed, not under-triggered.** 0–2 h launch counts:
+  WhatsApp 78, Discord 55, **NewPipe 48**, browser 22, Keep 9 — yet it ranks
+  10–13 at 1 am (scores ≈ 220 / 100 / 90 for WhatsApp / Discord / Keep vs ≈ 35)
+  because W_HOUR = 1.2 rides on top of all-day volume. 78/92 rows have no ctx;
+  it is the LAST app of the day on 35/87 days, usually after WhatsApp/Discord.
+- **W_HOUR sweep:** 1.2 / 6 / 12 → global hit@3 45.0 / 43.1 / 42.5 (z −4.5),
+  night (23–2 h) hit@3 50.7 / 52.9 / 54.4, NewPipe in trio 0 / 17 / 40%. A
+  stronger hour term helps at night and hurts by day → no global retune (matches
+  the 2.8 verdict). Relative hour-concentration multipliers (2.12-style) lose
+  the same way (z −4 to −5.7).
+- **Pages-only concentration re-rank (zero cost):** keep ranks 1–3, sort ranks
+  4–12 by hour concentration (`share within ±1 h / (3/24)`, α = 2, cap 3, only
+  with ≥ 3 decayed launches). NewPipe median rank 13 → 4, in the first swipe
+  page 54% of the time; hit@3 untouched by construction, hit@12 77.2 → 77.4.
+- **KILLED:** hazard/"due" bonuses in every form (z −5 to −9), relative-hazard
+  penalties (z −1.5 to −2), P(≥k+1|≥k) continuation damping (z −5.6).
+- **Open:** the bedtime/wind-down *state* (no event fires at 0–2 h). v1.23.0
+  started stamping `AmbientState` (dnd / charging / minutes-to-alarm / wifi / bt)
+  on every row and the export carries it as `state`; `tools/backtest_brain.py`
+  prints per-state lifts. Judge after a few weeks of rows; a state that earns a
+  weight is the first legitimate use of the multi-slot/state column the KILLED
+  list deferred.
+
+---
+
 ## TIER 0 — MEASUREMENT (ship first; gatekeeper for everything else)
 
 **STATUS: SHIPPED in v1.14.0** — `predict/ScoreMath.kt` (shared pure formula,

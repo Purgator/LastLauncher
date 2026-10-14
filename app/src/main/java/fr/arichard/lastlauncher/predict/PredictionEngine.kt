@@ -74,6 +74,7 @@ object PredictionEngine {
                         dow = cal.get(Calendar.DAY_OF_WEEK),
                         prevPkg = prev?.takeIf { it != pkg },
                         ctxEvent = event,
+                        state = AmbientState.snapshot(appContext, now),
                     )
                 )
                 if (++insertsSincePrune >= 200) {
@@ -193,14 +194,15 @@ object PredictionEngine {
         executor.execute {
             try {
                 val database = db(appContext)
+                val state = AmbientState.snapshot(appContext, now)
                 for (pkg in shownPkgs) {
                     if (pkg == launchedPkg) continue
                     database.insertMiss(
-                        UsageDb.Row(pkg, now, hour, dow, prevPkg = null, ctxEvent = event)
+                        UsageDb.Row(pkg, now, hour, dow, prevPkg = null, ctxEvent = event, state = state)
                     )
                 }
                 database.insertLaunch(
-                    UsageDb.Row(launchedPkg, now, hour, dow, prevPkg = null, ctxEvent = event)
+                    UsageDb.Row(launchedPkg, now, hour, dow, prevPkg = null, ctxEvent = event, state = state)
                 )
             } catch (e: Exception) {
                 Log.w(TAG, "Could not log trio correction", e)
@@ -265,6 +267,10 @@ object PredictionEngine {
         val boosted: Set<String>,
         val notifying: Map<String, Int>,
         val totalMisses: Int = 0,
+        /** Rows stamped with an ambient-state snapshot (schema 3+). */
+        val stateRows: Int = 0,
+        /** The ambient state as it reads right now (see [AmbientState]). */
+        val ambient: String? = null,
     )
 
     /** Builds a live view of the engine's data and current ranking, off the UI thread. */
@@ -296,6 +302,8 @@ object PredictionEngine {
                     boosted = Prefs(appContext).boostedApps,
                     notifying = NotifListener.counts.filterValues { it > 0 },
                     totalMisses = database.totalMissCount(),
+                    stateRows = database.countWithState(),
+                    ambient = AmbientState.snapshot(appContext, now),
                 )
             } catch (e: Exception) {
                 Log.w(TAG, "Snapshot failed", e)
@@ -376,9 +384,15 @@ object PredictionEngine {
                     put("dow", r.dow)
                     put("prev", r.prevPkg ?: org.json.JSONObject.NULL)
                     put("ctx", r.ctxEvent ?: org.json.JSONObject.NULL)
+                    // Ambient state as an object on schema-3 rows, null before.
+                    put(
+                        "state",
+                        r.state?.let { org.json.JSONObject(AmbientState.parse(it)) }
+                            ?: org.json.JSONObject.NULL
+                    )
                 }
                 val root = org.json.JSONObject()
-                root.put("schema", 1)
+                root.put("schema", 2)
                 root.put("app_version", fr.arichard.lastlauncher.BuildConfig.VERSION_NAME)
                 root.put("exported_at", System.currentTimeMillis())
                 root.put("timezone", java.util.TimeZone.getDefault().id)
