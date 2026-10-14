@@ -157,7 +157,8 @@ class InsightsActivity : AppCompatActivity() {
             getString(R.string.insights_db, StatusLine.formatBytes(s.dbBytes))
         ).append("\n")
         sb.append("  ").append(getString(R.string.insights_today, s.launchesToday)).append("\n")
-        sb.append("  ").append(getString(R.string.insights_misses, s.totalMisses)).append("\n\n")
+        sb.append("  ").append(getString(R.string.insights_misses, s.totalMisses)).append("\n")
+        sb.append("  ").append(getString(R.string.insights_state_rows, s.stateRows)).append("\n\n")
 
         // Live hit-rate calibration (roadmap Tier 0.2) — observability only.
         sb.append("§ ").append(getString(R.string.insights_calibration_title)).append("\n")
@@ -199,6 +200,9 @@ class InsightsActivity : AppCompatActivity() {
         }
         s.activeTrigger?.let {
             sb.append("  ").append(getString(R.string.insights_trigger, it)).append("\n")
+        }
+        s.ambient?.let {
+            sb.append("  ").append(getString(R.string.insights_ambient, it)).append("\n")
         }
         if (s.notifying.isNotEmpty()) {
             sb.append("  ").append(

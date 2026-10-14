@@ -13,3 +13,4 @@ LastLauncher.apk
 # Personal brain exports for offline analysis - never commit
 brain-export*.json
 lastlauncher-brain*.json
+.kotlin/

@@ -13,7 +13,7 @@ import android.database.sqlite.SQLiteOpenHelper
  * statistics launches feed. Kept small by pruning, never leaves the device.
  */
 class UsageDb(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "usage.db", null, 2) {
+    SQLiteOpenHelper(context.applicationContext, "usage.db", null, 3) {
 
     data class Row(
         val pkg: String,
@@ -22,6 +22,8 @@ class UsageDb(context: Context) :
         val dow: Int,
         val prevPkg: String?,
         val ctxEvent: String?,
+        /** [AmbientState] snapshot (`k=v,...`); null on rows older than schema 3. */
+        val state: String? = null,
     )
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -33,7 +35,8 @@ class UsageDb(context: Context) :
                 hour INTEGER NOT NULL,
                 dow INTEGER NOT NULL,
                 prev_pkg TEXT,
-                ctx_event TEXT)"""
+                ctx_event TEXT,
+                state TEXT)"""
         )
         db.execSQL("CREATE INDEX idx_launches_ts ON launches(ts)")
         createMisses(db)
@@ -41,6 +44,13 @@ class UsageDb(context: Context) :
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createMisses(db)
+        if (oldVersion < 3) {
+            // Schema 3: the ambient-state snapshot (see AmbientState). Fresh installs
+            // get the column from CREATE; a v1 database got its misses table just
+            // above, so both tables exist here.
+            db.execSQL("ALTER TABLE launches ADD COLUMN state TEXT")
+            db.execSQL("ALTER TABLE misses ADD COLUMN state TEXT")
+        }
     }
 
     private fun createMisses(db: SQLiteDatabase) {
@@ -51,7 +61,8 @@ class UsageDb(context: Context) :
                 ts INTEGER NOT NULL,
                 hour INTEGER NOT NULL,
                 dow INTEGER NOT NULL,
-                ctx_event TEXT)"""
+                ctx_event TEXT,
+                state TEXT)"""
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_misses_ts ON misses(ts)")
     }
@@ -64,13 +75,14 @@ class UsageDb(context: Context) :
             put("dow", row.dow)
             put("prev_pkg", row.prevPkg)
             put("ctx_event", row.ctxEvent)
+            put("state", row.state)
         })
     }
 
     fun rowsSince(sinceTs: Long): List<Row> {
         val rows = ArrayList<Row>(1024)
         readableDatabase.rawQuery(
-            "SELECT pkg, ts, hour, dow, prev_pkg, ctx_event FROM launches WHERE ts >= ? ORDER BY ts",
+            "SELECT pkg, ts, hour, dow, prev_pkg, ctx_event, state FROM launches WHERE ts >= ? ORDER BY ts",
             arrayOf(sinceTs.toString())
         ).use { c ->
             while (c.moveToNext()) {
@@ -82,6 +94,7 @@ class UsageDb(context: Context) :
                         dow = c.getInt(3),
                         prevPkg = if (c.isNull(4)) null else c.getString(4),
                         ctxEvent = if (c.isNull(5)) null else c.getString(5),
+                        state = if (c.isNull(6)) null else c.getString(6),
                     )
                 )
             }
@@ -98,6 +111,15 @@ class UsageDb(context: Context) :
     fun oldestTs(): Long? {
         readableDatabase.rawQuery("SELECT MIN(ts) FROM launches", null).use { c ->
             return if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
+        }
+    }
+
+    /** Launch rows carrying an ambient-state snapshot (schema 3+), for signal health. */
+    fun countWithState(): Int {
+        readableDatabase.rawQuery(
+            "SELECT COUNT(*) FROM launches WHERE state IS NOT NULL", null
+        ).use { c ->
+            return if (c.moveToFirst()) c.getInt(0) else 0
         }
     }
 
@@ -136,13 +158,14 @@ class UsageDb(context: Context) :
             put("hour", row.hour)
             put("dow", row.dow)
             put("ctx_event", row.ctxEvent)
+            put("state", row.state)
         })
     }
 
     fun missesSince(sinceTs: Long): List<Row> {
         val rows = ArrayList<Row>(64)
         readableDatabase.rawQuery(
-            "SELECT pkg, ts, hour, dow, ctx_event FROM misses WHERE ts >= ? ORDER BY ts",
+            "SELECT pkg, ts, hour, dow, ctx_event, state FROM misses WHERE ts >= ? ORDER BY ts",
             arrayOf(sinceTs.toString())
         ).use { c ->
             while (c.moveToNext()) {
@@ -154,6 +177,7 @@ class UsageDb(context: Context) :
                         dow = c.getInt(3),
                         prevPkg = null,
                         ctxEvent = if (c.isNull(4)) null else c.getString(4),
+                        state = if (c.isNull(5)) null else c.getString(5),
                     )
                 )
             }

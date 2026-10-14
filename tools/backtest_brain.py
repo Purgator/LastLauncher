@@ -246,6 +246,46 @@ def main():
             parts.append(f"{p.rsplit('.', 1)[-1]} x{lift:.1f}({c})")
         print(f"  {ctx:20s} {', '.join(parts)}")
 
+    print("\nAMBIENT STATE (schema-2 exports: dnd / chg / alarm / wifi / bt stamped per row)")
+    stated = [r for r in launches if r.get("state")]
+    if not stated:
+        print("  no rows carry a state snapshot yet (export predates v1.23 or nothing logged since)")
+    else:
+        print(f"  coverage: {len(stated)}/{n} rows, first {dt(stated[0]['ts'])}")
+        base_s = Counter(r["pkg"] for r in stated)
+        ns = len(stated)
+
+        def bucket(r):
+            st = r["state"]
+            out = []
+            if "dnd" in st:
+                out.append("dnd:" + {1: "all", 2: "priority", 3: "none", 4: "alarms"}.get(st["dnd"], str(st["dnd"])))
+            if "chg" in st:
+                out.append("charging" if st["chg"] else "unplugged")
+            if "alarm" in st:
+                a = st["alarm"]
+                out.append("alarm<4h" if a < 240 else "alarm<9h" if a < 540 else "alarm>=9h")
+            else:
+                out.append("no-alarm-24h")
+            if "wifi" in st:
+                out.append("wifi" if st["wifi"] else "no-wifi")
+            if "bt" in st:
+                out.append("bt-audio" if st["bt"] else "no-bt")
+            return out
+
+        per = defaultdict(list)
+        for r in stated:
+            for b in bucket(r):
+                per[b].append(r["pkg"])
+        print("  lift P(app|state)/P(app), top apps per state value (needs rows to mean anything):")
+        for b, pk in sorted(per.items(), key=lambda kv: -len(kv[1])):
+            apps = Counter(pk)
+            parts = []
+            for a, c in apps.most_common(4):
+                lift = (c / len(pk)) / (base_s[a] / ns)
+                parts.append(f"{a.rsplit('.', 1)[-1]} x{lift:.1f}({c})")
+            print(f"    {b:14s} n={len(pk):4d}  {', '.join(parts)}")
+
     print("\nLEARNING CURVE (hit@3 per quartile of the evaluated range)")
     m = n - warmup
     q = m // 4
