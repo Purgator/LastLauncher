@@ -204,6 +204,11 @@ class InsightsActivity : AppCompatActivity() {
         s.ambient?.let {
             sb.append("  ").append(getString(R.string.insights_ambient, it)).append("\n")
         }
+        for ((pkg, minutes) in s.satiated) {
+            sb.append("  ").append(
+                getString(R.string.insights_satiated, minutes / 60, minutes % 60, label(pkg))
+            ).append("\n")
+        }
         if (s.notifying.isNotEmpty()) {
             sb.append("  ").append(
                 getString(R.string.insights_notifying, s.notifying.size)
@@ -221,11 +226,15 @@ class InsightsActivity : AppCompatActivity() {
                 if (i < 3) append(" ◈")
                 if (pkg in s.boosted) append(" ↑boost")
                 s.notifying[pkg]?.let { append(" ✉$it") }
+                s.concentration[pkg]?.let { append(" ⌚×%.1f".format(java.util.Locale.US, it)) }
             }
             sb.append(
                 "  %2d. %-22s %6.2f%s\n"
                     .format(java.util.Locale.US, i + 1, label(pkg).take(22), score, marks)
             )
+        }
+        if (s.concentration.isNotEmpty()) {
+            sb.append("  ").append(getString(R.string.insights_pages_note)).append("\n")
         }
         sb.append("\n").append(getString(R.string.insights_footer))
         return sb.toString()
