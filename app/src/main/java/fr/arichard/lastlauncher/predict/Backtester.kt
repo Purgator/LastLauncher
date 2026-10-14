@@ -11,12 +11,16 @@ package fr.arichard.lastlauncher.predict
  * next-app-prediction work always compares against them and they are
  * embarrassingly strong: pure recency (LRU) and pure 60-day frequency (MFU).
  *
- * Pure Kotlin, no Android dependencies, unit-tested. Two honest limits:
+ * Pure Kotlin, no Android dependencies, unit-tested. Three honest limits:
  *  - notification counts and user boosts have no historical snapshots, so they
  *    are NOT replayed (the live trio likely does a little better on notifying
  *    messengers than the replay shows);
  *  - the engine's defaultPicks fillers need PackageManager, so the filler zone
- *    is favorites-only here.
+ *    is favorites-only here;
+ *  - the once-a-day [SatiationTracker] here learns from the whole log, the live
+ *    engine from its 60-day scan — a repeat rate can differ slightly at the edge.
+ * The swipe-page re-rank ([ScoreMath.rerankPages]) IS replayed: it moves apps
+ * across the 12-deep cut, so hit@12 reflects it.
  */
 object Backtester {
 
@@ -56,8 +60,9 @@ object Backtester {
         // the 60-day history so the baselines see what the engine sees.
         val lastUse = HashMap<String, Long>()
         val counts = HashMap<String, Int>()
+        val satiation = SatiationTracker()
         var windowStart = 0
-        for (j in 0 until warmup) fold(rows[j], lastUse, counts)
+        for (j in 0 until warmup) fold(rows[j], lastUse, counts, satiation)
 
         for (i in warmup until rows.size) {
             val t = rows[i]
@@ -69,6 +74,7 @@ object Backtester {
                 windowStart++
             }
 
+            val concentration = HashMap<String, Double>(64)
             val scores = scoreSnapshot(
                 rows, missRows, i,
                 now = t.ts,
@@ -76,17 +82,21 @@ object Backtester {
                 weekendNow = ScoreMath.isWeekend(t.dow),
                 prevPkg = prevRow.pkg,
                 activeEvent = t.ctxEvent,
+                concentrationOut = concentration,
             )
-            // The just-used crush, exactly as computeSuggestions applies it.
+            // Once-a-day satiation and the just-used crush, exactly as the engine applies them.
+            for (pkg in satiation.satiated(t.ts)) {
+                scores[pkg]?.let { scores[pkg] = it * ScoreMath.SATIATION_FACTOR }
+            }
             val gap = t.ts - prevRow.ts
             if (gap in ScoreMath.MISTAKE_WINDOW_MS..ScoreMath.JUST_USED_WINDOW_MS) {
                 scores[prevRow.pkg]?.let { scores[prevRow.pkg] = it * ScoreMath.JUST_USED_FACTOR }
             }
-            engine.add(rankIn(engineRanking(scores, favorites, hidden), t.pkg))
+            engine.add(rankIn(engineRanking(scores, favorites, hidden, concentration), t.pkg))
             mfu.add(rankIn(counts.entries.sortedByDescending { it.value }.map { it.key }, t.pkg))
             lru.add(rankIn(lastUse.entries.sortedByDescending { it.value }.map { it.key }, t.pkg))
 
-            fold(t, lastUse, counts)
+            fold(t, lastUse, counts, satiation)
         }
         return Report(
             evaluated = evaluated,
@@ -102,6 +112,8 @@ object Backtester {
      * every earlier launch and miss row inside the 60-day history, scored with
      * [ScoreMath.rowScore] against the given moment. Public so the parity unit
      * test can pin it against a by-hand computation of the documented formula.
+     * When [concentrationOut] is given it receives each app's
+     * [ScoreMath.hourConcentration] for [hourNow] from the same pass.
      */
     fun scoreSnapshot(
         launches: List<UsageDb.Row>,
@@ -112,9 +124,11 @@ object Backtester {
         weekendNow: Boolean,
         prevPkg: String?,
         activeEvent: String?,
+        concentrationOut: HashMap<String, Double>? = null,
     ): HashMap<String, Double> {
         val horizon = now - ScoreMath.HISTORY_DAYS * ScoreMath.DAY_MS
         val scores = HashMap<String, Double>(64)
+        val mass = if (concentrationOut != null) HashMap<String, DoubleArray>(64) else null
         for (j in 0 until endExclusive) {
             val r = launches[j]
             if (r.ts < horizon) continue
@@ -123,6 +137,15 @@ object Backtester {
                 now, hourNow, weekendNow, prevPkg, activeEvent,
             )
             scores.merge(r.pkg, s, Double::plus)
+            if (mass != null) {
+                val w = ScoreMath.decayWeight(r.ts, now)
+                val m = mass.getOrPut(r.pkg) { DoubleArray(2) }
+                m[0] += w
+                if (ScoreMath.circularHourDiff(r.hour, hourNow) <= 1) m[1] += w
+            }
+        }
+        if (mass != null && concentrationOut != null) {
+            for ((pkg, m) in mass) concentrationOut[pkg] = ScoreMath.hourConcentration(m[0], m[1])
         }
         for (r in misses) {
             if (r.ts >= now) break // sorted; later corrections don't exist yet
@@ -136,16 +159,19 @@ object Backtester {
         return scores
     }
 
-    /** Confident scores first, then favorites fillers, then the leftovers. */
+    /** Confident scores first (pages re-ranked), then favorites fillers, then the leftovers. */
     private fun engineRanking(
         scores: Map<String, Double>,
         favorites: List<String>,
         hidden: Set<String>,
+        concentration: Map<String, Double>,
     ): List<String> {
-        val ranked = scores.entries.asSequence()
+        val confident = scores.entries.asSequence()
             .filter { it.key !in hidden && it.value >= ScoreMath.MIN_CONFIDENCE }
             .sortedByDescending { it.value }
             .map { it.key }
+            .toList()
+        val ranked = ScoreMath.rerankPages(confident, scores) { concentration[it] ?: 1.0 }
             .toMutableList()
         val seen = ranked.toHashSet()
         for (pkg in favorites) {
@@ -162,9 +188,15 @@ object Backtester {
         return if (idx >= 0) idx + 1 else null
     }
 
-    private fun fold(row: UsageDb.Row, lastUse: HashMap<String, Long>, counts: HashMap<String, Int>) {
+    private fun fold(
+        row: UsageDb.Row,
+        lastUse: HashMap<String, Long>,
+        counts: HashMap<String, Int>,
+        satiation: SatiationTracker,
+    ) {
         lastUse[row.pkg] = row.ts
         counts.merge(row.pkg, 1, Int::plus)
+        satiation.add(row.pkg, row.ts)
     }
 
     private class Tally {

@@ -98,12 +98,13 @@ object PredictionEngine {
     ) {
         val appContext = context.applicationContext
         executor.execute {
-            val result = try {
-                score(appContext).toMutableMap()
+            val scoring = try {
+                score(appContext)
             } catch (e: Exception) {
                 Log.w(TAG, "Prediction failed", e)
-                mutableMapOf()
+                Scoring(emptyMap(), emptyMap(), SatiationTracker())
             }
+            val result = scoring.scores.toMutableMap()
             val prefs = Prefs(appContext)
             val hidden = prefs.hiddenApps
             fun eligible(pkg: String) = pkg !in hidden
@@ -116,11 +117,14 @@ object PredictionEngine {
                 result[prev] = (result[prev] ?: 0.0) * JUST_USED_FACTOR
             }
 
-            // Confident learned predictions first…
-            val ranked = result.entries.asSequence()
+            // Confident learned predictions first — the trio is their plain top,
+            // the swipe pages behind it favour apps concentrated on this hour…
+            val confident = result.entries.asSequence()
                 .filter { eligible(it.key) && it.value >= MIN_CONFIDENCE }
                 .sortedByDescending { it.value }
                 .map { it.key }
+                .toList()
+            val ranked = ScoreMath.rerankPages(confident, result) { scoring.concentration[it] ?: 1.0 }
                 .take(count)
                 .toMutableList()
             // …then the user's go-to apps and sensible defaults while the memory is
@@ -135,7 +139,15 @@ object PredictionEngine {
         }
     }
 
-    private fun score(context: Context): Map<String, Double> {
+    /** Everything one scan of the log yields: the scores plus the signals that re-shape them. */
+    class Scoring(
+        val scores: Map<String, Double>,
+        /** Per app, [ScoreMath.hourConcentration] for the current hour (absent = 1.0). */
+        val concentration: Map<String, Double>,
+        val satiation: SatiationTracker,
+    )
+
+    private fun score(context: Context): Scoring {
         val now = System.currentTimeMillis()
         val cal = Calendar.getInstance()
         val hourNow = cal.get(Calendar.HOUR_OF_DAY)
@@ -145,12 +157,19 @@ object PredictionEngine {
 
         val rows = db(context).rowsSince(now - HISTORY_DAYS * DAY_MS)
         val scores = HashMap<String, Double>(64)
+        val mass = HashMap<String, DoubleArray>(64) // per app: [decayed launches, of which within ±1 h]
+        val satiation = SatiationTracker()
         for (r in rows) {
             val s = ScoreMath.rowScore(
                 r.ts, r.hour, r.dow, r.prevPkg, r.ctxEvent,
                 now, hourNow, weekendNow, prev, activeEvent,
             )
             scores.merge(r.pkg, s, Double::plus)
+            val w = ScoreMath.decayWeight(r.ts, now)
+            val m = mass.getOrPut(r.pkg) { DoubleArray(2) }
+            m[0] += w
+            if (ScoreMath.circularHourDiff(r.hour, hourNow) <= 1) m[1] += w
+            satiation.add(r.pkg, r.ts)
         }
         // Corrections: a suggested-but-swiped-away app counts as a negative launch,
         // matched and decayed exactly like the positive ones — strongest when the
@@ -163,6 +182,11 @@ object PredictionEngine {
             )
             scores.merge(r.pkg, -W_MISS * s, Double::plus)
         }
+        // "Once a day" apps opened in the last 12 h are damped — history-derived
+        // score only, never the notification/boost terms below.
+        for (pkg in satiation.satiated(now)) {
+            scores[pkg]?.let { scores[pkg] = it * ScoreMath.SATIATION_FACTOR }
+        }
         // An app currently showing notifications is more likely to be wanted next.
         // Empty map without notification access, so this is a no-op until granted.
         for ((pkg, count) in NotifListener.counts) {
@@ -173,7 +197,9 @@ object PredictionEngine {
         for (pkg in Prefs(context).boostedApps) {
             scores[pkg] = (scores[pkg] ?: 0.0) * BOOST_FACTOR + BOOST_BASE
         }
-        return scores
+        val concentration = HashMap<String, Double>(mass.size)
+        for ((pkg, m) in mass) concentration[pkg] = ScoreMath.hourConcentration(m[0], m[1])
+        return Scoring(scores, concentration, satiation)
     }
 
     /**
@@ -271,6 +297,10 @@ object PredictionEngine {
         val stateRows: Int = 0,
         /** The ambient state as it reads right now (see [AmbientState]). */
         val ambient: String? = null,
+        /** Apps damped by once-a-day satiation right now, with minutes since their launch. */
+        val satiated: List<Pair<String, Long>> = emptyList(),
+        /** Apps whose launches concentrate on this hour (factor > 1), sorting the swipe pages. */
+        val concentration: Map<String, Double> = emptyMap(),
     )
 
     /** Builds a live view of the engine's data and current ranking, off the UI thread. */
@@ -286,6 +316,7 @@ object PredictionEngine {
                     set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
                 }.timeInMillis
                 val oldest = database.oldestTs()
+                val scoring = score(appContext)
                 Snapshot(
                     totalRows = database.totalCount(),
                     daysCovered = oldest?.let { ((now - it) / DAY_MS).toInt() + 1 } ?: 0,
@@ -295,7 +326,7 @@ object PredictionEngine {
                     weekend = isWeekend(cal.get(Calendar.DAY_OF_WEEK)),
                     prevApp = Prefs(appContext).lastLaunchedPkg,
                     activeTrigger = ContextSignals.activeEvent(now),
-                    topScores = score(appContext).entries
+                    topScores = scoring.scores.entries
                         .sortedByDescending { it.value }
                         .take(10)
                         .map { it.key to it.value },
@@ -304,6 +335,10 @@ object PredictionEngine {
                     totalMisses = database.totalMissCount(),
                     stateRows = database.countWithState(),
                     ambient = AmbientState.snapshot(appContext, now),
+                    satiated = scoring.satiation.satiated(now).map {
+                        it to (scoring.satiation.sinceLast(it, now) ?: 0L) / 60_000
+                    },
+                    concentration = scoring.concentration.filterValues { it > 1.05 },
                 )
             } catch (e: Exception) {
                 Log.w(TAG, "Snapshot failed", e)
@@ -348,6 +383,8 @@ object PredictionEngine {
         "notification" to W_NOTIFICATION,
         "miss" to W_MISS,
         "boost_factor" to BOOST_FACTOR,
+        "satiation_factor" to ScoreMath.SATIATION_FACTOR,
+        "concentration_cap" to ScoreMath.CONCENTRATION_CAP,
     )
 
     /** Deletes the learned history (settings: "forget everything"). */
@@ -392,7 +429,7 @@ object PredictionEngine {
                     )
                 }
                 val root = org.json.JSONObject()
-                root.put("schema", 2)
+                root.put("schema", 3)
                 root.put("app_version", fr.arichard.lastlauncher.BuildConfig.VERSION_NAME)
                 root.put("exported_at", System.currentTimeMillis())
                 root.put("timezone", java.util.TimeZone.getDefault().id)
@@ -422,7 +459,7 @@ object PredictionEngine {
                 root.put(
                     "current_ranking",
                     org.json.JSONArray().also { arr ->
-                        score(appContext).entries
+                        score(appContext).scores.entries
                             .sortedByDescending { it.value }
                             .take(20)
                             .forEach {

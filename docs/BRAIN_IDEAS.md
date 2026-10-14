@@ -101,6 +101,10 @@ touching 2.3/2.4/2.5/2.6/2.11/2.12 → 2.7 → 2.8.
 
 ## 2026-10-14 ANALYSIS — "once-a-day apps" & rare night apps (owner export, 86 days)
 
+**STATUS: A (satiation) and B (pages re-rank) SHIPPED in v1.24.0** —
+`predict/Satiation.kt` + `ScoreMath.hourConcentration/rerankPages`, mirrored
+in `Backtester`, shown in Insights (satiated apps line, `⌚×n` marks).
+
 Owner's ask: (1) an app usually opened once a day (gym app `myone`, after
 `wifi_left` → camera app) keeps being proposed later that day; (2) rare apps
 without a trigger (NewPipe, "not long before bed") sit too deep in the list.

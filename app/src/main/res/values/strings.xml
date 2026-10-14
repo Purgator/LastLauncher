@@ -225,6 +225,8 @@
     <string name="insights_prev_app">previous app: %1$s</string>
     <string name="insights_trigger">active trigger: %1$s</string>
     <string name="insights_ambient">ambient state: %1$s</string>
+    <string name="insights_satiated">once a day, opened %1$dh%2$02d ago: %3$s</string>
+    <string name="insights_pages_note">⌚ = concentrated on this hour; sorts the swipe pages (trio unchanged)</string>
     <string name="insights_notifying">%1$d apps with notifications</string>
     <string name="insights_ranking_title">Current ranking (top 10)</string>
     <string name="insights_no_data">no data yet — launch some apps!</string>

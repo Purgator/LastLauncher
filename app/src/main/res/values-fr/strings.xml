@@ -225,6 +225,8 @@
     <string name="insights_prev_app">application précédente : %1$s</string>
     <string name="insights_trigger">déclencheur actif : %1$s</string>
     <string name="insights_ambient">état ambiant : %1$s</string>
+    <string name="insights_satiated">une fois par jour, ouvert il y a %1$dh%2$02d : %3$s</string>
+    <string name="insights_pages_note">⌚ = concentré sur cette heure ; trie les pages de balayage (trio inchangé)</string>
     <string name="insights_notifying">%1$d applications avec notifications</string>
     <string name="insights_ranking_title">Classement actuel (top 10)</string>
     <string name="insights_no_data">pas encore de données — lancez des applications !</string>

@@ -98,7 +98,8 @@ impractical — prioritize a readable history.
 | `LauncherApp.kt` | Application: repo bootstrap, package-change receiver (feeds new-app spotlight), context-signal registration. |
 | `apps/PinShortcutActivity.kt` | Toast-and-finish handler for `CONFIRM_PIN_SHORTCUT`. Exists so `ShortcutManager.isRequestPinShortcutSupported()` is true while we're the home app — Chrome checks that before offering to install a PWA at all. We don't render pinned shortcuts (installed PWAs are WebAPKs = normal apps); don't remove it. |
 | `apps/AppRepository.kt` | In-memory app catalog + icon cache, loaded/refreshed off-thread; fuzzy search (prefix > word > initials > substring > subsequence > package tokens). UI reads immutable snapshots. |
-| `predict/PredictionEngine.kt` | The "launcher memory". Scores = recency-decayed launches × hour/day-type match + Markov transition + context trigger + notification bonus + user boost − context-matched miss rows (corrected trios) − just-used penalty. All weights are named constants at the top. `snapshot()` powers the insights screen; `exportData()` dumps everything to a shareable JSON. |
+| `predict/PredictionEngine.kt` | The "launcher memory". Scores = recency-decayed launches × hour/day-type match + Markov transition + context trigger + notification bonus + user boost − context-matched miss rows (corrected trios) − just-used penalty − once-a-day satiation (`Satiation.kt`). The trio is the plain top 3; the swipe pages behind it are re-sorted by score × hour concentration (`ScoreMath.rerankPages`). All weights are named constants in `ScoreMath`. `snapshot()` powers the insights screen; `exportData()` dumps everything to a shareable JSON. |
+| `predict/Satiation.kt` | `SatiationTracker` (pure, unit-tested): per-app repeat rate = launches followed by the same app 45 min–12 h later (rebounds inside the crush window stay open, < 5 s reinforcement rows skipped). Rate ≤ 0.2 over ≥ 10 settled launches → ×0.25 while 45 min < elapsed < 12 h. Fed by the engine's scan and by the backtester's fold; damps the history score only, never notification/boost terms. |
 | `predict/UsageDb.kt` | SQLite log of launches (pruned at 5000 rows) + misses (corrected-trio rows, pruned at 1500), both context-stamped; schema 3 adds a `state` column (ambient snapshot). Never leaves the device unless the user exports. |
 | `predict/AmbientState.kt` | Per-row *state* snapshot (`dnd=…,chg=…,alarm=…,wifi=…,bt=…`), read with cheap binder calls on the predict executor at log time — DND filter, charging, minutes to the next alarm (<24 h), Wi-Fi transport, BT audio connected. **Collected for the brain export only; scoring ignores it** until a backtest earns a state a weight (the "bedtime app" question — see `docs/BRAIN_IDEAS.md` 2026-10-14 section). Pure format/parse is unit-tested. |
 | `predict/ContextSignals.kt` | Trigger events (5-minute window): Bluetooth/headset/charger receivers, Wi-Fi join/leave + connectivity lost/regained (NetworkCallbacks), "started moving" via the one-shot significant-motion sensor (never the raw accelerometer — battery). With `ssid_signal` + fine location, a join records `wifi:<sha256(salt+ssid)[:12]>` — salt is a per-install random UUID, so tokens are opaque and app-only. |
@@ -242,7 +243,14 @@ dispatchDraw and the results panel uses `clipToOutline` — keep both.
   launching an app outside it within 8 s writes context-stamped miss rows for the
   shown apps (scored as negative launches, same decay/matching) plus one extra
   reinforcement launch row for the opened app. Cycling with no launch after =
-  play, no signal.
+  play, no signal. That reinforcement row shares the real launch's instant:
+  any per-day / inter-launch statistic must skip same-app rows < 5 s apart
+  (`ScoreMath.DUPLICATE_GAP_MS`) or every corrected app reads as twice-a-day.
+- Suggestion pool order: ranks 1–3 (the trio) are the plain score order;
+  ranks 4–12 (the swipe pages) are the remaining confident apps sorted by
+  score × hour concentration, computed BEFORE the 12-cut so a "due at this
+  hour" app at plain rank 13 reaches the first swipe. Fillers (favorites,
+  defaults) come after. The Backtester mirrors both this and satiation.
 - Hints, spotlight and ticker all yield to drawers/search and stop on pause.
 
 ## Testing
