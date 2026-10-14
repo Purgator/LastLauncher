@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~3 months
-(first commit 2026-07-11), currently at **v1.23.0**. Owner tests
+(first commit 2026-07-11), currently at **v1.24.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -199,7 +199,26 @@ in a later message.
   (if Bedtime mode doesn't enable DND, `dnd` stays 1 and the alarm/charging keys
   carry the signal instead).
 
-## Current state (as of v1.23.0)
+- **v1.24.0 (2026-10-14)**: the two engine changes from the same analysis,
+  owner's go after the explanation. **A — once-a-day satiation**
+  (`predict/Satiation.kt`): per app, the share of launches followed by the
+  same app 45 min–12 h later (rebounds inside the 45-min crush keep the launch
+  open; < 5 s reinforcement rows skipped); ≤ 0.2 over ≥ 10 settled launches →
+  score × 0.25 between the end of the crush and 12 h after the last launch,
+  history-derived score only. On the export it changes 3 of 4289 trios (all
+  the gym app, never the launched one) — a perceived-relevance fix, not a
+  hit-rate win. **B — swipe-page re-rank**: ranks 1–3 unchanged, ranks 4–12
+  sorted by score × hour concentration (share of decayed launches within ±1 h
+  vs uniform, α = 2, cap 3, ≥ 3 launches), computed before the 12-cut. NewPipe
+  median rank 13 → 4 at night; hit@3 untouched, hit@12 +0.2 pp. Both mirrored
+  in `Backtester` (satiation learns from the whole log there vs the engine's
+  60-day scan — noted in its KDoc). Insights: "once a day, opened 3h12 ago:
+  X" lines in the context block, `⌚×1.8` marks in the ranking + a note.
+  9 new unit tests. **Unverified on-device**: that the gym app really leaves
+  the trio on the second outing (the replay says ×0.25 is enough against the
+  Wi-Fi trigger bonus), and the night-time first-swipe content.
+
+## Current state (as of v1.24.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
@@ -214,8 +233,9 @@ in a later message.
   recency baselines). Tier 2 priorities were re-ordered based on real-data
   backtest results, not guesses — read `docs/BRAIN_IDEAS.md` before changing
   any scoring weight. Since v1.23.0 rows carry an ambient-state snapshot that
-  scoring ignores (collect-first); two metric-neutral UX changes (once-a-day
-  satiation, pages-only hour re-rank) are analysed and awaiting the owner's go.
+  scoring ignores (collect-first; judge the bedtime-state question on a fresh
+  export after a few weeks). v1.24.0 added once-a-day satiation and the
+  hour-concentration swipe-page order — both metric-neutral by design.
 - **Drag & drop**: fully unified across every draggable surface as of
   v1.15.0; the interaction contract is documented in detail in `CLAUDE.md`'s
   "Interaction contracts" section (search "Drag & drop, one model

@@ -108,4 +108,40 @@ class ScoreMathTest {
         assertTrue(ScoreMath.isWeekend(7))
         for (dow in 2..6) assertFalse(ScoreMath.isWeekend(dow))
     }
+
+    // ------------------------------------------------ swipe-page re-rank (B)
+
+    @Test
+    fun hourConcentrationIsOneForSpreadOrThinApps() {
+        // Uniform over the day: 3/24 of the mass sits in the ±1 h window.
+        assertEquals(1.0, ScoreMath.hourConcentration(mass = 48.0, hourMass = 6.0), 1e-9)
+        // Below the evidence floor, whatever the shape.
+        assertEquals(1.0, ScoreMath.hourConcentration(mass = 2.9, hourMass = 2.9), 1e-9)
+        // Never below 1 — a dead hour does not demote.
+        assertEquals(1.0, ScoreMath.hourConcentration(mass = 40.0, hourMass = 0.0), 1e-9)
+    }
+
+    @Test
+    fun hourConcentrationRewardsPeaksUpToTheCap() {
+        // Half of 20 launches within the window: share (10+0.25)/22 → ×3.73, capped at 3.
+        assertEquals(ScoreMath.CONCENTRATION_CAP, ScoreMath.hourConcentration(20.0, 10.0), 1e-9)
+        // A quarter: (5+0.25)/22 / 0.125 ≈ 1.91 — smoothing keeps it under the raw 2×.
+        val c = ScoreMath.hourConcentration(20.0, 5.0)
+        assertTrue(c > 1.8 && c < 2.0)
+        // At the evidence floor: 1 of 3 in-window → (1+0.25)/5 / 0.125 = 2.0 exactly.
+        assertEquals(2.0, ScoreMath.hourConcentration(3.0, 1.0), 1e-9)
+    }
+
+    @Test
+    fun rerankPagesKeepsTheTrioAndSortsTheRestByConcentratedScore() {
+        val scores = mapOf("a" to 100.0, "b" to 90.0, "c" to 80.0, "d" to 50.0, "e" to 30.0, "f" to 20.0)
+        val conc = mapOf("f" to 3.0, "e" to 1.0, "d" to 1.0, "a" to 3.0)
+        val ranked = listOf("a", "b", "c", "d", "e", "f")
+        // f: 20×3 = 60 beats d: 50 and e: 30; the head is untouched even though a is concentrated.
+        assertEquals(listOf("a", "b", "c", "f", "d", "e"), ScoreMath.rerankPages(ranked, scores) { conc[it] ?: 1.0 })
+        // Ties keep the plain order (stable sort).
+        assertEquals(ranked, ScoreMath.rerankPages(ranked, scores) { 1.0 })
+        // Nothing to sort behind the head.
+        assertEquals(listOf("a", "b", "c", "d"), ScoreMath.rerankPages(listOf("a", "b", "c", "d"), scores) { 3.0 })
+    }
 }
