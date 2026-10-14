@@ -224,6 +224,7 @@
     <string name="insights_weekend">week-end</string>
     <string name="insights_prev_app">application précédente : %1$s</string>
     <string name="insights_trigger">déclencheur actif : %1$s</string>
+    <string name="insights_ambient">état ambiant : %1$s</string>
     <string name="insights_notifying">%1$d applications avec notifications</string>
     <string name="insights_ranking_title">Classement actuel (top 10)</string>
     <string name="insights_no_data">pas encore de données — lancez des applications !</string>
@@ -248,6 +249,7 @@
     <string name="pref_export_data_summary">Un fichier JSON avec tout l\'historique d\'apprentissage et le classement actuel — à partager où vous voulez pour inspection ou analyse</string>
     <string name="export_failed">Échec de l\'export</string>
     <string name="insights_misses">corrections enregistrées : %d</string>
+    <string name="insights_state_rows">lignes avec état ambiant : %d</string>
     <string name="cmd_launcher_settings">Réglages du lanceur</string>
     <string name="pref_music_widget">Lecture en cours</string>
     <string name="pref_music_widget_summary">Une ligne de lecteur compacte quand une musique joue ou est en pause (accès aux notifications requis). L\'application en lecture s\'efface des suggestions — la ligne la remplace.</string>

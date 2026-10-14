@@ -15,8 +15,8 @@ ending the conversation — that's the whole point of the file.
 
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
-puts three guesses under the thumb. Built conversationally over ~2 months
-(first commit 2026-07-11), 127 commits, currently at **v1.22.0**. Owner tests
+puts three guesses under the thumb. Built conversationally over ~3 months
+(first commit 2026-07-11), currently at **v1.23.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -178,7 +178,28 @@ in a later message.
   (the provider stores end as the UTC midnight after the last day — the
   code assumes that; if a trip shows one day too many, that assumption is off).
 
-## Current state (as of v1.22.0)
+- **v1.23.0 (2026-10-14)**: prediction-engine research + data collection. The
+  owner asked for "once-a-day apps shouldn't be re-proposed after their launch"
+  (gym app after leaving home Wi-Fi) and "help rare apps without triggers"
+  (NewPipe before bed). Backtested on a fresh 86-day export — verdicts are in
+  `docs/BRAIN_IDEAS.md` ("2026-10-14 ANALYSIS"): a generic launched-today damp
+  is clearly negative; a once-a-day class damp (repeat-within-12h ≤ 0.2, ×0.25
+  for 12 h) is metric-neutral and only ever removes the gym app; NewPipe is the
+  3rd most launched app at 0–2 h but ranks 10–13 because the hour term is weak,
+  and strengthening it globally costs 2.5 pp; a pages-only hour re-rank gets it
+  to rank 4 for free. **Neither A (satiation) nor B (pages re-rank) is shipped
+  yet — owner was still deciding.** Shipped: `predict/AmbientState` — every
+  launch/miss row now carries a state snapshot (DND filter, charging, minutes to
+  next alarm, Wi-Fi, BT audio), DB schema 3 (`state` column), export schema 2
+  (`state` object per row), Insights shows the live state + stamped-row count,
+  `tools/backtest_brain.py` prints per-state app lifts. Purpose: decide in a few
+  weeks whether a bedtime/wind-down *state* predicts the "last app of the day".
+  Scoring does not read it. **Unverified on-device**: the ALTER TABLE upgrade
+  path and that `getCurrentInterruptionFilter` reports the Pixel's bedtime mode
+  (if Bedtime mode doesn't enable DND, `dnd` stays 1 and the alarm/charging keys
+  carry the signal instead).
+
+## Current state (as of v1.23.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
@@ -192,7 +213,9 @@ in a later message.
   Settings → Insights (live hit-rate + backtest scoreboard vs. frequency/
   recency baselines). Tier 2 priorities were re-ordered based on real-data
   backtest results, not guesses — read `docs/BRAIN_IDEAS.md` before changing
-  any scoring weight.
+  any scoring weight. Since v1.23.0 rows carry an ambient-state snapshot that
+  scoring ignores (collect-first); two metric-neutral UX changes (once-a-day
+  satiation, pages-only hour re-rank) are analysed and awaiting the owner's go.
 - **Drag & drop**: fully unified across every draggable surface as of
   v1.15.0; the interaction contract is documented in detail in `CLAUDE.md`'s
   "Interaction contracts" section (search "Drag & drop, one model

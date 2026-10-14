@@ -224,6 +224,7 @@
     <string name="insights_weekend">weekend</string>
     <string name="insights_prev_app">previous app: %1$s</string>
     <string name="insights_trigger">active trigger: %1$s</string>
+    <string name="insights_ambient">ambient state: %1$s</string>
     <string name="insights_notifying">%1$d apps with notifications</string>
     <string name="insights_ranking_title">Current ranking (top 10)</string>
     <string name="insights_no_data">no data yet — launch some apps!</string>
@@ -248,6 +249,7 @@
     <string name="pref_export_data_summary">A JSON file with the full learning history and current ranking — share it wherever you like for inspection or analysis</string>
     <string name="export_failed">Export failed</string>
     <string name="insights_misses">corrections recorded: %d</string>
+    <string name="insights_state_rows">rows with ambient state: %d</string>
     <string name="cmd_launcher_settings">Launcher settings</string>
     <string name="pref_music_widget">Now-playing controls</string>
     <string name="pref_music_widget_summary">A compact player line while music plays or is paused (needs notification access). The playing app steps out of the suggestions — the row already covers it.</string>
