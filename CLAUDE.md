@@ -86,7 +86,7 @@ grep -c 'severity="Error"' app/build/reports/lint-results-debug.xml
 5. Verify: `gh release view vX.Y.Z --json tagName,assets`.
 
 Commit style: gitmoji first (`✨ 🐛 💄 📝 🔖 ✅ 🚨 🌐`), imperative subject, body
-explains the why; end with `Co-Authored-By:` trailer for the assistant. Group commits
+explains the why. Never add a `Co-Authored-By:` trailer. Group commits
 by feature; shared files (MainActivity) make perfect per-commit compilability
 impractical — prioritize a readable history.
 
