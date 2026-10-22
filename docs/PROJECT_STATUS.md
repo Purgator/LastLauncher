@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~3 months
-(first commit 2026-07-11), currently at **v1.24.0**. Owner tests
+(first commit 2026-07-11), currently at **v1.24.1**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -217,7 +217,7 @@ in a later message.
   9 new unit tests. **Unverified on-device**: that the gym app really leaves
   the trio on the second outing (the replay says ×0.25 is enough against the
   Wi-Fi trigger bonus), and the night-time first-swipe content.
-- **Unreleased (2026-10-21)**: pin slot missing during a drag from the
+- **v1.24.1 (2026-10-23)**: pin slot missing during a drag from the
   results list. Owner's screenshot: long-press an app in all-apps/search →
   no drop circle. `updateParkSpot` hid the slot whenever the results panel
   was visible, and the drag-started refresh goes through the same gate, so
@@ -227,7 +227,7 @@ in a later message.
   suggestions block sits INVISIBLE behind the results, so `spotBottomMargin`
   still anchors the slot above the trio's line, keyboard up or not.
 
-## Current state (as of v1.24.0)
+## Current state (as of v1.24.1)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
