@@ -2943,10 +2943,13 @@ class MainActivity : AppCompatActivity() {
         val parked =
             if (prefs.parkEnabled) prefs.parkedApps().mapNotNull { repo.byComponentKey(it) }
             else emptyList()
-        // At rest the slot yields to a drawer on its side; during a drag it stays
-        // available and simply moves in past the drawer band.
+        // At rest the slot yields to a drawer on its side and to the results
+        // panel; during a drag it stays available whatever is on screen — an app
+        // lifted from the results list (all-apps, search) must find it too — and
+        // simply moves in past the drawer band. The suggestions block is only
+        // INVISIBLE behind the results, so it still anchors the slot's height.
         val show = prefs.parkEnabled && (!drawerOnSide || dragInFlight) &&
-            binding.results.visibility != View.VISIBLE &&
+            (binding.results.visibility != View.VISIBLE || dragInFlight) &&
             (parked.isNotEmpty() || dragInFlight)
         // Views that are GONE when a drag starts never receive that drag's events,
         // so the slot hides via alpha and stays a live drop target: enabled →

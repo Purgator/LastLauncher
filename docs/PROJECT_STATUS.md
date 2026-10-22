@@ -217,6 +217,15 @@ in a later message.
   9 new unit tests. **Unverified on-device**: that the gym app really leaves
   the trio on the second outing (the replay says ×0.25 is enough against the
   Wi-Fi trigger bonus), and the night-time first-swipe content.
+- **Unreleased (2026-10-21)**: pin slot missing during a drag from the
+  results list. Owner's screenshot: long-press an app in all-apps/search →
+  no drop circle. `updateParkSpot` hid the slot whenever the results panel
+  was visible, and the drag-started refresh goes through the same gate, so
+  only trio/spotlight/drawer lifts ever revealed it. Now a drag in flight
+  overrides the results gate (as it already did the drawer-on-side gate);
+  at rest the slot still yields to results. Geometry needed no change: the
+  suggestions block sits INVISIBLE behind the results, so `spotBottomMargin`
+  still anchors the slot above the trio's line, keyboard up or not.
 
 ## Current state (as of v1.24.0)
 
