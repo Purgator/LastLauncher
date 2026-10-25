@@ -927,6 +927,8 @@ class MainActivity : AppCompatActivity() {
     private var dragOpenedLeft = false   // a drawer already auto-opened on that side this drag
     private var dragOpenedRight = false
     private var dragRejectedOverride = false // a consumed-but-refused drop (command bar)
+    private var dragRevealedHome = false     // the results list stepped aside for this drag
+    private var dragRevealPending = false    // ... and its fade-out has not landed yet
 
     private fun onAppDragStarted(entry: AppEntry, sourceView: View) {
         dragSourceView = sourceView
@@ -954,6 +956,8 @@ class MainActivity : AppCompatActivity() {
                     dragOpenedLeft = false
                     dragOpenedRight = false
                     dragRejectedOverride = false
+                    dragRevealedHome = false
+                    dragRevealPending = false
                     showRemoveBands(event.localState as? WheelDrawer.DragPayload)
                     // Any app drag reveals the park slot's drop circle.
                     updateParkSpot()
@@ -969,6 +973,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 android.view.DragEvent.ACTION_DRAG_ENDED -> {
                     dragInFlight = false
+                    finishHomeReveal()
                     binding.parkSpot.scaleX = 1f
                     binding.parkSpot.scaleY = 1f
                     hideRemoveBands()
@@ -1017,9 +1022,49 @@ class MainActivity : AppCompatActivity() {
             dragMaxTravel,
             kotlin.math.hypot((x - dragStartX).toDouble(), (y - dragStartY).toDouble()).toFloat(),
         )
+        revealHomeForDrag()
         parkAttract(x, y)
         removeAttract(y)
         autoOpenDrawerNear(x)
+    }
+
+    /**
+     * An app lifted from the results list (all-apps, search) is headed for the
+     * home screen's targets — the pin slot, the drawers — yet the list covers
+     * them. The moment the finger really travels (past the long-press threshold,
+     * so setting it back down still opens the menu over the list) the list fades
+     * out and the home shows through: trio, slots, agenda, keyboard down. The
+     * drop then lands on what the user sees. Once per drag; drawers stay as they
+     * are (unlike resetToHome), an auto-opened one must not snap shut.
+     */
+    private fun revealHomeForDrag() {
+        if (dragRevealedHome || binding.results.visibility != View.VISIBLE || dragIsInPlace()) {
+            return
+        }
+        dragRevealedHome = true
+        // The lifted row never comes back into view: undim it now, or the
+        // recycled row would resurface dimmed in a later search.
+        dragSourceView?.animate()?.cancel()
+        dragSourceView?.alpha = 1f
+        if (!prefs.animations) {
+            showHomeContent()
+            return
+        }
+        dragRevealPending = true
+        binding.results.animate().alpha(0f).setDuration(150).withEndAction {
+            finishHomeReveal()
+            binding.suggestionsBlock.alpha = 0f
+            binding.suggestionsBlock.animate().alpha(1f).setDuration(180).start()
+        }.start()
+    }
+
+    /** Lands a pending reveal (fade done, or the drag ended mid-fade). */
+    private fun finishHomeReveal() {
+        if (!dragRevealPending) return
+        dragRevealPending = false
+        binding.results.animate().cancel()
+        binding.results.alpha = 1f
+        showHomeContent()
     }
 
     /**
@@ -1169,6 +1214,13 @@ class MainActivity : AppCompatActivity() {
         // A rejected drop deserves feedback too — the accepted path buzzes in
         // handleAppDrop, so without this a failed drop just feels dead.
         if (!success) haptic(binding.root)
+        if (dragRevealedHome) {
+            // The list the app came from stepped aside: a refused drop dissolves
+            // where it was let go instead of flying back to a row that no longer shows.
+            source.alpha = 1f
+            if (!success && prefs.animations && dragIcon != null) dissolveGhost()
+            return
+        }
         if (success || !prefs.animations || dragIcon == null) {
             source.animate().alpha(1f).setDuration(150).start()
             return
@@ -1193,6 +1245,28 @@ class MainActivity : AppCompatActivity() {
             .withEndAction {
                 ghost.visibility = View.GONE
                 source.animate().alpha(1f).setDuration(120).start()
+            }
+            .start()
+    }
+
+    /** The icon shrinks and fades at the drop point — a drop with nowhere to go. */
+    private fun dissolveGhost() {
+        val ghost = binding.dragGhost
+        val half = ghost.layoutParams.width / 2f
+        ghost.setImageDrawable(dragIcon)
+        ghost.x = dragLastX - half
+        ghost.y = dragLastY - half
+        ghost.alpha = 1f
+        ghost.scaleX = 1f
+        ghost.scaleY = 1f
+        ghost.visibility = View.VISIBLE
+        ghost.animate().alpha(0f).scaleX(0.4f).scaleY(0.4f)
+            .setDuration(220)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .withEndAction {
+                ghost.visibility = View.GONE
+                ghost.scaleX = 1f
+                ghost.scaleY = 1f
             }
             .start()
     }
@@ -1287,9 +1361,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun resetToHome() {
-        allAppsOpen = false
         agendaShownByGesture = false
         closeDrawers(animate = false)
+        showHomeContent()
+    }
+
+    /** The home content in place of the results list: trio, agenda, music, hints. */
+    private fun showHomeContent() {
+        allAppsOpen = false
         if (binding.searchInput.text.isNotEmpty()) {
             binding.searchInput.setText("")
         }

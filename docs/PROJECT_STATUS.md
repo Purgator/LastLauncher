@@ -226,6 +226,18 @@ in a later message.
   at rest the slot still yields to results. Geometry needed no change: the
   suggestions block sits INVISIBLE behind the results, so `spotBottomMargin`
   still anchors the slot above the trio's line, keyboard up or not.
+- **Unreleased (2026-10-26)**: a drag out of the results list reveals the
+  home screen. Owner on v1.24.1: the slot appeared, but over the list, with
+  the keyboard up — "lacks elegance". Now `revealHomeForDrag` (from
+  trackDrag) fades the list out once the finger has travelled past the
+  long-press threshold and calls `showHomeContent` (the results→home half of
+  `resetToHome`, split out; drawers are left alone so an auto-opened one
+  doesn't snap shut): keyboard down, trio/slots/agenda back. A set-down
+  before travel still opens the menu over the list. A refused drop after a
+  reveal dissolves at the drop point (`dissolveGhost`) — the source row is
+  gone, so the fly-back had nowhere to go — and the lifted row is undimmed
+  at reveal time so a recycled row can't resurface dimmed. Unverified
+  on-device: the IME hide mid-drag re-layouting under a live system drag.
 
 ## Current state (as of v1.24.1)
 
