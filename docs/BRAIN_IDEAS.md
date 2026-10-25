@@ -254,7 +254,7 @@ shown in Insights; observability only, MIN_CONFIDENCE untouched), and
   logTrioCorrection's reinforcement row shares the real row's timestamp and would
   read as a 0-minute rebound.
 
-### 1.7 DB hygiene on uninstall — effort S (pure win)
+### 1.7 DB hygiene on uninstall — effort S (pure win) — SHIPPED v1.25.0 (rows only; boosted/favorites/parked cleanup still open)
 - LauncherApp's package receiver (already has the "package" scheme + EXTRA_REPLACING
   guard): add ACTION_PACKAGE_FULLY_REMOVED → on predict executor DELETE FROM
   launches/misses WHERE pkg=?, remove from boosted/favorites/parked.

@@ -239,7 +239,29 @@ in a later message.
   at reveal time so a recycled row can't resurface dimmed. Unverified
   on-device: the IME hide mid-drag re-layouting under a live system drag.
 
-## Current state (as of v1.24.2)
+- **v1.25.0 (2026-10-26)**: brain size cap + flat refresh cost, owner's
+  "the brain keeps growing" concern. Diagnosis: rows were already capped
+  (5000 launches / 1500 misses) but the SQLite *file* only ever grew (deleted
+  pages are never returned without VACUUM; the schema-3 `state` column fattened
+  every row), the every-200-inserts prune never ran at startup, and every
+  suggestion refresh re-read up to 5000 rows from disk. Shipped, all
+  score-neutral by construction (the engine never read past 60 days):
+  time-based prune at the 60-day horizon (`UsageDb.RETENTION_DAYS`, count caps
+  kept as belts) + housekeeping once per process on first DB open; `VACUUM`
+  when the free list holds ≥ 64 pages (`compactIfFragmented`); an in-memory
+  row cache on the predict executor (loaded once, appended on insert, expired
+  from the front, dropped by prune/sweep/clear) so a refresh never touches
+  disk after the first scan; a scoring projection without the `state` column;
+  uninstall hygiene (roadmap 1.7, rows only — boosts/favorites untouched):
+  `ACTION_PACKAGE_FULLY_REMOVED` → `forgetPackage`, plus a sweep during
+  housekeeping that skips itself when > 10 packages read as absent (a
+  PackageManager hiccup must never empty the log). Insights "Your data" gained
+  a "last scan: N rows in X ms (disk read Y ms, Z free pages)" line so the
+  owner can confirm the refresh cost stays flat. **Unverified on-device**: the
+  VACUUM running cleanly on the owner's file, and the sweep finding nothing to
+  delete on a healthy catalog (watch logcat `PredictionEngine: Housekeeping`).
+
+## Current state (as of v1.25.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
@@ -257,6 +279,9 @@ in a later message.
   scoring ignores (collect-first; judge the bedtime-state question on a fresh
   export after a few weeks). v1.24.0 added once-a-day satiation and the
   hour-concentration swipe-page order — both metric-neutral by design.
+  v1.25.0 bounded the log for real (60-day retention + VACUUM) and made the
+  refresh disk-free after the first scan (row cache); if a future feature
+  must read older rows than 60 days, raise `UsageDb.RETENTION_DAYS` first.
 - **Drag & drop**: fully unified across every draggable surface as of
   v1.15.0; the interaction contract is documented in detail in `CLAUDE.md`'s
   "Interaction contracts" section (search "Drag & drop, one model
