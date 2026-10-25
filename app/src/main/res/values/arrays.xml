@@ -9,18 +9,31 @@
     <string-array name="status_token_entries">
         <item>@string/token_battery</item>
         <item>@string/token_network</item>
+        <item>@string/token_wifi_name</item>
+        <item>@string/token_bt</item>
+        <item>@string/token_ringer</item>
         <item>@string/token_alarm</item>
+        <item>@string/token_event</item>
         <item>@string/token_launches</item>
         <item>@string/token_storage</item>
+        <item>@string/token_ram</item>
         <item>@string/token_db</item>
+        <item>@string/token_uptime</item>
     </string-array>
+    <!-- Same order as StatusLine.ALL_TOKENS: the picker lists fields as the line shows them. -->
     <string-array name="status_token_values">
         <item>battery</item>
         <item>network</item>
+        <item>wifi_name</item>
+        <item>bt</item>
+        <item>ringer</item>
         <item>alarm</item>
+        <item>event</item>
         <item>launches</item>
         <item>storage</item>
+        <item>ram</item>
         <item>db</item>
+        <item>uptime</item>
     </string-array>
     <string-array name="side_entries">
         <item>@string/side_left</item>

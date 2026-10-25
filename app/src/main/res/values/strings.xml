@@ -151,6 +151,12 @@
     <string name="token_launches">Apps launched today</string>
     <string name="token_storage">Free storage</string>
     <string name="token_db">Launcher memory size</string>
+    <string name="token_wifi_name">Wi-Fi network name</string>
+    <string name="token_bt">Bluetooth audio connected</string>
+    <string name="token_ringer">Ringer / Do not disturb</string>
+    <string name="token_event">Next event countdown</string>
+    <string name="token_ram">Free memory (RAM)</string>
+    <string name="token_uptime">Uptime</string>
 
     <string name="cat_apps">Apps</string>
     <string name="pref_hidden_apps">Hidden apps</string>

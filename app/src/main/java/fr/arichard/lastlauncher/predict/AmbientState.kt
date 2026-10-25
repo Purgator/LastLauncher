@@ -62,6 +62,30 @@ object AmbientState {
         return out
     }
 
+    /**
+     * Whether a headset / A2DP audio device is connected; null when it cannot be
+     * known (no BLUETOOTH_CONNECT grant, no adapter). Binder calls — off the UI thread.
+     */
+    fun btAudioState(context: Context): Boolean? = try {
+        if (context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            context.getSystemService(BluetoothManager::class.java)?.adapter?.let { adapter ->
+                val connected = BluetoothAdapter.STATE_CONNECTED
+                adapter.getProfileConnectionState(BluetoothProfile.A2DP) == connected ||
+                    adapter.getProfileConnectionState(BluetoothProfile.HEADSET) == connected
+            }
+        } else null
+    } catch (e: SecurityException) {
+        Log.d(TAG, "bluetooth state not permitted", e)
+        null
+    } catch (e: Exception) {
+        Log.d(TAG, "bluetooth unavailable", e)
+        null
+    }
+
+    fun btAudioConnected(context: Context): Boolean = btAudioState(context) == true
+
     /** Reads the current state; call off the UI thread. Never throws. */
     fun snapshot(context: Context, now: Long = System.currentTimeMillis()): String? {
         val values = LinkedHashMap<String, Int>()
@@ -91,23 +115,7 @@ object AmbientState {
         } catch (e: Exception) {
             Log.d(TAG, "network unavailable", e)
         }
-        try {
-            if (context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) ==
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
-                if (adapter != null) {
-                    val connected = BluetoothAdapter.STATE_CONNECTED
-                    val audio = adapter.getProfileConnectionState(BluetoothProfile.A2DP) == connected ||
-                        adapter.getProfileConnectionState(BluetoothProfile.HEADSET) == connected
-                    values[KEY_BT] = if (audio) 1 else 0
-                }
-            }
-        } catch (e: SecurityException) {
-            Log.d(TAG, "bluetooth state not permitted", e)
-        } catch (e: Exception) {
-            Log.d(TAG, "bluetooth unavailable", e)
-        }
+        btAudioState(context)?.let { values[KEY_BT] = if (it) 1 else 0 }
         return format(values)
     }
 }

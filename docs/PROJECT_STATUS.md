@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~3 months
-(first commit 2026-07-11), currently at **v1.24.2**. Owner tests
+(first commit 2026-07-11), currently at **v1.26.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -261,7 +261,25 @@ in a later message.
   VACUUM running cleanly on the owner's file, and the sweep finding nothing to
   delete on a healthy catalog (watch logcat `PredictionEngine: Housekeeping`).
 
-## Current state (as of v1.25.0)
+- **v1.26.0 (2026-10-26)**: six more status-line fields, owner's "more
+  options" ask (picked from an eight-candidate list; week/day-of-year and
+  unread-notification count were declined). All read on resume + the minute
+  tick, nothing polled, no sensors: **Wi-Fi name** (`wifi:Home`, suffixes the
+  network token — or stands alone when network is off; needs the existing
+  SSID sense + precise location, shares `ContextSignals.currentSsid`),
+  **Bluetooth audio** (`bt`, `AmbientState.btAudioState` extracted for it),
+  **ringer / DND** (`vib` / `mute` / `dnd`, silent when normal; DND wins; the
+  ringer-mode and interruption-filter broadcasts refresh it between ticks),
+  **next event countdown** (`▸ 1h20 Dentist`, title cut at 14 chars, from the
+  agenda's cached events via the same pure `Agenda.rows` pass — all-day
+  events have no countdown and are skipped), **free RAM** (`⌁ 2.1G`) and
+  **uptime** (`up 3d4h`). `StatusLine.formatDuration` is the shared compact
+  duration (two units max). Tap actions: Wi-Fi / Bluetooth / sound /
+  device-info settings, the calendar app for the event. **Unverified
+  on-device**: the SSID read on Android 14+ through `transportInfo`, and
+  whether `ACTION_DEVICE_INFO_SETTINGS` lands somewhere useful on the Pixel.
+
+## Current state (as of v1.26.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17

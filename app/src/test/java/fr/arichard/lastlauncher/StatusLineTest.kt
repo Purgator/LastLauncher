@@ -71,6 +71,97 @@ class StatusLineTest {
         assertTrue(line.contains("off"))
     }
 
+    // ------------------------------------------------------- new fields (1.26)
+
+    @Test
+    fun wifiNameRidesTheNetworkTokenOrStandsAlone() {
+        val v = values(net = StatusLine.Net.WIFI).copy(wifiName = "Home")
+        // Both on: one segment, the name suffixed to the network token.
+        val both = StatusLine.segments(setOf(StatusLine.NETWORK, StatusLine.WIFI_NAME), v)
+        assertEquals(listOf(StatusLine.NETWORK to "wifi:Home"), both)
+        // Name only: its own segment, so the tap can still open Wi-Fi settings.
+        val alone = StatusLine.segments(setOf(StatusLine.WIFI_NAME), v)
+        assertEquals(listOf(StatusLine.WIFI_NAME to "Home"), alone)
+        // No name readable: plain token, nothing standalone.
+        val unnamed = values(net = StatusLine.Net.WIFI)
+        assertTrue(StatusLine.build(setOf(StatusLine.NETWORK, StatusLine.WIFI_NAME), unnamed).endsWith("wifi"))
+        assertTrue(StatusLine.segments(setOf(StatusLine.WIFI_NAME), unnamed).isEmpty())
+        // Off Wi-Fi a stale name never shows.
+        val cell = values(net = StatusLine.Net.CELLULAR).copy(wifiName = "Home")
+        assertEquals("› cell", StatusLine.build(setOf(StatusLine.NETWORK, StatusLine.WIFI_NAME), cell))
+    }
+
+    @Test
+    fun quietStatesOnlyWhenActive() {
+        val all = setOf(StatusLine.BT, StatusLine.RINGER)
+        assertEquals("› ", StatusLine.build(all, values()))
+        assertEquals("› bt", StatusLine.build(all, values().copy(btAudio = true)))
+        assertEquals("› vib", StatusLine.build(all, values().copy(ringer = StatusLine.Ringer.VIBRATE)))
+        assertEquals("› mute", StatusLine.build(all, values().copy(ringer = StatusLine.Ringer.SILENT)))
+        assertEquals(
+            "› bt  ·  dnd",
+            StatusLine.build(all, values().copy(btAudio = true, ringer = StatusLine.Ringer.DND))
+        )
+    }
+
+    @Test
+    fun durationsAreCompactAndNeverZero() {
+        assertEquals("0m", StatusLine.formatDuration(0))
+        assertEquals("12m", StatusLine.formatDuration(12))
+        assertEquals("1h05", StatusLine.formatDuration(65))
+        assertEquals("23h59", StatusLine.formatDuration(23 * 60 + 59))
+        assertEquals("1d", StatusLine.formatDuration(24 * 60 + 30)) // minutes dropped past a day
+        assertEquals("3d4h", StatusLine.formatDuration(3 * 24 * 60 + 4 * 60 + 59))
+        assertEquals("0m", StatusLine.formatDuration(-5))
+    }
+
+    @Test
+    fun uptimeTokenFromElapsedMillis() {
+        val line = StatusLine.build(setOf(StatusLine.UPTIME), values().copy(uptimeMs = 3 * 86_400_000L + 4 * 3_600_000L))
+        assertEquals("› up 3d4h", line)
+        assertEquals("› ", StatusLine.build(setOf(StatusLine.UPTIME), values()))
+    }
+
+    @Test
+    fun eventCountdownWithShortTitle() {
+        assertEquals("1h20 Dentist", StatusLine.formatEvent(80, "Dentist"))
+        assertEquals("now Dentist", StatusLine.formatEvent(0, "Dentist"))
+        assertEquals("now Dentist", StatusLine.formatEvent(-30, "Dentist"))
+        assertEquals("2d3h", StatusLine.formatEvent(2 * 24 * 60 + 3 * 60, "  "))
+        assertEquals("5m", StatusLine.formatEvent(5, null))
+        // Long titles are cut with an ellipsis at EVENT_TITLE_MAX characters.
+        val cut = StatusLine.formatEvent(5, "Quarterly planning review with everyone")
+        assertEquals("5m Quarterly pla…", cut)
+        val line = StatusLine.build(
+            setOf(StatusLine.EVENT), values().copy(nextEventMinutes = 80, nextEventTitle = "Dentist")
+        )
+        assertEquals("› ▸ 1h20 Dentist", line)
+        assertEquals("› ", StatusLine.build(setOf(StatusLine.EVENT), values()))
+    }
+
+    @Test
+    fun ramUsesDotDecimalRegardlessOfLocale() {
+        val previous = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.FRANCE)
+            val line = StatusLine.build(setOf(StatusLine.RAM), values().copy(freeRamGb = 2.14))
+            assertEquals("› ⌁ 2.1G", line)
+        } finally {
+            java.util.Locale.setDefault(previous)
+        }
+    }
+
+    @Test
+    fun newTokensKeepCanonicalOrder() {
+        val v = values().copy(
+            wifiName = "Home", btAudio = true, ringer = StatusLine.Ringer.DND,
+            nextEventMinutes = 80, nextEventTitle = "Dentist", freeRamGb = 2.1, uptimeMs = 3_600_000L,
+            dbBytes = 218_000,
+        )
+        val ids = StatusLine.segments(StatusLine.ALL_TOKENS.toSet(), v).map { it.first }
+        assertEquals(StatusLine.ALL_TOKENS - StatusLine.WIFI_NAME, ids)
+    }
+
     // ------------------------------------------------- next-alarm reconciliation
 
     private fun min(h: Int, m: Int) = h * 60 + m

@@ -44,7 +44,9 @@ import fr.arichard.lastlauncher.gesture.GestureBinding
 import fr.arichard.lastlauncher.lock.LockService
 import fr.arichard.lastlauncher.notify.MediaWatch
 import fr.arichard.lastlauncher.notify.NotifListener
+import fr.arichard.lastlauncher.predict.AmbientState
 import fr.arichard.lastlauncher.predict.Calibration
+import fr.arichard.lastlauncher.predict.ContextSignals
 import fr.arichard.lastlauncher.predict.PredictionEngine
 import fr.arichard.lastlauncher.settings.InsightsActivity
 import fr.arichard.lastlauncher.settings.Prefs
@@ -2448,6 +2450,16 @@ class MainActivity : AppCompatActivity() {
             filter.addAction(Intent.ACTION_POWER_CONNECTED)
             filter.addAction(Intent.ACTION_POWER_DISCONNECTED)
         }
+        // Rare, user-driven broadcasts: free to listen to while in front, and they
+        // keep the token honest between two minute ticks.
+        if (statusOn && StatusLine.RINGER in enabled) {
+            filter.addAction(android.media.AudioManager.RINGER_MODE_CHANGED_ACTION)
+            filter.addAction(android.app.NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
+        }
+        if (statusOn && StatusLine.BT in enabled) {
+            filter.addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED)
+            filter.addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        }
         registerReceiver(statusReceiver, filter)
     }
 
@@ -2470,6 +2482,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (ioExecutor.isShutdown) return
+        // The agenda's cached events are a main-thread field; the pure row pass is
+        // the same one renderAgenda does on every tick.
+        val event = if (StatusLine.EVENT in enabled) nextAgendaEvent() else null
+        val uptime = if (StatusLine.UPTIME in enabled) android.os.SystemClock.elapsedRealtime() else 0L
         // This runs every minute while the launcher is in front, and each field is a
         // binder or disk read — gather them off-thread, render back on main.
         ioExecutor.execute {
@@ -2497,6 +2513,12 @@ class MainActivity : AppCompatActivity() {
                     0L
                 }
             } else 0L
+            val wifiName = if (StatusLine.WIFI_NAME in enabled && net == StatusLine.Net.WIFI) {
+                ContextSignals.currentSsid(this)
+            } else null
+            val bt = StatusLine.BT in enabled && AmbientState.btAudioConnected(this)
+            val ringer = if (StatusLine.RINGER in enabled) currentRinger() else StatusLine.Ringer.NORMAL
+            val ram = if (StatusLine.RAM in enabled) freeRamGb() else 0.0
 
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
@@ -2505,7 +2527,10 @@ class MainActivity : AppCompatActivity() {
                         StatusLine.segments(
                             enabled,
                             StatusLine.Values(
-                                percent, charging, net, alarm, launches, storage, dbBytes
+                                percent, charging, net, alarm, launches, storage, dbBytes,
+                                wifiName = wifiName, btAudio = bt, ringer = ringer,
+                                nextEventMinutes = event?.first, nextEventTitle = event?.second,
+                                freeRamGb = ram, uptimeMs = uptime,
                             )
                         ),
                         net
@@ -2539,10 +2564,18 @@ class MainActivity : AppCompatActivity() {
                             if (net == StatusLine.Net.WIFI) Settings.ACTION_WIFI_SETTINGS
                             else Settings.ACTION_WIRELESS_SETTINGS
                         )
+                        StatusLine.WIFI_NAME -> openSettingsAction(Settings.ACTION_WIFI_SETTINGS)
+                        StatusLine.BT -> openSettingsAction(Settings.ACTION_BLUETOOTH_SETTINGS)
+                        StatusLine.RINGER -> openSettingsAction(Settings.ACTION_SOUND_SETTINGS)
                         StatusLine.ALARM ->
                             startActivitySafely(Intent(AlarmClock.ACTION_SHOW_ALARMS))
+                        StatusLine.EVENT -> startActivitySafely(
+                            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR)
+                        )
                         StatusLine.STORAGE ->
                             openSettingsAction(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
+                        StatusLine.RAM, StatusLine.UPTIME ->
+                            openSettingsAction(Settings.ACTION_DEVICE_INFO_SETTINGS)
                         // Launch count and DB size both live in the insights screen.
                         else -> startActivity(Intent(this@MainActivity, InsightsActivity::class.java))
                     }
@@ -2562,6 +2595,48 @@ class MainActivity : AppCompatActivity() {
         stat.availableBytes.toDouble() / 1_000_000_000.0
     } catch (e: Exception) {
         0.0
+    }
+
+    private fun freeRamGb(): Double = try {
+        val info = android.app.ActivityManager.MemoryInfo()
+        getSystemService(android.app.ActivityManager::class.java)?.getMemoryInfo(info)
+        info.availMem.toDouble() / 1_000_000_000.0
+    } catch (e: Exception) {
+        0.0
+    }
+
+    /** Do-not-disturb wins over the ringer switch: it is what actually silences. */
+    private fun currentRinger(): StatusLine.Ringer = try {
+        val filter = getSystemService(android.app.NotificationManager::class.java)
+            ?.currentInterruptionFilter
+        if (filter != null && filter != android.app.NotificationManager.INTERRUPTION_FILTER_ALL &&
+            filter != android.app.NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+        ) {
+            StatusLine.Ringer.DND
+        } else {
+            when (getSystemService(android.media.AudioManager::class.java)?.ringerMode) {
+                android.media.AudioManager.RINGER_MODE_VIBRATE -> StatusLine.Ringer.VIBRATE
+                android.media.AudioManager.RINGER_MODE_SILENT -> StatusLine.Ringer.SILENT
+                else -> StatusLine.Ringer.NORMAL
+            }
+        }
+    } catch (e: Exception) {
+        StatusLine.Ringer.NORMAL
+    }
+
+    /**
+     * (minutes until it starts, title) of the agenda's next timed event, from the
+     * events already cached for the stream — all-day events have no countdown.
+     */
+    private fun nextAgendaEvent(): Pair<Int, String>? {
+        if (!prefs.agendaEnabled || agendaEvents.isEmpty()) return null
+        val now = System.currentTimeMillis()
+        val rows = Agenda.rows(
+            agendaEvents.filter { !it.allDay }, now, horizonDays = prefs.agendaDays,
+        )
+        val row = rows.firstOrNull { it is Agenda.Row.Event } as? Agenda.Row.Event ?: return null
+        val minutes = ((row.event.begin - now) / 60_000L).toInt()
+        return minutes to row.event.title
     }
 
     private fun currentNet(): StatusLine.Net {

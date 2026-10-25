@@ -170,15 +170,32 @@ object ContextSignals {
     private fun wifiJoinEvent(caps: android.net.NetworkCapabilities?): String {
         val ctx = appContext ?: return EVENT_WIFI_ON
         val prefs = fr.arichard.lastlauncher.settings.Prefs(ctx)
-        if (!prefs.ssidSignal) return EVENT_WIFI_ON
+        val name = currentSsid(ctx, caps, prefs) ?: return EVENT_WIFI_ON
+        return "wifi:" + sha256Prefix(prefs.ssidSalt + name)
+    }
+
+    /**
+     * The joined Wi-Fi network's name, or null when it is not readable: the SSID
+     * option off, precise location not granted, or the system hides it. [caps] are
+     * the network's capabilities when the caller already has them (a callback);
+     * otherwise the active network's are looked up. Binder calls — off the UI thread.
+     */
+    fun currentSsid(
+        ctx: Context,
+        caps: android.net.NetworkCapabilities? = null,
+        prefs: fr.arichard.lastlauncher.settings.Prefs = fr.arichard.lastlauncher.settings.Prefs(ctx),
+    ): String? {
+        if (!prefs.ssidSignal) return null
         if (ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) !=
             android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
-            return EVENT_WIFI_ON
+            return null
         }
         val ssid = try {
             if (android.os.Build.VERSION.SDK_INT >= 31) {
-                (caps?.transportInfo as? android.net.wifi.WifiInfo)?.ssid
+                val c = caps ?: ctx.getSystemService(android.net.ConnectivityManager::class.java)
+                    ?.let { cm -> cm.activeNetwork?.let { cm.getNetworkCapabilities(it) } }
+                (c?.transportInfo as? android.net.wifi.WifiInfo)?.ssid
             } else {
                 @Suppress("DEPRECATION")
                 (ctx.applicationContext.getSystemService(Context.WIFI_SERVICE)
@@ -187,10 +204,8 @@ object ContextSignals {
         } catch (e: Exception) {
             null
         }
-        val name = ssid?.trim('"')?.trim()
+        return ssid?.trim('"')?.trim()
             ?.takeIf { it.isNotEmpty() && !it.contains("unknown ssid", ignoreCase = true) }
-            ?: return EVENT_WIFI_ON
-        return "wifi:" + sha256Prefix(prefs.ssidSalt + name)
     }
 
     /** First 12 hex chars of SHA-256 — opaque but stable place token. */

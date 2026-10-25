@@ -151,6 +151,12 @@
     <string name="token_launches">Applications lancées aujourd’hui</string>
     <string name="token_storage">Stockage libre</string>
     <string name="token_db">Taille de la mémoire du lanceur</string>
+    <string name="token_wifi_name">Nom du réseau Wi-Fi</string>
+    <string name="token_bt">Audio Bluetooth connecté</string>
+    <string name="token_ringer">Sonnerie / Ne pas déranger</string>
+    <string name="token_event">Compte à rebours du prochain événement</string>
+    <string name="token_ram">Mémoire vive (RAM) libre</string>
+    <string name="token_uptime">Temps depuis le démarrage</string>
 
     <string name="cat_apps">Applications</string>
     <string name="pref_hidden_apps">Applications masquées</string>
