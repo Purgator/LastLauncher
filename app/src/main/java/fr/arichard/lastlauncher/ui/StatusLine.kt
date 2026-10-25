@@ -5,7 +5,10 @@ package fr.arichard.lastlauncher.ui
  * date. Which tokens appear — and their fixed left-to-right order — is chosen by the
  * user; battery is off by default since the system status bar already shows it.
  *
- * Example:  › wifi:Home · bt · ⏰07:00 · ▸ 1h20 Dentist · ↑23 · ▤ 41.2G · up 3d4h
+ * Example:  › wifi:Home · bt · ⏰07:00 · ▸ 1h20 Dentist · ↑23 · ▤ 41.2G · ◎ 71% · up 3d4h
+ *
+ * The "brain" tokens ([HITRATE], [MEMORY], [CONTEXT], [SATIATED]) read the prediction
+ * engine's own state — a tap on any of them opens the insights screen.
  *
  * Purely a formatter so it stays unit testable; the host gathers the live [Values].
  */
@@ -31,12 +34,20 @@ object StatusLine {
     const val STORAGE = "storage"
     const val RAM = "ram"
     const val DB = "db"
+    const val HITRATE = "hitrate"
+    const val MEMORY = "memory"
+    const val CONTEXT = "context"
+    const val SATIATED = "satiated"
     const val UPTIME = "uptime"
 
     /** Canonical order tokens are rendered in, regardless of selection order. */
     val ALL_TOKENS = listOf(
-        BATTERY, NETWORK, WIFI_NAME, BT, RINGER, ALARM, EVENT, LAUNCHES, STORAGE, RAM, DB, UPTIME
+        BATTERY, NETWORK, WIFI_NAME, BT, RINGER, ALARM, EVENT, LAUNCHES, STORAGE, RAM, DB,
+        HITRATE, MEMORY, CONTEXT, SATIATED, UPTIME,
     )
+
+    /** Tokens whose tap opens the insights screen (they describe the engine). */
+    val BRAIN_TOKENS = setOf(LAUNCHES, DB, HITRATE, MEMORY, CONTEXT, SATIATED)
 
     val DEFAULT_TOKENS = setOf(NETWORK, ALARM, LAUNCHES)
 
@@ -61,6 +72,15 @@ object StatusLine {
         val nextEventTitle: String? = null,
         val freeRamGb: Double = 0.0,
         val uptimeMs: Long = 0,
+        /** Live trio hit rate in 0..1, null until the engine has graded a launch. */
+        val hitRate: Double? = null,
+        /** Launch rows the engine remembers, and how many days back the oldest one is. */
+        val launchesRemembered: Int = 0,
+        val historyDays: Int = 0,
+        /** The context trigger in effect (ContextSignals event id), null when none. */
+        val contextEvent: String? = null,
+        /** Apps damped by once-a-day satiation right now. */
+        val satiatedCount: Int = 0,
     )
 
     fun build(enabled: Set<String>, v: Values): String =
@@ -85,6 +105,13 @@ object StatusLine {
         STORAGE -> "▤ ${"%.1f".format(java.util.Locale.US, v.freeStorageGb)}G"
         RAM -> "⌁ ${"%.1f".format(java.util.Locale.US, v.freeRamGb)}G"
         DB -> if (v.dbBytes > 0) "◇ ${formatBytes(v.dbBytes)}" else null
+        HITRATE -> v.hitRate?.let { "◎ ${(it * 100).toInt().coerceIn(0, 100)}%" }
+        MEMORY -> if (v.launchesRemembered > 0) {
+            "⌘ ${formatCount(v.launchesRemembered)}" +
+                if (v.historyDays > 0) "·${v.historyDays}d" else ""
+        } else null
+        CONTEXT -> v.contextEvent?.let { "⚡ ${contextLabel(it)}" }
+        SATIATED -> if (v.satiatedCount > 0) "☾ ${v.satiatedCount}" else null
         UPTIME -> if (v.uptimeMs > 0) "up ${formatDuration(v.uptimeMs / 60_000L)}" else null
         else -> null
     }
@@ -114,6 +141,29 @@ object StatusLine {
             days > 0 -> if (hours > 0) "${days}d${hours}h" else "${days}d"
             hours > 0 -> "${hours}h" + "%02d".format(java.util.Locale.US, mins)
             else -> "${mins}m"
+        }
+    }
+
+    /** Compact count: 870, 4.8k, 12k. */
+    internal fun formatCount(n: Int): String = when {
+        n >= 10_000 -> "${n / 1000}k"
+        n >= 1000 -> "%.1fk".format(java.util.Locale.US, n / 1000.0)
+        else -> n.toString()
+    }
+
+    /** Short label for a ContextSignals event id; a hashed Wi-Fi place reads as plain wifi. */
+    internal fun contextLabel(event: String): String = when {
+        event.startsWith("wifi:") -> "wifi"
+        else -> when (event) {
+            "bt_connected" -> "bt"
+            "headset_plugged" -> "jack"
+            "power_connected" -> "chg"
+            "wifi_joined" -> "wifi"
+            "wifi_left" -> "nowifi"
+            "back_online" -> "online"
+            "went_offline" -> "offline"
+            "started_moving" -> "moving"
+            else -> event.take(8)
         }
     }
 

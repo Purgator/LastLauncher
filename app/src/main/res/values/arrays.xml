@@ -18,6 +18,10 @@
         <item>@string/token_storage</item>
         <item>@string/token_ram</item>
         <item>@string/token_db</item>
+        <item>@string/token_hitrate</item>
+        <item>@string/token_memory</item>
+        <item>@string/token_context</item>
+        <item>@string/token_satiated</item>
         <item>@string/token_uptime</item>
     </string-array>
     <!-- Same order as StatusLine.ALL_TOKENS: the picker lists fields as the line shows them. -->
@@ -33,6 +37,10 @@
         <item>storage</item>
         <item>ram</item>
         <item>db</item>
+        <item>hitrate</item>
+        <item>memory</item>
+        <item>context</item>
+        <item>satiated</item>
         <item>uptime</item>
     </string-array>
     <string-array name="side_entries">

@@ -157,6 +157,10 @@
     <string name="token_event">Next event countdown</string>
     <string name="token_ram">Free memory (RAM)</string>
     <string name="token_uptime">Uptime</string>
+    <string name="token_hitrate">Suggestions hit rate</string>
+    <string name="token_memory">Launches remembered · days of history</string>
+    <string name="token_context">Active context trigger</string>
+    <string name="token_satiated">Apps resting (once-a-day)</string>
 
     <string name="cat_apps">Apps</string>
     <string name="pref_hidden_apps">Hidden apps</string>

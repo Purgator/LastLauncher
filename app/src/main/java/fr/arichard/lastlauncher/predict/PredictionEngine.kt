@@ -63,6 +63,8 @@ object PredictionEngine {
     private var lastLoadMillis = -1L
     private var lastScanMillis = -1L
     private var lastScanRows = 0
+    /** Apps satiated at the last suggestion scan — the status line reads it as a map lookup. */
+    @Volatile private var lastSatiatedCount = 0
 
     private fun db(context: Context): UsageDb {
         db?.let { return it }
@@ -356,6 +358,7 @@ object PredictionEngine {
         for ((pkg, m) in mass) concentration[pkg] = ScoreMath.hourConcentration(m[0], m[1])
         lastScanRows = rows.size + missRows.size
         lastScanMillis = android.os.SystemClock.elapsedRealtime() - t0
+        lastSatiatedCount = satiation.satiated(now).size
         return Scoring(scores, concentration, satiation)
     }
 
@@ -415,6 +418,32 @@ object PredictionEngine {
         resolve(Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com")))
         resolve(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
         return picks.toList()
+    }
+
+    /** Number of apps once-a-day satiation damped at the last scan; cheap, no rescan. */
+    fun satiatedCount(): Int = lastSatiatedCount
+
+    /**
+     * (launch rows remembered, days back to the oldest one) — two COUNT/MIN queries on
+     * the predict executor, delivered on the main thread. For the status line.
+     */
+    fun memoryStats(context: Context, callback: (count: Int, days: Int) -> Unit) {
+        val appContext = context.applicationContext
+        executor.execute {
+            var count = 0
+            var days = 0
+            try {
+                val db = db(appContext)
+                count = db.totalCount()
+                val oldest = db.oldestTs()
+                if (oldest != null) {
+                    days = ((System.currentTimeMillis() - oldest) / DAY_MS).toInt().coerceAtLeast(0)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "memoryStats failed", e)
+            }
+            mainHandler.post { callback(count, days) }
+        }
     }
 
     /** Counts launches logged since local midnight; delivered on the main thread. */

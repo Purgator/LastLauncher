@@ -156,10 +156,77 @@ class StatusLineTest {
         val v = values().copy(
             wifiName = "Home", btAudio = true, ringer = StatusLine.Ringer.DND,
             nextEventMinutes = 80, nextEventTitle = "Dentist", freeRamGb = 2.1, uptimeMs = 3_600_000L,
-            dbBytes = 218_000,
+            dbBytes = 218_000, hitRate = 0.7, launchesRemembered = 100, historyDays = 10,
+            contextEvent = "bt_connected", satiatedCount = 1,
         )
         val ids = StatusLine.segments(StatusLine.ALL_TOKENS.toSet(), v).map { it.first }
         assertEquals(StatusLine.ALL_TOKENS - StatusLine.WIFI_NAME, ids)
+    }
+
+    // --------------------------------------------------------- brain fields (1.27)
+
+    @Test
+    fun hitRateIsAPercentOrNothing() {
+        assertEquals("› ", StatusLine.build(setOf(StatusLine.HITRATE), values()))
+        assertEquals("› ◎ 71%", StatusLine.build(setOf(StatusLine.HITRATE), values().copy(hitRate = 0.714)))
+        assertEquals("› ◎ 100%", StatusLine.build(setOf(StatusLine.HITRATE), values().copy(hitRate = 1.2)))
+        assertEquals("› ◎ 0%", StatusLine.build(setOf(StatusLine.HITRATE), values().copy(hitRate = 0.0)))
+    }
+
+    @Test
+    fun memoryCombinesCountAndDays() {
+        assertEquals("870", StatusLine.formatCount(870))
+        assertEquals("4.8k", StatusLine.formatCount(4_812))
+        assertEquals("12k", StatusLine.formatCount(12_400))
+        val both = values().copy(launchesRemembered = 4_812, historyDays = 58)
+        assertEquals("› ⌘ 4.8k·58d", StatusLine.build(setOf(StatusLine.MEMORY), both))
+        val fresh = values().copy(launchesRemembered = 3, historyDays = 0)
+        assertEquals("› ⌘ 3", StatusLine.build(setOf(StatusLine.MEMORY), fresh))
+        assertEquals("› ", StatusLine.build(setOf(StatusLine.MEMORY), values()))
+    }
+
+    @Test
+    fun memoryCountUsesDotDecimalRegardlessOfLocale() {
+        val previous = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.FRANCE)
+            assertEquals("4.8k", StatusLine.formatCount(4_812))
+        } finally {
+            java.util.Locale.setDefault(previous)
+        }
+    }
+
+    @Test
+    fun contextTriggerShowsOnlyWhileActive() {
+        assertEquals("› ", StatusLine.build(setOf(StatusLine.CONTEXT), values()))
+        assertEquals("› ⚡ bt", StatusLine.build(setOf(StatusLine.CONTEXT), values().copy(contextEvent = "bt_connected")))
+        assertEquals("chg", StatusLine.contextLabel("power_connected"))
+        assertEquals("wifi", StatusLine.contextLabel("wifi_joined"))
+        assertEquals("wifi", StatusLine.contextLabel("wifi:3f9a1c0b2d4e")) // hashed place stays opaque
+        assertEquals("moving", StatusLine.contextLabel("started_moving"))
+        assertEquals("some_new", StatusLine.contextLabel("some_new_event")) // unknown ids are cut, never dropped
+    }
+
+    @Test
+    fun satiatedCountOnlyWhenSomeoneRests() {
+        assertEquals("› ", StatusLine.build(setOf(StatusLine.SATIATED), values()))
+        assertEquals("› ☾ 2", StatusLine.build(setOf(StatusLine.SATIATED), values().copy(satiatedCount = 2)))
+    }
+
+    @Test
+    fun brainTokensSitBetweenDbAndUptime() {
+        val v = values().copy(
+            dbBytes = 218_000, uptimeMs = 3_600_000L, hitRate = 0.7, launchesRemembered = 100,
+            historyDays = 10, contextEvent = "bt_connected", satiatedCount = 1,
+        )
+        val ids = StatusLine.segments(
+            setOf(StatusLine.DB, StatusLine.UPTIME) + StatusLine.BRAIN_TOKENS, v
+        ).map { it.first }
+        assertEquals(
+            listOf(StatusLine.LAUNCHES, StatusLine.DB, StatusLine.HITRATE, StatusLine.MEMORY, StatusLine.CONTEXT,
+                StatusLine.SATIATED, StatusLine.UPTIME),
+            ids
+        )
     }
 
     // ------------------------------------------------- next-alarm reconciliation

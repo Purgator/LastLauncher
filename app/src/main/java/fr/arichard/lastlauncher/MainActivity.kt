@@ -2486,6 +2486,12 @@ class MainActivity : AppCompatActivity() {
         // the same one renderAgenda does on every tick.
         val event = if (StatusLine.EVENT in enabled) nextAgendaEvent() else null
         val uptime = if (StatusLine.UPTIME in enabled) android.os.SystemClock.elapsedRealtime() else 0L
+        // Brain fields: a prefs parse, two in-memory reads — main thread is fine.
+        val hitRate = if (StatusLine.HITRATE in enabled) {
+            Calibration.parse(prefs.calibration).let { if (it.globalN > 0) it.globalEma else null }
+        } else null
+        val contextEvent = if (StatusLine.CONTEXT in enabled) ContextSignals.activeEvent() else null
+        val satiated = if (StatusLine.SATIATED in enabled) PredictionEngine.satiatedCount() else 0
         // This runs every minute while the launcher is in front, and each field is a
         // binder or disk read — gather them off-thread, render back on main.
         ioExecutor.execute {
@@ -2522,7 +2528,8 @@ class MainActivity : AppCompatActivity() {
 
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
-                fun render(launches: Int) {
+                fun render(launches: Int, remembered: Int, days: Int) {
+                    if (isDestroyed) return
                     binding.statusLine.text = clickableStatusText(
                         StatusLine.segments(
                             enabled,
@@ -2531,6 +2538,9 @@ class MainActivity : AppCompatActivity() {
                                 wifiName = wifiName, btAudio = bt, ringer = ringer,
                                 nextEventMinutes = event?.first, nextEventTitle = event?.second,
                                 freeRamGb = ram, uptimeMs = uptime,
+                                hitRate = hitRate, launchesRemembered = remembered,
+                                historyDays = days, contextEvent = contextEvent,
+                                satiatedCount = satiated,
                             )
                         ),
                         net
@@ -2539,8 +2549,14 @@ class MainActivity : AppCompatActivity() {
                         android.text.method.LinkMovementMethod.getInstance()
                     binding.statusLine.visibility = View.VISIBLE
                 }
-                if (StatusLine.LAUNCHES in enabled) PredictionEngine.launchesToday(this) { render(it) }
-                else render(0)
+                // The two DB-backed fields go through the predict executor and post back.
+                fun withMemory(launches: Int) {
+                    if (StatusLine.MEMORY in enabled) {
+                        PredictionEngine.memoryStats(this) { count, days -> render(launches, count, days) }
+                    } else render(launches, 0, 0)
+                }
+                if (StatusLine.LAUNCHES in enabled) PredictionEngine.launchesToday(this) { withMemory(it) }
+                else withMemory(0)
             }
         }
     }
@@ -2576,7 +2592,7 @@ class MainActivity : AppCompatActivity() {
                             openSettingsAction(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
                         StatusLine.RAM, StatusLine.UPTIME ->
                             openSettingsAction(Settings.ACTION_DEVICE_INFO_SETTINGS)
-                        // Launch count and DB size both live in the insights screen.
+                        // Brain tokens (launch count, DB size, hit rate…) live in the insights screen.
                         else -> startActivity(Intent(this@MainActivity, InsightsActivity::class.java))
                     }
                 }

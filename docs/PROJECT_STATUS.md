@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~3 months
-(first commit 2026-07-11), currently at **v1.26.0**. Owner tests
+(first commit 2026-07-11), currently at **v1.27.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -279,7 +279,22 @@ in a later message.
   on-device**: the SSID read on Android 14+ through `transportInfo`, and
   whether `ACTION_DEVICE_INFO_SETTINGS` lands somewhere useful on the Pixel.
 
-## Current state (as of v1.26.0)
+- **v1.27.0 (2026-10-26)**: four brain fields for the status line, owner's
+  follow-up to v1.26.0 ("not only phone state"). Same refresh path (resume +
+  minute tick), never `snapshot()` (it scores + backtests): **hit rate**
+  (`◎ 71%`, `Calibration.parse(prefs.calibration).globalEma`, hidden until a
+  launch has been graded), **memory** (`⌘ 4.8k·58d`, `COUNT(*)` + `MIN(ts)`
+  through `PredictionEngine.memoryStats` on the predict executor, posting to
+  main like `launchesToday`), **context** (`⚡ bt` / `chg` / `wifi` / `jack`
+  / `moving`…, `ContextSignals.activeEvent`, nothing outside the 5-minute
+  window; a hashed Wi-Fi place reads as plain `wifi`), **satiated** (`☾ 2`,
+  the count cached by the last suggestion scan — `PredictionEngine.
+  satiatedCount`, no rescan). Top-confidence bucket skipped as redundant
+  with the trio. Brain tokens (`StatusLine.BRAIN_TOKENS`) tap into Insights.
+  **Unverified on-device**: nothing beyond the usual — all reads are
+  existing, exercised paths.
+
+## Current state (as of v1.27.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17

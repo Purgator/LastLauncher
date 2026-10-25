@@ -157,6 +157,10 @@
     <string name="token_event">Compte à rebours du prochain événement</string>
     <string name="token_ram">Mémoire vive (RAM) libre</string>
     <string name="token_uptime">Temps depuis le démarrage</string>
+    <string name="token_hitrate">Taux de réussite des suggestions</string>
+    <string name="token_memory">Lancements mémorisés · jours d’historique</string>
+    <string name="token_context">Déclencheur de contexte actif</string>
+    <string name="token_satiated">Applications au repos (une fois par jour)</string>
 
     <string name="cat_apps">Applications</string>
     <string name="pref_hidden_apps">Applications masquées</string>
