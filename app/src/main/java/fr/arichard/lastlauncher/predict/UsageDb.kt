@@ -79,10 +79,16 @@ class UsageDb(context: Context) :
         })
     }
 
-    fun rowsSince(sinceTs: Long): List<Row> {
+    /**
+     * Launch rows from [sinceTs] on, oldest first. [withState] = false skips the
+     * ambient-state column (scoring ignores it; the export and insights read it):
+     * fewer bytes off disk and one string less per row, [Row.state] then null.
+     */
+    fun rowsSince(sinceTs: Long, withState: Boolean = true): List<Row> {
         val rows = ArrayList<Row>(1024)
+        val stateCol = if (withState) ", state" else ""
         readableDatabase.rawQuery(
-            "SELECT pkg, ts, hour, dow, prev_pkg, ctx_event, state FROM launches WHERE ts >= ? ORDER BY ts",
+            "SELECT pkg, ts, hour, dow, prev_pkg, ctx_event$stateCol FROM launches WHERE ts >= ? ORDER BY ts",
             arrayOf(sinceTs.toString())
         ).use { c ->
             while (c.moveToNext()) {
@@ -94,7 +100,7 @@ class UsageDb(context: Context) :
                         dow = c.getInt(3),
                         prevPkg = if (c.isNull(4)) null else c.getString(4),
                         ctxEvent = if (c.isNull(5)) null else c.getString(5),
-                        state = if (c.isNull(6)) null else c.getString(6),
+                        state = if (!withState || c.isNull(6)) null else c.getString(6),
                     )
                 )
             }
@@ -132,16 +138,66 @@ class UsageDb(context: Context) :
         }
     }
 
-    /** Caps the tables so they can never grow unbounded. */
-    fun prune() {
-        writableDatabase.execSQL(
+    /**
+     * Caps the tables so they can never grow unbounded. Rows older than the
+     * scoring horizon ([ScoreMath.HISTORY_DAYS]) go first — the engine never
+     * reads them, so dropping them changes no score — then the row-count belts
+     * cap a heavy user's log. Returns the number of rows deleted.
+     */
+    fun prune(now: Long): Int {
+        val db = writableDatabase
+        val horizon = now - RETENTION_DAYS * ScoreMath.DAY_MS
+        var deleted = 0
+        deleted += db.compileStatement("DELETE FROM launches WHERE ts < ?")
+            .apply { bindLong(1, horizon) }.use { it.executeUpdateDelete() }
+        deleted += db.compileStatement("DELETE FROM misses WHERE ts < ?")
+            .apply { bindLong(1, horizon) }.use { it.executeUpdateDelete() }
+        deleted += db.compileStatement(
             """DELETE FROM launches WHERE id NOT IN
                (SELECT id FROM launches ORDER BY ts DESC LIMIT $MAX_ROWS)"""
-        )
-        writableDatabase.execSQL(
+        ).use { it.executeUpdateDelete() }
+        deleted += db.compileStatement(
             """DELETE FROM misses WHERE id NOT IN
                (SELECT id FROM misses ORDER BY ts DESC LIMIT $MAX_MISS_ROWS)"""
-        )
+        ).use { it.executeUpdateDelete() }
+        return deleted
+    }
+
+    /** Pages SQLite holds in its free list — space deletes left in the file. */
+    fun freePages(): Long {
+        readableDatabase.rawQuery("PRAGMA freelist_count", null).use { c ->
+            return if (c.moveToFirst()) c.getLong(0) else 0L
+        }
+    }
+
+    /**
+     * Rebuilds the file without its free pages when pruning has left at least
+     * [VACUUM_FREE_PAGES] of them (SQLite never gives deleted pages back on its
+     * own, so the file only ever grew). A few milliseconds on a file this
+     * size; a no-op below the threshold. Returns true when it ran.
+     */
+    fun compactIfFragmented(): Boolean {
+        if (freePages() < VACUUM_FREE_PAGES) return false
+        writableDatabase.execSQL("VACUUM")
+        return true
+    }
+
+    /** Every package with at least one launch or miss row. */
+    fun knownPackages(): Set<String> {
+        val out = HashSet<String>(64)
+        readableDatabase.rawQuery(
+            "SELECT DISTINCT pkg FROM launches UNION SELECT DISTINCT pkg FROM misses", null
+        ).use { c ->
+            while (c.moveToNext()) out.add(c.getString(0))
+        }
+        return out
+    }
+
+    /** Drops every launch and miss row of [pkg] (uninstalled app). Returns rows deleted. */
+    fun deletePackage(pkg: String): Int {
+        val args = arrayOf(pkg)
+        val db = writableDatabase
+        return db.delete("launches", "pkg = ?", args) + db.delete("misses", "pkg = ?", args)
     }
 
     fun clearAll() {
@@ -162,10 +218,12 @@ class UsageDb(context: Context) :
         })
     }
 
-    fun missesSince(sinceTs: Long): List<Row> {
+    /** Miss rows from [sinceTs] on, oldest first; [withState] as in [rowsSince]. */
+    fun missesSince(sinceTs: Long, withState: Boolean = true): List<Row> {
         val rows = ArrayList<Row>(64)
+        val stateCol = if (withState) ", state" else ""
         readableDatabase.rawQuery(
-            "SELECT pkg, ts, hour, dow, ctx_event, state FROM misses WHERE ts >= ? ORDER BY ts",
+            "SELECT pkg, ts, hour, dow, ctx_event$stateCol FROM misses WHERE ts >= ? ORDER BY ts",
             arrayOf(sinceTs.toString())
         ).use { c ->
             while (c.moveToNext()) {
@@ -177,7 +235,7 @@ class UsageDb(context: Context) :
                         dow = c.getInt(3),
                         prevPkg = null,
                         ctxEvent = if (c.isNull(4)) null else c.getString(4),
-                        state = if (c.isNull(5)) null else c.getString(5),
+                        state = if (!withState || c.isNull(5)) null else c.getString(5),
                     )
                 )
             }
@@ -191,8 +249,13 @@ class UsageDb(context: Context) :
         }
     }
 
-    private companion object {
+    companion object {
+        /** Row-count belts, kept as a cap on top of the time-based prune. */
         const val MAX_ROWS = 5000
         const val MAX_MISS_ROWS = 1500
+        /** Rows older than this are deleted — equal to the scoring horizon on purpose. */
+        const val RETENTION_DAYS = ScoreMath.HISTORY_DAYS
+        /** Free pages (4 KB each) that trigger a VACUUM after a prune: 64 ≈ 256 KB. */
+        const val VACUUM_FREE_PAGES = 64L
     }
 }

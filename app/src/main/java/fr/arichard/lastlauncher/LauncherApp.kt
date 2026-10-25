@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import fr.arichard.lastlauncher.apps.AppRepository
 import fr.arichard.lastlauncher.predict.ContextSignals
+import fr.arichard.lastlauncher.predict.PredictionEngine
 
 class LauncherApp : Application() {
 
@@ -32,12 +33,18 @@ class LauncherApp : Application() {
                         fr.arichard.lastlauncher.settings.Prefs(context).addNewApp(it)
                     }
                 }
+                // A real uninstall (never sent for updates): its launch history is
+                // dead weight in the usage log — drop it (DB hygiene, roadmap 1.7).
+                if (intent.action == Intent.ACTION_PACKAGE_FULLY_REMOVED) {
+                    intent.data?.schemeSpecificPart?.let { PredictionEngine.forgetPackage(context, it) }
+                }
                 repo.load()
             }
         }
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_FULLY_REMOVED)
             addAction(Intent.ACTION_PACKAGE_CHANGED)
             addAction(Intent.ACTION_PACKAGE_REPLACED)
             addDataScheme("package")

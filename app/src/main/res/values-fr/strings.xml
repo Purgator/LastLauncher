@@ -217,6 +217,7 @@
     <string name="insights_rows">%1$d lancements mémorisés</string>
     <string name="insights_days">sur %1$d jours</string>
     <string name="insights_db">base de données sur disque : %1$s</string>
+    <string name="insights_scan">dernier balayage : %1$d lignes en %2$d ms (lecture disque %3$d ms, %4$d pages libres)</string>
     <string name="insights_today">%1$d lancements aujourd’hui</string>
     <string name="insights_context_title">Contexte actuel</string>
     <string name="insights_context_now">heure %1$d, %2$s</string>

@@ -217,6 +217,7 @@
     <string name="insights_rows">%1$d launches remembered</string>
     <string name="insights_days">covering %1$d days</string>
     <string name="insights_db">database on disk: %1$s</string>
+    <string name="insights_scan">last scan: %1$d rows in %2$d ms (disk read %3$d ms, %4$d free pages)</string>
     <string name="insights_today">%1$d launches today</string>
     <string name="insights_context_title">Context right now</string>
     <string name="insights_context_now">hour %1$d, %2$s</string>

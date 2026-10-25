@@ -158,7 +158,11 @@ class InsightsActivity : AppCompatActivity() {
         ).append("\n")
         sb.append("  ").append(getString(R.string.insights_today, s.launchesToday)).append("\n")
         sb.append("  ").append(getString(R.string.insights_misses, s.totalMisses)).append("\n")
-        sb.append("  ").append(getString(R.string.insights_state_rows, s.stateRows)).append("\n\n")
+        sb.append("  ").append(getString(R.string.insights_state_rows, s.stateRows)).append("\n")
+        // Scan cost: proves the refresh stays flat whatever the log's size.
+        sb.append("  ").append(
+            getString(R.string.insights_scan, s.scanRows, s.scanMillis, s.loadMillis, s.freePages)
+        ).append("\n\n")
 
         // Live hit-rate calibration (roadmap Tier 0.2) — observability only.
         sb.append("§ ").append(getString(R.string.insights_calibration_title)).append("\n")
