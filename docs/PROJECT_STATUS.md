@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~3 months
-(first commit 2026-07-11), currently at **v1.24.1**. Owner tests
+(first commit 2026-07-11), currently at **v1.24.2**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -226,7 +226,7 @@ in a later message.
   at rest the slot still yields to results. Geometry needed no change: the
   suggestions block sits INVISIBLE behind the results, so `spotBottomMargin`
   still anchors the slot above the trio's line, keyboard up or not.
-- **Unreleased (2026-10-26)**: a drag out of the results list reveals the
+- **v1.24.2 (2026-10-26)**: a drag out of the results list reveals the
   home screen. Owner on v1.24.1: the slot appeared, but over the list, with
   the keyboard up — "lacks elegance". Now `revealHomeForDrag` (from
   trackDrag) fades the list out once the finger has travelled past the
@@ -239,7 +239,7 @@ in a later message.
   at reveal time so a recycled row can't resurface dimmed. Unverified
   on-device: the IME hide mid-drag re-layouting under a live system drag.
 
-## Current state (as of v1.24.1)
+## Current state (as of v1.24.2)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
