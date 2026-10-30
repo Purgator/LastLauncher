@@ -114,4 +114,4 @@ Design rules: everything heavier than a map lookup runs off the main thread; the
 
 ## License
 
-[GPL-3.0](LICENSE)
+[GNU General Public License v3.0 or later](LICENSE) (`GPL-3.0-or-later`)
