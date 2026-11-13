@@ -4,6 +4,15 @@
 
 No app drawers to organize, no pages to swipe through, no widgets to babysit. Just a clock, the three apps you're most likely to want right now, and a command bar where typing two letters launches anything.
 
+<p align="center">
+  <img src="docs/home.png" width="240" alt="LastLauncher home screen: clock, status line, the three suggested apps and the command bar">
+  <img src="docs/search.png" width="240" alt="Typing two letters in the command bar lists the matching apps">
+  <img src="docs/quick-math.png" width="240" alt="Quick math in the command bar: 12*7 gives 84">
+  <img src="docs/settings.png" width="240" alt="LastLauncher settings categories">
+</p>
+
+<p align="center"><sub>The one-page home screen · two letters find any app · quick math in the command bar · the settings.</sub></p>
+
 ## Why it feels like the future
 
 LastLauncher keeps a small on-device memory of *when* you open *what*: the hour, the day, the app you came from, and what your phone was doing (Bluetooth just connected? headphones plugged in? charger attached?). From that it predicts your next app:
