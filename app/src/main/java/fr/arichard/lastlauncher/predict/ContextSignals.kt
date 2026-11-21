@@ -191,21 +191,49 @@ object ContextSignals {
         ) {
             return null
         }
-        val ssid = try {
-            if (android.os.Build.VERSION.SDK_INT >= 31) {
-                val c = caps ?: ctx.getSystemService(android.net.ConnectivityManager::class.java)
-                    ?.let { cm -> cm.activeNetwork?.let { cm.getNetworkCapabilities(it) } }
-                (c?.transportInfo as? android.net.wifi.WifiInfo)?.ssid
-            } else {
+        // A flagged callback's capabilities carry the name — when the app was
+        // allowed to see it at that instant. The synchronous
+        // ConnectivityManager.getNetworkCapabilities() ALWAYS redacts it (12+), so
+        // without usable caps the only on-demand source is WifiManager's
+        // (deprecated, still served) connection info.
+        val fromCaps = if (android.os.Build.VERSION.SDK_INT >= 31) {
+            cleanSsid((caps?.transportInfo as? android.net.wifi.WifiInfo)?.ssid)
+        } else {
+            null
+        }
+        return fromCaps ?: cleanSsid(
+            try {
                 @Suppress("DEPRECATION")
                 (ctx.applicationContext.getSystemService(Context.WIFI_SERVICE)
                     as? android.net.wifi.WifiManager)?.connectionInfo?.ssid
+            } catch (e: Exception) {
+                null
             }
-        } catch (e: Exception) {
-            null
-        }
-        return ssid?.trim('"')?.trim()
+        )
+    }
+
+    /** A usable network name, or null for the quoted/placeholder forms the system returns. */
+    internal fun cleanSsid(raw: String?): String? =
+        raw?.trim()?.trim('"')?.trim()
             ?.takeIf { it.isNotEmpty() && !it.contains("unknown ssid", ignoreCase = true) }
+
+    /**
+     * Upgrades a generic Wi-Fi join still in its window to its per-network token.
+     * Most joins happen with the screen off or another app in front, and the
+     * system hides the network name from an app that is not in the foreground —
+     * the callback then only yields "joined some Wi-Fi". The engine calls this
+     * from its executor right before reading [activeEvent], i.e. once the home
+     * screen is showing and the name is readable. Binder call — off the UI thread.
+     */
+    fun refineWifiJoin(ctx: Context, now: Long = System.currentTimeMillis()) {
+        if (lastEventType != EVENT_WIFI_ON || now - lastEventTs > EVENT_WINDOW_MS) return
+        val prefs = fr.arichard.lastlauncher.settings.Prefs(ctx)
+        val name = currentSsid(ctx, null, prefs) ?: return
+        // Re-checked: a newer event may have landed during the binder call.
+        if (lastEventType == EVENT_WIFI_ON) {
+            lastEventType = "wifi:" + sha256Prefix(prefs.ssidSalt + name)
+            Log.d(TAG, "Wi-Fi join refined to its network token")
+        }
     }
 
     /** First 12 hex chars of SHA-256 — opaque but stable place token. */

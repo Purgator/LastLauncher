@@ -218,9 +218,10 @@ object PredictionEngine {
         val now = System.currentTimeMillis()
         prefs.lastLaunchedTs = now
         val cal = Calendar.getInstance()
-        val event = ContextSignals.activeEvent(now)
         executor.execute {
             try {
+                ContextSignals.refineWifiJoin(appContext, now)
+                val event = ContextSignals.activeEvent(now)
                 val database = db(appContext)
                 val row = UsageDb.Row(
                     pkg = pkg,
@@ -309,6 +310,7 @@ object PredictionEngine {
         val hourNow = cal.get(Calendar.HOUR_OF_DAY)
         val weekendNow = isWeekend(cal.get(Calendar.DAY_OF_WEEK))
         val prev = Prefs(context).lastLaunchedPkg
+        ContextSignals.refineWifiJoin(context, now)
         val activeEvent = ContextSignals.activeEvent(now)
 
         val t0 = android.os.SystemClock.elapsedRealtime()
@@ -376,9 +378,10 @@ object PredictionEngine {
         val cal = Calendar.getInstance()
         val hour = cal.get(Calendar.HOUR_OF_DAY)
         val dow = cal.get(Calendar.DAY_OF_WEEK)
-        val event = ContextSignals.activeEvent(now)
         executor.execute {
             try {
+                ContextSignals.refineWifiJoin(appContext, now)
+                val event = ContextSignals.activeEvent(now)
                 val database = db(appContext)
                 val state = AmbientState.snapshot(appContext, now)
                 for (pkg in shownPkgs) {
