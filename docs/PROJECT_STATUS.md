@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~3 months
-(first commit 2026-07-11), currently at **v1.28.0**. Owner tests
+(first commit 2026-07-11), currently at **v1.29.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -319,7 +319,27 @@ in a later message.
   `Settings.Secure "assistant"` is readable on the Pixel, that the status
   line now shows the network name, and the slot swipe's feel.
 
-## Current state (as of v1.28.0)
+- **v1.29.0 (2026-11-21)**: owner's follow-up — "yes, per device; join/leave
+  already works well, I just want it better; I don't see the Wi-Fi name".
+  **Per-device Bluetooth**: ACL connect records `bt:<salted hash of the
+  address>` (same salt as Wi-Fi). **No learning lost, by construction**:
+  `ScoreMath.triggerMatches` lets a generic token match its family's specific
+  ones in both directions, so legacy `bt_connected` / `wifi_joined` rows keep
+  full weight until they age out; only two different specific tokens miss.
+  This also repairs a regression v1.28.0 introduced for a day: upgrading the
+  active join to `wifi:<hash>` had stopped it matching the (many) generic
+  `wifi_joined` rows. **Wi-Fi name not showing**, two causes: the manifest
+  never declared `ACCESS_WIFI_STATE`, so v1.28.0's `WifiManager` read threw
+  and returned null; and precise location was only ever requested when the
+  place switch was flipped ON (it defaults to on → never asked), with a
+  FINE-only request that Android 12+ drops silently. Now requested FINE +
+  COARSE, once from the home screen when the place signal or the Wi-Fi-name
+  field wants it (one permission dialog per resume), and again by tapping the
+  status line's network token. **Unverified on-device**: that the name now
+  shows once precise location is granted (location services must be ON too),
+  and that `bt:` tokens appear in Insights' "trigger" line on a connect.
+
+## Current state (as of v1.29.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
@@ -358,13 +378,13 @@ in a later message.
   stock clock app, another app (sleep tracker, bedtime schedule, wearable
   companion) owns the alarm slot and we need to filter or pick differently.
   This has not been followed up on since v1.9.4 shipped.
-- **Bluetooth is device-blind** (found 2026-11-21): every ACL connection is the
-  same `bt_connected` trigger. Per-device tokens (`bt:<salted hash of the
-  address>`, like Wi-Fi) were proposed to the owner, not built. If built:
-  keep legacy `bt_connected` rows matching for their 60 days or BT learning
-  restarts from zero, and teach the status line / Insights the new prefix.
-  Same audit: the *current* Wi-Fi network (a state, not a join event) is not
-  scored either — that one needs a backtest first (`docs/BRAIN_IDEAS.md`).
+- **Place/device as a state, not an event** (from the 2026-11-21 audit): the
+  network you are ON and the device that IS connected are not scored — only
+  the 5 minutes after a join/connect are. Needs a backtest first
+  (`docs/BRAIN_IDEAS.md`); the brain export does not carry the hashed
+  network/device in its state snapshot yet, so collecting it is step one.
+  Also noticed: the `bt_signal` switch only gates the permission prompt —
+  `ContextSignals` records Bluetooth events whatever its value.
 - **New-app spotlight "vanishing" — resolved in v1.20.0.** The v1.17.0
   rotation investigation was chasing the wrong thing: the owner's "apps
   disappear from the spotlight quickly" was the tap handler calling
