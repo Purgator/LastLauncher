@@ -90,6 +90,28 @@ class ScoreMathTest {
     }
 
     @Test
+    fun specificTriggersOnlyMatchThemselvesOrTheirGenericForm() {
+        val hit = 1.0 + ScoreMath.W_TRIGGER
+        // Same device / same network.
+        assertEquals(hit, score(rowCtx = "bt:aaa", activeEvent = "bt:aaa"), 1e-9)
+        assertEquals(hit, score(rowCtx = "wifi:home", activeEvent = "wifi:home"), 1e-9)
+        // Car vs headphones, home vs office: different triggers.
+        assertEquals(1.0, score(rowCtx = "bt:aaa", activeEvent = "bt:bbb"), 1e-9)
+        assertEquals(1.0, score(rowCtx = "wifi:home", activeEvent = "wifi:office"), 1e-9)
+        // Rows logged before the finer grain keep their full weight…
+        assertEquals(hit, score(rowCtx = "bt_connected", activeEvent = "bt:aaa"), 1e-9)
+        assertEquals(hit, score(rowCtx = "wifi_joined", activeEvent = "wifi:home"), 1e-9)
+        // …and a join whose name could not be read still finds the named rows.
+        assertEquals(hit, score(rowCtx = "wifi:home", activeEvent = "wifi_joined"), 1e-9)
+        assertEquals(hit, score(rowCtx = "bt:aaa", activeEvent = "bt_connected"), 1e-9)
+        // Families never cross, and leaving Wi-Fi is not joining it.
+        assertEquals(1.0, score(rowCtx = "bt:aaa", activeEvent = "wifi:aaa"), 1e-9)
+        assertEquals(1.0, score(rowCtx = "bt_connected", activeEvent = "wifi_joined"), 1e-9)
+        assertEquals(1.0, score(rowCtx = "wifi_left", activeEvent = "wifi:home"), 1e-9)
+        assertEquals(1.0, score(rowCtx = "wifi_left", activeEvent = "wifi_joined"), 1e-9)
+    }
+
+    @Test
     fun allSignalsStackOnTheDecayedWeight() {
         val expected = exp(-1.0) * (
             1.0 + ScoreMath.W_HOUR + ScoreMath.W_DAY_TYPE +

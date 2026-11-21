@@ -137,7 +137,34 @@ object ScoreMath {
         if (circularHourDiff(rowHour, hourNow) <= 1) s += W_HOUR * w
         if (isWeekend(rowDow) == weekendNow) s += W_DAY_TYPE * w
         if (prevPkg != null && rowPrevPkg == prevPkg) s += W_TRANSITION * w
-        if (activeEvent != null && rowCtxEvent == activeEvent) s += W_TRIGGER * w
+        if (triggerMatches(rowCtxEvent, activeEvent)) s += W_TRIGGER * w
         return s
     }
+
+    /**
+     * Whether a logged row's trigger counts for the trigger in effect now.
+     * Identical tokens always do. Wi-Fi joins and Bluetooth connections each
+     * come in two grains — a generic token ("wifi_joined", "bt_connected") and
+     * a per-network / per-device one ("wifi:<hash>", "bt:<hash>") — and inside
+     * one family a generic token on EITHER side still matches: rows logged
+     * before the finer grain existed (or while the name was unreadable) keep
+     * all their weight, so going finer never throws learning away. Only two
+     * DIFFERENT specific tokens — office vs home, car vs headphones — miss.
+     */
+    fun triggerMatches(rowEvent: String?, activeEvent: String?): Boolean {
+        if (rowEvent == null || activeEvent == null) return false
+        if (rowEvent == activeEvent) return true
+        for ((generic, prefix) in TRIGGER_FAMILIES) {
+            val rowIn = rowEvent == generic || rowEvent.startsWith(prefix)
+            val activeIn = activeEvent == generic || activeEvent.startsWith(prefix)
+            if (rowIn && activeIn) return rowEvent == generic || activeEvent == generic
+        }
+        return false
+    }
+
+    /** (generic token, specific-token prefix) per two-grain trigger family. */
+    private val TRIGGER_FAMILIES = listOf(
+        ContextSignals.EVENT_WIFI_ON to ContextSignals.WIFI_PREFIX,
+        ContextSignals.EVENT_BT_CONNECTED to ContextSignals.BT_PREFIX,
+    )
 }

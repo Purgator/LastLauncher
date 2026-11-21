@@ -62,7 +62,7 @@ object ContextSignals {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 when (intent.action) {
-                    BluetoothDevice.ACTION_ACL_CONNECTED -> recordEvent(EVENT_BT_CONNECTED)
+                    BluetoothDevice.ACTION_ACL_CONNECTED -> recordEvent(btConnectEvent(ctx, intent))
                     Intent.ACTION_POWER_CONNECTED -> recordEvent(EVENT_POWER_CONNECTED)
                     Intent.ACTION_HEADSET_PLUG -> {
                         // 1 = plugged; the sticky initial broadcast is ignored on register
@@ -88,6 +88,29 @@ object ContextSignals {
         registerNetworkSignals(context)
         registerMotionSignal(context)
     }
+
+    /**
+     * The event for a Bluetooth connection: "bt:<hash>" of the device's address,
+     * so the car and the headphones (and a watch that keeps reconnecting) are
+     * three different triggers. Same salted hash as the Wi-Fi place token — the
+     * address itself is never stored. Falls back to the generic event when the
+     * broadcast carries no device.
+     */
+    private fun btConnectEvent(ctx: Context, intent: Intent): String {
+        val address = try {
+            androidx.core.content.IntentCompat.getParcelableExtra(
+                intent, BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java
+            )?.address
+        } catch (e: Exception) {
+            null
+        }
+        if (address.isNullOrEmpty()) return EVENT_BT_CONNECTED
+        val salt = fr.arichard.lastlauncher.settings.Prefs(ctx.applicationContext).ssidSalt
+        return BT_PREFIX + sha256Prefix(salt + address)
+    }
+
+    const val BT_PREFIX = "bt:"
+    const val WIFI_PREFIX = "wifi:"
 
     /**
      * Wi-Fi joins/leaves stand in for places (home, office, gym); with the
@@ -171,7 +194,7 @@ object ContextSignals {
         val ctx = appContext ?: return EVENT_WIFI_ON
         val prefs = fr.arichard.lastlauncher.settings.Prefs(ctx)
         val name = currentSsid(ctx, caps, prefs) ?: return EVENT_WIFI_ON
-        return "wifi:" + sha256Prefix(prefs.ssidSalt + name)
+        return WIFI_PREFIX + sha256Prefix(prefs.ssidSalt + name)
     }
 
     /**
@@ -231,7 +254,7 @@ object ContextSignals {
         val name = currentSsid(ctx, null, prefs) ?: return
         // Re-checked: a newer event may have landed during the binder call.
         if (lastEventType == EVENT_WIFI_ON) {
-            lastEventType = "wifi:" + sha256Prefix(prefs.ssidSalt + name)
+            lastEventType = WIFI_PREFIX + sha256Prefix(prefs.ssidSalt + name)
             Log.d(TAG, "Wi-Fi join refined to its network token")
         }
     }

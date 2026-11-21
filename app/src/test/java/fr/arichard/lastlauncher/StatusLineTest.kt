@@ -203,6 +203,7 @@ class StatusLineTest {
         assertEquals("chg", StatusLine.contextLabel("power_connected"))
         assertEquals("wifi", StatusLine.contextLabel("wifi_joined"))
         assertEquals("wifi", StatusLine.contextLabel("wifi:3f9a1c0b2d4e")) // hashed place stays opaque
+        assertEquals("bt", StatusLine.contextLabel("bt:3f9a1c0b2d4e")) // so does a hashed device
         assertEquals("moving", StatusLine.contextLabel("started_moving"))
         assertEquals("some_new", StatusLine.contextLabel("some_new_event")) // unknown ids are cut, never dropped
     }

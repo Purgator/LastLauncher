@@ -154,6 +154,7 @@ object StatusLine {
     /** Short label for a ContextSignals event id; a hashed Wi-Fi place reads as plain wifi. */
     internal fun contextLabel(event: String): String = when {
         event.startsWith("wifi:") -> "wifi"
+        event.startsWith("bt:") -> "bt"
         else -> when (event) {
             "bt_connected" -> "bt"
             "headset_plugged" -> "jack"
