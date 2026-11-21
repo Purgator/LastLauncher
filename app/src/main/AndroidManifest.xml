@@ -17,6 +17,9 @@
     <!-- Optional per-network place signal: reading the joined Wi-Fi's name requires
          fine location. Only a salted hash of the name is ever stored. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- WifiManager.getConnectionInfo() — the only on-demand read of the joined
+         network's name — throws without it. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Bluetooth connection events feed the prediction engine (optional signal). -->
     <uses-permission
         android:name="android.permission.BLUETOOTH"

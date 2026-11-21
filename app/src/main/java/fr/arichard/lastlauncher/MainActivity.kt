@@ -146,8 +146,14 @@ class MainActivity : AppCompatActivity() {
         resetToHome()
         updateStarterPill()
         refreshSuggestions()
+        // One permission dialog per resume: a request made while another is
+        // pending comes back cancelled, and its "asked" flag would be burnt.
+        val askedBefore = prefs.btPermissionAsked to prefs.calendarPermissionAsked
         maybeRequestBluetoothPermission()
         maybeRequestCalendarPermission()
+        if (askedBefore == (prefs.btPermissionAsked to prefs.calendarPermissionAsked)) {
+            maybeRequestWifiNamePermission()
+        }
         checkForUpdate()
         setupStatusLine()
         NotifListener.ensureBound(this)
@@ -2650,11 +2656,10 @@ class MainActivity : AppCompatActivity() {
                     when (segment.first) {
                         StatusLine.BATTERY ->
                             openSettingsAction(Intent.ACTION_POWER_USAGE_SUMMARY)
-                        StatusLine.NETWORK -> openSettingsAction(
-                            if (net == StatusLine.Net.WIFI) Settings.ACTION_WIFI_SETTINGS
-                            else Settings.ACTION_WIRELESS_SETTINGS
-                        )
-                        StatusLine.WIFI_NAME -> openSettingsAction(Settings.ACTION_WIFI_SETTINGS)
+                        StatusLine.NETWORK ->
+                            if (net == StatusLine.Net.WIFI) onWifiTokenTapped()
+                            else openSettingsAction(Settings.ACTION_WIRELESS_SETTINGS)
+                        StatusLine.WIFI_NAME -> onWifiTokenTapped()
                         StatusLine.BT -> openSettingsAction(Settings.ACTION_BLUETOOTH_SETTINGS)
                         StatusLine.RINGER -> openSettingsAction(Settings.ACTION_SOUND_SETTINGS)
                         StatusLine.ALARM ->
@@ -3429,6 +3434,50 @@ class MainActivity : AppCompatActivity() {
         }
         prefs.btPermissionAsked = true
         requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1)
+    }
+
+    private fun hasFineLocation(): Boolean =
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+
+    /** Something the user turned on needs the joined Wi-Fi's name. */
+    private fun wantsWifiName(): Boolean = prefs.ssidSignal &&
+        ((prefs.showStatusLine && StatusLine.WIFI_NAME in prefs.statusTokens) || prefs.predictions)
+
+    /**
+     * Reading the Wi-Fi name needs precise location, which until now was only
+     * requested when the place-signal switch was flipped ON — and that switch
+     * defaults to on, so most installs never saw the dialog. Asked once here.
+     */
+    private fun maybeRequestWifiNamePermission() {
+        if (prefs.wifiNamePermissionAsked || !wantsWifiName() || hasFineLocation()) return
+        prefs.wifiNamePermissionAsked = true
+        requestWifiNamePermission()
+    }
+
+    private fun requestWifiNamePermission() {
+        Toast.makeText(this, R.string.ssid_needs_location, Toast.LENGTH_LONG).show()
+        // FINE and COARSE together: Android 12+ silently drops a request for FINE alone.
+        requestPermissions(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            ),
+            3,
+        )
+    }
+
+    /** Wi-Fi token tapped: ask for the missing permission if the name is wanted, else Wi-Fi settings. */
+    private fun onWifiTokenTapped() {
+        if (StatusLine.WIFI_NAME in prefs.statusTokens && prefs.ssidSignal && !hasFineLocation() &&
+            (!prefs.wifiNamePermissionAsked ||
+                shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION))
+        ) {
+            prefs.wifiNamePermissionAsked = true
+            requestWifiNamePermission()
+        } else {
+            openSettingsAction(Settings.ACTION_WIFI_SETTINGS)
+        }
     }
 
     private companion object {

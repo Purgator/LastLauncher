@@ -364,8 +364,14 @@ class SettingsActivity : AppCompatActivity(),
                             android.Manifest.permission.ACCESS_FINE_LOCATION
                         ) != android.content.pm.PackageManager.PERMISSION_GRANTED
                     ) {
+                        // Both together: on Android 12+ a request for FINE
+                        // alone is silently dropped — no dialog, no grant.
                         requestPermissions(
-                            arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), 44
+                            arrayOf(
+                                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                            ),
+                            44,
                         )
                         Toast.makeText(
                             requireContext(), R.string.ssid_needs_location, Toast.LENGTH_SHORT

@@ -73,7 +73,7 @@ class ConfigBackupTest {
             Prefs.KEY_CALIBRATION, Prefs.KEY_NEW_APPS, Prefs.KEY_PARKED,
             Prefs.KEY_WEATHER_TEMP, Prefs.KEY_WEATHER_CODE, Prefs.KEY_WEATHER_FETCH,
             Prefs.KEY_LAST_UPDATE_CHECK, Prefs.KEY_UPDATE_DEFERRED,
-            Prefs.KEY_BT_PERM_ASKED, Prefs.KEY_CAL_PERM_ASKED,
+            Prefs.KEY_BT_PERM_ASKED, Prefs.KEY_WIFI_NAME_PERM_ASKED, Prefs.KEY_CAL_PERM_ASKED,
             Prefs.KEY_AGENDA_EXCLUDED, // carried separately, by name
             Prefs.KEY_DRAWER_APPS, // legacy, migrated
         )

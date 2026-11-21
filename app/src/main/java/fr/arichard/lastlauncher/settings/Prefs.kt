@@ -253,6 +253,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean(KEY_BT_PERM_ASKED, false)
         set(value) = sp.edit().putBoolean(KEY_BT_PERM_ASKED, value).apply()
 
+    /** Precise location (to read the Wi-Fi name) was requested once from the home screen. */
+    var wifiNamePermissionAsked: Boolean
+        get() = sp.getBoolean(KEY_WIFI_NAME_PERM_ASKED, false)
+        set(value) = sp.edit().putBoolean(KEY_WIFI_NAME_PERM_ASKED, value).apply()
+
     /** Persisted command-bar mode id (smart/apps/settings/ask). */
     var searchModeId: String
         get() = sp.getString(KEY_SEARCH_MODE, "smart") ?: "smart"
@@ -455,6 +460,7 @@ class Prefs(context: Context) {
         const val KEY_MUSIC_WIDGET = "music_widget"
         const val KEY_ONBOARDING_DONE = "onboarding_done"
         const val KEY_BT_PERM_ASKED = "bt_permission_asked"
+        const val KEY_WIFI_NAME_PERM_ASKED = "wifi_name_permission_asked"
         const val KEY_LAST_LAUNCHED = "last_launched_pkg"
         const val KEY_LAST_LAUNCHED_TS = "last_launched_ts"
         const val KEY_CALIBRATION = "predict_calibration"
