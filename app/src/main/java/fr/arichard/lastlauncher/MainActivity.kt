@@ -334,6 +334,12 @@ class MainActivity : AppCompatActivity() {
     private var musicDispatchCandidate = false
     private var musicDispatchClaimed = false
 
+    // A swipe on a floating slot that holds several apps turns it to the next one.
+    // The slots overlap the suggestion band, so they are tested first and win.
+    private var slotDispatchCandidate = SLOT_NONE
+    private var slotDispatchClaimed = false
+    private var slotDispatchFired = false
+
     /** Whether the DOWN at ([x], [y]) landed on [view] (window coordinates). */
     private fun downInView(view: View, x: Float, y: Float): Boolean {
         if (view.visibility != View.VISIBLE) return false
@@ -366,8 +372,11 @@ class MainActivity : AppCompatActivity() {
                 suggSwipeActive = false
                 suggDispatchClaimed = false
                 musicDispatchClaimed = false
+                slotDispatchClaimed = false
+                slotDispatchFired = false
+                slotDispatchCandidate = slotUnder(ev.x, ev.y)
                 val edge = 40 * resources.displayMetrics.density
-                suggDispatchCandidate =
+                suggDispatchCandidate = slotDispatchCandidate == SLOT_NONE &&
                     binding.suggestionsBlock.visibility == View.VISIBLE &&
                     downInSuggestions() &&
                     ev.x > edge && ev.x < binding.root.width - edge // edges = drawer pulls
@@ -377,10 +386,30 @@ class MainActivity : AppCompatActivity() {
                 maxPointers = maxOf(maxPointers, ev.pointerCount)
                 suggDispatchCandidate = false // two-finger swipes run gesture actions
                 musicDispatchCandidate = false
+                if (!slotDispatchClaimed) slotDispatchCandidate = SLOT_NONE
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = ev.x - downX
                 val dy = ev.y - downY
+                // Any direction counts on a slot: it is a small round target, and
+                // leaving the touch slop already rules out a tap or a long-press lift.
+                if (slotDispatchCandidate != SLOT_NONE && !slotDispatchClaimed &&
+                    kotlin.math.hypot(dx, dy) > slop * 1.5f
+                ) {
+                    slotDispatchClaimed = true
+                    claimDispatchGesture(ev)
+                }
+                if (slotDispatchClaimed) {
+                    if (!slotDispatchFired &&
+                        kotlin.math.hypot(dx, dy) >= SLOT_SWIPE_DP * resources.displayMetrics.density
+                    ) {
+                        slotDispatchFired = true
+                        // Left / up = next, right / down = back — the trio's convention.
+                        val forward = if (abs(dx) >= abs(dy)) dx < 0 else dy < 0
+                        turnSlot(slotDispatchCandidate, forward)
+                    }
+                    return true
+                }
                 if (musicDispatchCandidate && !musicDispatchClaimed &&
                     abs(dx) > slop * 1.5f && abs(dx) > abs(dy) * 1.2f
                 ) {
@@ -400,6 +429,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (slotDispatchClaimed) {
+                    slotDispatchClaimed = false
+                    slotDispatchCandidate = SLOT_NONE
+                    return true
+                }
                 if (musicDispatchClaimed) {
                     musicDispatchClaimed = false
                     val dx = ev.x - downX
@@ -1449,34 +1483,74 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Opens the assistant. When [query] is given (Ask mode / "ask the assistant" row),
-     * the text is carried along: Android has no universal "ask the assistant this text"
-     * intent, so we deliver it via the query-bearing search intent the Google app and
-     * most assistants handle, falling back to the plain voice/assist entry points.
+     * the text must travel with it — and Android has no "ask the assistant this
+     * text" intent. ACTION_ASSIST with a query extra (the previous approach) always
+     * "succeeds" and opens an EMPTY assistant: the extra is ignored and the
+     * fallbacks behind it were never reached. So the text goes the one way every
+     * chat assistant accepts it: shared as plain text straight to the assistant
+     * app, then a web search carrying the query, and only then the bare assistant.
      */
     private fun launchAssistant(query: String? = null) {
         haptic(binding.modeBtn)
         val q = query?.trim().orEmpty()
-        val candidates = if (q.isNotEmpty()) {
-            listOf(
-                Intent(Intent.ACTION_ASSIST).putExtra(SearchManager.QUERY, q),
-                Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, q),
-                Intent(Intent.ACTION_VOICE_COMMAND),
-            )
-        } else {
-            listOf(
-                Intent(Intent.ACTION_VOICE_COMMAND),
-                Intent(Intent.ACTION_ASSIST),
-                Intent(Intent.ACTION_WEB_SEARCH),
-            )
-        }
-        for (intent in candidates) {
-            try {
-                startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                return
-            } catch (e: Exception) {
-                // try the next one
+        if (q.isNotEmpty()) {
+            for (pkg in assistantPackages()) {
+                val share = Intent(Intent.ACTION_SEND)
+                    .setType("text/plain")
+                    .putExtra(Intent.EXTRA_TEXT, q)
+                    .setPackage(pkg)
+                if (tryStart(share)) return
             }
+            if (tryStart(Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, q))) return
         }
+        // No text to carry (or nobody took it): the system's own "show the
+        // assistant" call — the same door as the power-button / corner gesture —
+        // before the activity-based entry points, which can land on a chooser.
+        try {
+            if (showAssist(Bundle())) return
+        } catch (e: Exception) {
+            // fall through to the intents
+        }
+        for (intent in listOf(
+            Intent(Intent.ACTION_VOICE_COMMAND),
+            Intent(Intent.ACTION_ASSIST),
+            Intent(Intent.ACTION_WEB_SEARCH),
+        )) {
+            if (tryStart(intent)) return
+        }
+    }
+
+    private fun tryStart(intent: Intent): Boolean = try {
+        startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    } catch (e: Exception) {
+        false
+    }
+
+    /**
+     * Apps to hand a typed question to, best first: the device's chosen assistant.
+     * When that is the Google app (which hosts both the classic Assistant and
+     * Gemini's overlay), the standalone Gemini app goes first — it takes shared
+     * text as a prompt, where the Google app would only run a search. Packages
+     * that are absent or take no text simply fail the start and are skipped.
+     */
+    private fun assistantPackages(): List<String> {
+        val out = ArrayList<String>(3)
+        for (key in listOf("assistant", "voice_interaction_service")) {
+            val pkg = try {
+                Settings.Secure.getString(contentResolver, key)
+                    ?.let { android.content.ComponentName.unflattenFromString(it) }
+                    ?.packageName
+            } catch (e: Exception) {
+                null // the key is not public API: unreadable on some builds
+            }
+            if (pkg != null && pkg !in out) out.add(pkg)
+        }
+        if (out.isEmpty() || GOOGLE_APP_PKG in out) {
+            out.remove(GEMINI_PKG)
+            out.add(0, GEMINI_PKG)
+        }
+        return out
     }
 
     // ------------------------------------------------------------- commands
@@ -3203,6 +3277,45 @@ class MainActivity : AppCompatActivity() {
             }.start()
     }
 
+    /**
+     * Which floating slot a touch-down at ([x], [y]) can turn by swiping: only a
+     * slot that is really showing and holds more than one app — a single-app slot
+     * keeps its plain tap / long-press handling, untouched.
+     */
+    private fun slotUnder(x: Float, y: Float): Int = when {
+        dragInFlight -> SLOT_NONE
+        downInView(binding.newAppSpot, x, y) &&
+            prefs.newApps().count { repo.byPackage(it) != null } > 1 -> SLOT_NEW_APP
+        binding.parkSpot.alpha >= 0.5f && downInView(binding.parkSpot, x, y) &&
+            prefs.parkedApps().count { repo.byComponentKey(it) != null } > 1 -> SLOT_PARK
+        else -> SLOT_NONE
+    }
+
+    /**
+     * The swipe on a slot: shows its next (or previous) app now instead of waiting
+     * for the timer, and restarts that timer so the chosen app gets a full stay.
+     * The index fields point at the app that comes NEXT, hence the −2 to go back.
+     */
+    private fun turnSlot(slot: Int, forward: Boolean) {
+        if (slot == SLOT_NEW_APP) {
+            val n = prefs.newApps().count { repo.byPackage(it) != null }
+            if (n < 2) return
+            haptic(binding.newAppSpot)
+            if (!forward) spotIndex = Math.floorMod(spotIndex - 2, n)
+            spotHandler.removeCallbacks(spotRunnable)
+            showNextSpotApp()
+            spotHandler.postDelayed(spotRunnable, SPOT_ROTATE_MS)
+        } else if (slot == SLOT_PARK) {
+            val n = prefs.parkedApps().count { repo.byComponentKey(it) != null }
+            if (n < 2) return
+            haptic(binding.parkSpot)
+            if (!forward) parkIndex = Math.floorMod(parkIndex - 2, n)
+            parkHandler.removeCallbacks(parkRotate)
+            showNextParked()
+            if (prefs.parkMulti) parkHandler.postDelayed(parkRotate, SPOT_ROTATE_MS)
+        }
+    }
+
     private fun showNextParked() {
         val parked = prefs.parkedApps().mapNotNull { repo.byComponentKey(it) }
         if (parked.isEmpty()) {
@@ -3333,6 +3446,12 @@ class MainActivity : AppCompatActivity() {
         const val MUSIC_SKIP_PX = 48
         // Radius (dp) inside which a drag makes the park slot lean toward the finger.
         const val PARK_ATTRACT_DP = 120
+        const val GOOGLE_APP_PKG = "com.google.android.googlequicksearchbox"
+        const val GEMINI_PKG = "com.google.android.apps.bard"
+        const val SLOT_NONE = 0
+        const val SLOT_NEW_APP = 1
+        const val SLOT_PARK = 2
+        const val SLOT_SWIPE_DP = 22       // travel on a floating slot that turns it
         const val DRAG_MENU_DP = 18        // lift travel below this = long-press → menu
         const val DRAG_EDGE_OPEN_DP = 48   // finger this close to an edge opens its drawer
         const val REMOVE_ZONE_DP = 120     // top/bottom depth where a drop removes

@@ -16,7 +16,7 @@ ending the conversation — that's the whole point of the file.
 A one-page Android launcher (single Kotlin module, no third-party runtime
 deps) that predicts the user's next app from on-device usage patterns and
 puts three guesses under the thumb. Built conversationally over ~3 months
-(first commit 2026-07-11), currently at **v1.27.0**. Owner tests
+(first commit 2026-07-11), currently at **v1.28.0**. Owner tests
 on a **Pixel 8 Pro, English system language** — no emulator/device available
 in the dev environment, so verification is always compile + unit tests +
 lint + reasoning, with real-device confirmation coming back from the owner
@@ -294,7 +294,32 @@ in a later message.
   **Unverified on-device**: nothing beyond the usual — all reads are
   existing, exercised paths.
 
-## Current state (as of v1.27.0)
+- **v1.28.0 (2026-11-21)**: three owner asks. **(1) "Is the Wi-Fi SSID really a
+  criterion, and Bluetooth?"** — audit: the SSID is one, but only as a
+  *just-joined* trigger (`wifi:<hash>`, 5-minute window, exact-token match in
+  `ScoreMath.rowScore`); "which network am I on right now" is not scored
+  (AmbientState's `wifi` is on/off and unscored). Two real holes found and
+  fixed: the system hides the SSID from a non-foreground app, so joins seen
+  with the screen off — most of them — were logged as generic `wifi_joined`
+  (now `ContextSignals.refineWifiJoin` upgrades the pending join from the
+  engine's executor once the home screen shows); and `currentSsid` without
+  callback caps used the synchronous `getNetworkCapabilities()`, which always
+  redacts the name on 12+ — so v1.26.0's status-line Wi-Fi name likely never
+  showed (now `WifiManager.connectionInfo`). **Bluetooth is NOT per-device**:
+  one `bt_connected` token for any device (car, headphones, a watch
+  reconnecting). Left as is — owner to decide (see Open threads). **(2)** Swipe
+  a floating slot holding several apps to turn it now (`turnSlot`, dispatch-
+  level claim tested before the suggestion band). **(3)** "Ask the assistant"
+  with typed text did nothing useful: `ACTION_ASSIST` + query extra starts
+  fine and ignores the text, so the fallbacks never ran. Now the text is
+  shared (ACTION_SEND text/plain) to the assistant app (Gemini first when the
+  assistant is the Google app), then ACTION_WEB_SEARCH; no-text path uses
+  `showAssist()`. **Unverified on-device**: all three — that Gemini takes the
+  shared text as a prompt (and whether it submits it or only prefills), that
+  `Settings.Secure "assistant"` is readable on the Pixel, that the status
+  line now shows the network name, and the slot swipe's feel.
+
+## Current state (as of v1.28.0)
 
 - **Toolchain**: JDK 25 (Temurin, `C:/dev/tools/jdk-25`, user `JAVA_HOME`) /
   Gradle 9.5.1 / AGP 8.13.2 / Kotlin 2.2.21. App still targets Java 17
@@ -333,6 +358,13 @@ in a later message.
   stock clock app, another app (sleep tracker, bedtime schedule, wearable
   companion) owns the alarm slot and we need to filter or pick differently.
   This has not been followed up on since v1.9.4 shipped.
+- **Bluetooth is device-blind** (found 2026-11-21): every ACL connection is the
+  same `bt_connected` trigger. Per-device tokens (`bt:<salted hash of the
+  address>`, like Wi-Fi) were proposed to the owner, not built. If built:
+  keep legacy `bt_connected` rows matching for their 60 days or BT learning
+  restarts from zero, and teach the status line / Insights the new prefix.
+  Same audit: the *current* Wi-Fi network (a state, not a join event) is not
+  scored either — that one needs a backtest first (`docs/BRAIN_IDEAS.md`).
 - **New-app spotlight "vanishing" — resolved in v1.20.0.** The v1.17.0
   rotation investigation was chasing the wrong thing: the owner's "apps
   disappear from the spotlight quickly" was the tap handler calling

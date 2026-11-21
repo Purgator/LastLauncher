@@ -100,7 +100,7 @@ perfect per-commit compilability impractical — prioritize a readable history.
 | `predict/Satiation.kt` | `SatiationTracker` (pure, unit-tested): per-app repeat rate = launches followed by the same app 45 min–12 h later (rebounds inside the crush window stay open, < 5 s reinforcement rows skipped). Rate ≤ 0.2 over ≥ 10 settled launches → ×0.25 while 45 min < elapsed < 12 h. Fed by the engine's scan and by the backtester's fold; damps the history score only, never notification/boost terms. |
 | `predict/UsageDb.kt` | SQLite log of launches + misses (corrected-trio rows), both context-stamped; schema 3 adds a `state` column (ambient snapshot). Bounded: rows older than `RETENTION_DAYS` (= the 60-day scoring horizon) are pruned, count belts at 5000 / 1500 on top, `VACUUM` once ≥ 64 pages are free; housekeeping runs on first open per process and every 200 inserts, and sweeps uninstalled packages (skipped if > 10 read as absent). The engine keeps the window's rows in memory (loaded once per process, appended on insert, dropped by any delete) — scoring never re-reads disk; the scoring projection skips `state`. Never leaves the device unless the user exports. |
 | `predict/AmbientState.kt` | Per-row *state* snapshot (`dnd=…,chg=…,alarm=…,wifi=…,bt=…`), read with cheap binder calls on the predict executor at log time — DND filter, charging, minutes to the next alarm (<24 h), Wi-Fi transport, BT audio connected. **Collected for the brain export only; scoring ignores it** until a backtest earns a state a weight (the "bedtime app" question — see `docs/BRAIN_IDEAS.md` 2026-10-14 section). Pure format/parse is unit-tested. |
-| `predict/ContextSignals.kt` | Trigger events (5-minute window): Bluetooth/headset/charger receivers, Wi-Fi join/leave + connectivity lost/regained (NetworkCallbacks), "started moving" via the one-shot significant-motion sensor (never the raw accelerometer — battery). With `ssid_signal` + fine location, a join records `wifi:<sha256(salt+ssid)[:12]>` — salt is a per-install random UUID, so tokens are opaque and app-only. |
+| `predict/ContextSignals.kt` | Trigger events (5-minute window): Bluetooth/headset/charger receivers, Wi-Fi join/leave + connectivity lost/regained (NetworkCallbacks), "started moving" via the one-shot significant-motion sensor (never the raw accelerometer — battery). With `ssid_signal` + fine location, a join records `wifi:<sha256(salt+ssid)[:12]>` — salt is a per-install random UUID, so tokens are opaque and app-only. The system hides the SSID from a non-foreground app, so a join seen with the screen off lands as generic `wifi_joined`; `refineWifiJoin` (called by the engine on its executor before every `activeEvent` read) upgrades it once the home screen shows. `currentSsid` without callback caps reads `WifiManager.connectionInfo` — the synchronous `getNetworkCapabilities()` always redacts the name on 12+. Bluetooth is ONE generic `bt_connected` token (any device); AmbientState's wifi/bt are on/off, unscored. |
 | `notify/NotifListener.kt` | NotificationListenerService → badge counts + ticker messages, in-memory only. |
 | `notify/MediaWatch.kt` | Active media sessions via MediaSessionManager (rides the notification-listener grant): the now-playing row's data + transport controls. Registered only while resumed. |
 | `notify/MediaState.kt` | Pure playback-state ranking (unit-tested): which session the row shows. |
@@ -208,7 +208,17 @@ dispatchDraw and the results panel uses `clipToOutline` — keep both.
   either slot (and the now-playing app) are excluded from the suggestion trio
   (visibleSuggestionPool). At rest the park slot yields to a drawer on its side;
   during a drag it stays live and moves in past the drawer band (placeSlot
-  pastDrawer) so a drop is always possible.
+  pastDrawer) so a drop is always possible. A slot holding SEVERAL apps turns on
+  a swipe (any direction, SLOT_SWIPE_DP = 22; left/up = next, right/down = back,
+  timer restarted): claimed in `dispatchTouchEvent` like the trio and music
+  swipes, and tested BEFORE the suggestion band, which the slots overlap. A
+  single-app slot is never a candidate, so its tap / long-press path is untouched.
+- Asking the assistant with text (`launchAssistant(query)`): the text is SHARED
+  (ACTION_SEND text/plain, setPackage) to the device's assistant app — Gemini's
+  standalone app first when the assistant is the Google app — then
+  ACTION_WEB_SEARCH with the query. Never ACTION_ASSIST + a query extra: it
+  starts fine, ignores the text, and hides every fallback behind it. Without
+  text: `Activity.showAssist()` first, then the voice/assist intents.
 - Drag & drop, one model everywhere (trio, results rows, spotlight, park slot,
   drawer items): long-press LIFTS the app into a system drag; releasing it within
   DRAG_MENU_DP (18 dp) of the lift point is a long-press → app menu (onDragEnded
