@@ -392,6 +392,12 @@ in a later message.
   the "Hours it stays" setting. Removed; the spotlight now only expires by
   time. If rotation still looks off after this, re-open the v1.17.0 note.
 
+- **Never-suggested apps (1.30.0, unreleased until the evening window):** per-app
+  "Never suggest" in the long-press menu + Settings → Suggestions list
+  (`Prefs.noTrioApps`, backed up). Filtered in `MainActivity.visibleSuggestionPool`
+  only — the engine still learns from the app, search/lists are untouched, and it
+  also keeps the app out of the now-playing front slot. Not device-tested.
+
 ## Environment quick facts (full detail in `CLAUDE.md`)
 
 - Fresh shell already has `JAVA_HOME` pointed at Temurin 25; only a shell

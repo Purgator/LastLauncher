@@ -140,6 +140,13 @@ class SettingsActivity : AppCompatActivity(),
     class RootFragment : BaseFragment() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.preferences, rootKey)
+            findPreference<Preference>("no_trio_apps")?.setOnPreferenceClickListener {
+                pickAppsByPackage(getString(R.string.pref_no_trio), prefs.noTrioApps) {
+                    prefs.noTrioApps = it.toSet()
+                }
+                true
+            }
+
             findPreference<Preference>("insights")?.setOnPreferenceClickListener {
                 startActivity(Intent(requireContext(), InsightsActivity::class.java))
                 true

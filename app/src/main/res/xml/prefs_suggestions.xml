@@ -26,6 +26,10 @@
         android:title="@string/pref_boosted"
         android:summary="@string/pref_boosted_summary" />
     <Preference
+        android:key="no_trio_apps"
+        android:title="@string/pref_no_trio"
+        android:summary="@string/pref_no_trio_summary" />
+    <Preference
         android:key="insights"
         android:title="@string/pref_insights"
         android:summary="@string/pref_insights_summary" />

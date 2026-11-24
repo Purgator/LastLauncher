@@ -91,6 +91,11 @@ class Prefs(context: Context) {
         get() = sp.getStringSet(KEY_BOOSTED_APPS, emptySet()) ?: emptySet()
         set(value) = sp.edit().putStringSet(KEY_BOOSTED_APPS, value).apply()
 
+    /** Apps that stay in search and the lists but never appear in the suggestion trio. */
+    var noTrioApps: Set<String>
+        get() = sp.getStringSet(KEY_NO_TRIO_APPS, emptySet()) ?: emptySet()
+        set(value) = sp.edit().putStringSet(KEY_NO_TRIO_APPS, value).apply()
+
     val weatherHasCache: Boolean get() = sp.contains(KEY_WEATHER_TEMP)
     val weatherTempC: Double
         get() = java.lang.Double.longBitsToDouble(sp.getLong(KEY_WEATHER_TEMP, 0))
@@ -446,6 +451,7 @@ class Prefs(context: Context) {
         const val KEY_TICKER_TWO_LINES = "ticker_two_lines"
         const val KEY_TICKER_SECONDS = "ticker_seconds"
         const val KEY_BOOSTED_APPS = "boosted_apps"
+        const val KEY_NO_TRIO_APPS = "no_trio_apps"
         const val KEY_WEATHER_TEMP = "weather_temp_c"
         const val KEY_WEATHER_CODE = "weather_code"
         const val KEY_WEATHER_FETCH = "weather_last_fetch"

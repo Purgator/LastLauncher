@@ -44,6 +44,8 @@
     <string name="menu_app_info">Infos de l’application</string>
     <string name="menu_boost">Booster dans les suggestions</string>
     <string name="menu_unboost">Retirer le boost</string>
+    <string name="menu_no_trio">Ne jamais suggérer</string>
+    <string name="menu_allow_trio">Autoriser dans les suggestions</string>
     <string name="menu_uninstall">Désinstaller</string>
     <string name="menu_hide">Masquer de la liste</string>
     <string name="menu_add_to_drawer">Ajouter à un tiroir…</string>
@@ -109,6 +111,8 @@
     <string name="pref_favorites_summary">Occupent les suggestions tant que le lanceur n’a pas appris vos habitudes — et quand les prédictions sont désactivées</string>
     <string name="pref_boosted">Applications boostées</string>
     <string name="pref_boosted_summary">Applications épinglées pour apparaître plus souvent dans le trio suggéré</string>
+    <string name="pref_no_trio">Applications jamais suggérées</string>
+    <string name="pref_no_trio_summary">Applications exclues du trio suggéré mais toujours trouvables dans la recherche et les listes</string>
     <string name="pref_reset_learning">Tout oublier</string>
     <string name="pref_reset_learning_summary">Supprime l’historique de lancements utilisé pour les prédictions</string>
     <string name="reset_learning_confirm">Supprimer tout l’historique appris ? Les suggestions repartiront de zéro.</string>

@@ -2014,11 +2014,16 @@ class MainActivity : AppCompatActivity() {
     private fun showAppMenu(entry: AppEntry, anchor: View) {
         haptic(anchor)
         val boosted = entry.packageName in prefs.boostedApps
+        val noTrio = entry.packageName in prefs.noTrioApps
         fun icon(res: Int) = androidx.core.content.ContextCompat.getDrawable(this, res)
         val items = listOf(
             AppPickerDialog.Item(
                 getString(if (boosted) R.string.menu_unboost else R.string.menu_boost),
                 icon(R.drawable.ic_boost)
+            ),
+            AppPickerDialog.Item(
+                getString(if (noTrio) R.string.menu_allow_trio else R.string.menu_no_trio),
+                icon(R.drawable.ic_block)
             ),
             AppPickerDialog.Item(getString(R.string.menu_add_to_drawer), icon(R.drawable.ic_apps)),
             AppPickerDialog.Item(getString(R.string.menu_app_info), icon(R.drawable.ic_info)),
@@ -2033,19 +2038,25 @@ class MainActivity : AppCompatActivity() {
                         else prefs.boostedApps + entry.packageName
                     refreshSuggestions()
                 }
-                1 -> pickDrawerFor(entry)
-                2 -> startActivitySafely(
+                1 -> {
+                    prefs.noTrioApps =
+                        if (noTrio) prefs.noTrioApps - entry.packageName
+                        else prefs.noTrioApps + entry.packageName
+                    refreshSuggestions()
+                }
+                2 -> pickDrawerFor(entry)
+                3 -> startActivitySafely(
                     Intent(
                         Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         Uri.parse("package:${entry.packageName}")
                     )
                 )
-                3 -> {
+                4 -> {
                     prefs.hideApp(entry.packageName)
                     refreshSuggestions()
                     onQueryChanged(binding.searchInput.text.toString())
                 }
-                4 -> startActivitySafely(
+                5 -> startActivitySafely(
                     Intent(Intent.ACTION_DELETE, Uri.parse("package:${entry.packageName}"))
                 )
             }
@@ -2355,8 +2366,8 @@ class MainActivity : AppCompatActivity() {
      * trio's front (it's the single most likely next tap).
      */
     private fun visibleSuggestionPool(): List<AppEntry> {
-        val excluded = HashSet<String>()
-        val music = MediaWatch.current?.pkg
+        val excluded = HashSet<String>(prefs.noTrioApps)
+        val music = MediaWatch.current?.pkg?.takeIf { it !in excluded }
         if (music != null && prefs.musicWidget) excluded += music
         if (prefs.newAppSpotEnabled) excluded += prefs.newApps()
         if (prefs.parkEnabled) {
