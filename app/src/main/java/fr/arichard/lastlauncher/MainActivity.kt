@@ -112,6 +112,46 @@ class MainActivity : AppCompatActivity() {
         NotifListener.addListener(notifListener)
     }
 
+    private var releaseNotesDialog: androidx.appcompat.app.AlertDialog? = null
+
+    /** After an update: one dialog listing every unseen version (skipped ones included). */
+    private fun showReleaseNotesIfUpdated() {
+        if (releaseNotesDialog?.isShowing == true) return
+        val notes = fr.arichard.lastlauncher.update.ReleaseNotes.pending(this)
+        if (notes.isEmpty()) {
+            fr.arichard.lastlauncher.update.ReleaseNotes.markSeen(this)
+            return
+        }
+        val view = layoutInflater.inflate(R.layout.dialog_release_notes, null)
+        val text = android.text.SpannableStringBuilder()
+        notes.forEachIndexed { index, (version, items) ->
+            if (index > 0) text.append("\n\n")
+            val start = text.length
+            text.append(getString(R.string.release_notes_version, version))
+            text.setSpan(
+                android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, text.length,
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+            items.forEach { text.append("\n").append(it) }
+        }
+        view.findViewById<TextView>(R.id.release_notes_text).text = text
+        val checkbox = view.findViewById<com.google.android.material.checkbox.MaterialCheckBox>(
+            R.id.release_notes_show_checkbox
+        )
+        checkbox.isChecked = true
+        releaseNotesDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.release_notes_title)
+            .setView(view)
+            .setPositiveButton(android.R.string.ok, null)
+            .setOnDismissListener {
+                if (!isChangingConfigurations) {
+                    prefs.showReleaseNotes = checkbox.isChecked
+                    fr.arichard.lastlauncher.update.ReleaseNotes.markSeen(this)
+                }
+            }
+            .show()
+    }
+
     /** Long-pressing a home-screen element jumps straight to its settings domain. */
     private fun setupContextualLongPress() {
         fun View.opensSettings(screen: String) {
@@ -153,6 +193,8 @@ class MainActivity : AppCompatActivity() {
         maybeRequestCalendarPermission()
         if (askedBefore == (prefs.btPermissionAsked to prefs.calendarPermissionAsked)) {
             maybeRequestWifiNamePermission()
+            // Not on top of a permission request: the notes stay pending until a clean resume.
+            showReleaseNotesIfUpdated()
         }
         checkForUpdate()
         setupStatusLine()

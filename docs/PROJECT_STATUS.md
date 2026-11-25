@@ -398,6 +398,13 @@ in a later message.
   only — the engine still learns from the app, search/lists are untouched, and it
   also keeps the app out of the now-playing front slot. Not device-tested.
 
+- **What's new popup (1.31.0, modelled on Upupup):** `update/ReleaseNotes.kt` +
+  per-release arrays in `release_notes.xml` (EN/FR). Shown once in
+  `MainActivity.onResume` (skipped on a resume that raised a permission request)
+  after an update, listing every unseen version; fresh installs see nothing;
+  baseline 1.29.0 so 1.30.0 is covered on the first run. Toggle + history in
+  Settings → Updates. Not device-tested.
+
 ## Environment quick facts (full detail in `CLAUDE.md`)
 
 - Fresh shell already has `JAVA_HOME` pointed at Temurin 25; only a shell

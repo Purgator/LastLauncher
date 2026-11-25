@@ -73,7 +73,8 @@ grep -c 'severity="Error"' app/build/reports/lint-results-debug.xml
 
 ## Release recipe (after the feature commits)
 
-1. Bump `versionCode` (+1) and `versionName` in `app/build.gradle.kts`; commit as
+1. Add the release's `release_notes_X_Y_Z` arrays (EN + FR, one emoji-prefixed line per
+   change) and register them in `update/ReleaseNotes.kt`. Bump `versionCode` (+1) and `versionName` in `app/build.gradle.kts`; commit as
    `🔖 Bump version to X.Y.Z`.
 2. `./gradlew assembleRelease && git push`
 3. Copy APK: `cp app/build/outputs/apk/release/app-release.apk LastLauncher.apk`
@@ -115,6 +116,7 @@ perfect per-commit compilability impractical — prioritize a readable history.
 | `command/CommandProcessor.kt` | Command-bar smarts: quick actions, settings jump, calculator, URL, assistant routing. Modes in `command/SearchMode.kt`. |
 | `weather/WeatherProvider.kt` | Open-Meteo (key-less), last-known coarse location, 1 h cache. |
 | `update/UpdateManager.kt` + `ApkInstaller.kt` | GitHub-releases self-update (daily, Wi-Fi download, PackageInstaller session). |
+| `update/ReleaseNotes.kt` | Bundled per-version "What's new" (arrays in `values/release_notes.xml` + `values-fr/`), shown once by MainActivity after an update — all unseen versions, none on a fresh install; `lastSeenVersion` pref; pure selection unit-tested. **Every release: add `release_notes_X_Y_Z` EN+FR arrays and register the version in `entries`.** |
 | `settings/SettingsActivity.kt` | Root list + one fragment per domain. **Navigation maps preference keys to constructors — never reinstate reflective `pref.fragment` instantiation (R8).** `SettingsActivity.open(context, SCREEN_X)` deep-links (used by contextual long-press). |
 | `settings/Prefs.kt` | Every setting, typed, with defaults. Add new keys here + constant. |
 | `backup/ConfigBackup.kt` | Pure logic (unit-tested) for the settings export/import file: the `PORTABLE_KEYS` allowlist (excludes device-local/transient state — caches, "have we asked" flags, the Wi-Fi salt, timestamps), `buildPayload`/`resolveImport`. **New user-facing setting → add its key here or it silently isn't backed up.** |

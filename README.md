@@ -46,6 +46,7 @@ The most likely app is the big glowing button; two runners-up flank it. Everythi
 - 🚀 **Starter picks** — on first run, choose your go-to apps (smart guesses pre-checked); they fill the suggestion slots until the launcher has learned your habits, and become a static-favorites mode if you turn predictions off
 - 🕐 **Clock tap** opens the clock app — or any app you choose in settings
 - 🫥 **Hidden apps**, app info / uninstall on long-press, web-search fallback when nothing matches
+- 📰 **What's new after updates** — a short popup lists the changes of every version you installed (skipped ones too); switch it off in *Settings → Updates*.
 - 🔄 **Auto-updates** straight from GitHub releases — checked once a day, downloaded on Wi-Fi, installed after your tap
 - 💾 **Export/import your settings** — *Settings → General → Export settings* saves a file with your gestures, drawers, appearance and everything else; share it straight to Google Drive, email, or wherever from the standard share sheet. *Import settings* reads it back — handy when moving to a new phone. Only settings, never usage history; nothing is uploaded by the app itself, you choose where it goes.
 - 🪶 **Lightweight & battery-friendly** — a single ~1.8 MB APK, no background services, no wakelocks, no trackers, no network calls except the update check

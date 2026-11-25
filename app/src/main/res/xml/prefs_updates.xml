@@ -8,6 +8,14 @@
     <Preference
         android:key="check_now"
         android:title="@string/pref_check_now" />
+    <SwitchPreferenceCompat
+        android:key="show_release_notes"
+        android:title="@string/pref_release_notes"
+        android:summary="@string/pref_release_notes_summary"
+        android:defaultValue="true" />
+    <Preference
+        android:key="whats_new"
+        android:title="@string/release_notes_title" />
     <Preference
         android:key="version"
         android:title="@string/pref_version"

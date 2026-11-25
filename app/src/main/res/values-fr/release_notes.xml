@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="release_notes_1_31_0">
+        <item>📰 Cette fenêtre « Quoi de neuf » après chaque mise à jour (désactivable)</item>
+    </string-array>
+
+    <string-array name="release_notes_1_30_0">
+        <item>🚫 Nouveau « Ne jamais suggérer » dans le menu long appui : l’app reste hors du trio</item>
+    </string-array>
+</resources>

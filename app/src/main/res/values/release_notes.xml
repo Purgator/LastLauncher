@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- One array per release; register it in update/ReleaseNotes.kt. Keep EN and FR in sync. -->
+    <string-array name="release_notes_1_31_0">
+        <item>📰 This “What’s new” popup after each update (you can turn it off)</item>
+    </string-array>
+
+    <string-array name="release_notes_1_30_0">
+        <item>🚫 New “Never suggest” in the long-press menu keeps an app out of the trio</item>
+    </string-array>
+</resources>

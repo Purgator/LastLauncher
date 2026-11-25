@@ -776,6 +776,18 @@ class SettingsActivity : AppCompatActivity(),
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.prefs_updates, rootKey)
             findPreference<Preference>("version")?.summary = BuildConfig.VERSION_NAME
+            findPreference<Preference>("whats_new")?.setOnPreferenceClickListener {
+                val text = fr.arichard.lastlauncher.update.ReleaseNotes.all(requireContext())
+                    .joinToString("\n\n") { (v, items) ->
+                        getString(R.string.release_notes_version, v) + "\n" + items.joinToString("\n")
+                    }
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.release_notes_title)
+                    .setMessage(text)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+                true
+            }
             findPreference<Preference>("check_now")?.setOnPreferenceClickListener { pref ->
                 checkForUpdatesNow(pref)
                 true
